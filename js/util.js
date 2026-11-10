@@ -148,24 +148,28 @@ export function enableMultiTouchTaps(root = document) {
     const d = downs.get(e.pointerId);
     if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > SLOP) downs.delete(e.pointerId); // a drag or scroll, not a tap
   }, true);
+  // Taps we've already acted on: the browser's own click follows a moment later at the same
+  // spot — often on a *new* element, because the tap re-drew the button (ticking a list item,
+  // the recent-widgets bar). Remember where and when, and swallow that late click.
+  const handled = [];
   root.addEventListener('pointerup', (e) => {
     const d = downs.get(e.pointerId);
     downs.delete(e.pointerId);
     if (!d || !d.btn.isConnected) return;
     const r = d.btn.getBoundingClientRect();
     if (e.clientX < r.left - SLOP || e.clientX > r.right + SLOP || e.clientY < r.top - SLOP || e.clientY > r.bottom + SLOP) return;
-    d.btn.dataset.tappedAt = String(Date.now());
+    handled.push({ t: performance.now(), x: e.clientX, y: e.clientY });
     d.btn.click();
   }, true);
-  // Swallow the browser's own (late) click for a tap we've already handled.
   root.addEventListener('click', (e) => {
     if (!e.isTrusted) return;
-    const btn = tappable(e.target);
-    const t = Number(btn?.dataset.tappedAt || 0);
-    if (t && Date.now() - t < 800) {
+    const now = performance.now();
+    while (handled.length && now - handled[0].t > 1000) handled.shift();
+    const k = handled.findIndex((t) => Math.hypot(t.x - e.clientX, t.y - e.clientY) < 40);
+    if (k >= 0) {
+      handled.splice(k, 1);
       e.stopImmediatePropagation();
       e.preventDefault();
-      delete btn.dataset.tappedAt;
     }
   }, true);
 }

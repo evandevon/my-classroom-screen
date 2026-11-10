@@ -132,7 +132,6 @@ const weather = {
             h('div', { class: 'wx-feels' }, `Feels like ${temp(c.apparent_temperature)} · ${temp(today.temperature_2m_min[0])} to ${temp(today.temperature_2m_max[0])}`),
           ),
           h('div', { class: 'wx-side' },
-            h('div', { class: 'wx-place' }, `📍 ${s.name}`),
             h('div', {}, `💧 Rain today ${today.precipitation_probability_max?.[0] ?? '–'}%`),
             h('div', {}, h('span', { class: 'wx-arrow', style: { transform: `rotate(${(c.wind_direction_10m + 180) % 360}deg)` } }, '↑'), ` ${Math.round(c.wind_speed_10m)} km/h from the ${compass(c.wind_direction_10m)}`),
           ),
@@ -148,12 +147,22 @@ const weather = {
           ...today.time.slice(0, 5).map((t, i) => { const w = describe(today.weather_code[i], 1); return h('div', { class: 'wx-d' }, h('small', {}, dayLabel(t, i)), h('span', { class: 'wx-hi', title: w.text }, w.icon), h('b', {}, temp(today.temperature_2m_max[i])), h('small', {}, temp(today.temperature_2m_min[i]))); }),
         ),
         h('div', { class: 'wx-foot' },
+          placeChip(),
           error ? h('span', { class: 'error' }, error) : h('span', {}, loading ? 'Updating…' : `Updated ${age < 1 ? 'just now' : `${age} min ago`}`),
           h('button', { class: 'btn small', title: 'Update now', 'aria-label': 'Update now', onclick: () => load(true) }, '⟳'),
           h('a', { href: 'https://open-meteo.com/', target: '_blank', rel: 'noopener', class: 'wx-credit' }, 'Weather data by Open-Meteo.com'),
         ),
       );
       box.dataset.show = s.show;
+    }
+
+    /** Always say where the weather is for — tap to change it. */
+    function placeChip() {
+      return h('button', {
+        class: `wx-placechip${s.guessed ? ' guessed' : ''}`,
+        title: s.guessed ? 'Guessed from this computer’s time zone — tap to choose your town' : 'Tap to change the place',
+        onclick: () => ctx.openSettings?.(),
+      }, `📍 ${s.name}`, s.guessed ? h('small', {}, ' (guessed)') : null);
     }
 
     /** "Weather today": one big, simple picture of the school day, with what to bring. */
@@ -183,7 +192,7 @@ const weather = {
         return h('div', { class: 'wxt-slot' }, h('small', {}, `${hr % 12 || 12}${hr < 12 ? 'am' : 'pm'}`), h('span', { class: 'wxt-si', title: hw.text }, hw.icon), h('b', {}, temp(d.hourly.temperature_2m[i])));
       }).filter(Boolean);
       setKids(box,
-        h('div', { class: 'wxt-head' }, h('span', {}, day), h('span', {}, `📍 ${s.name}`)),
+        h('div', { class: 'wxt-head' }, h('span', {}, day)),
         h('div', { class: 'wxt-main' },
           h('div', { class: 'wxt-icon', 'aria-hidden': 'true' }, w.icon),
           h('div', { class: 'wxt-words' },
@@ -195,6 +204,7 @@ const weather = {
         slots.length ? h('div', { class: 'wxt-slots' }, ...slots) : null,
         h('div', { class: 'wxt-tips' }, ...tips.map(([i, t]) => h('div', { class: 'wxt-tip' }, h('span', { class: 'wxt-ti' }, i), h('span', {}, t)))),
         h('div', { class: 'wx-foot' },
+          placeChip(),
           error ? h('span', { class: 'error' }, error) : null,
           h('a', { href: 'https://open-meteo.com/', target: '_blank', rel: 'noopener', class: 'wx-credit' }, 'Weather data by Open-Meteo.com'),
         ),
