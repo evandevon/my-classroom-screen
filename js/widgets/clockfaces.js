@@ -262,34 +262,174 @@ const words = {
 
 // ================================================================ SUNDIAL
 export const PLACES = {
-  sydney: ['Sydney', -33.87, 151.21],
-  portmac: ['Port Macquarie', -31.43, 152.91],
-  newcastle: ['Newcastle', -32.93, 151.78],
-  canberra: ['Canberra', -35.28, 149.13],
-  melbourne: ['Melbourne', -37.81, 144.96],
-  brisbane: ['Brisbane', -27.47, 153.03],
-  adelaide: ['Adelaide', -34.93, 138.6],
-  perth: ['Perth', -31.95, 115.86],
-  hobart: ['Hobart', -42.88, 147.33],
-  darwin: ['Darwin', -12.46, 130.84],
-  auckland: ['Auckland', -36.85, 174.76],
-  london: ['London', 51.5, -0.13],
+  sydney: ['Sydney', -33.87, 151.21, 'Australia/Sydney'],
+  portmac: ['Port Macquarie', -31.43, 152.91, 'Australia/Sydney'],
+  newcastle: ['Newcastle', -32.93, 151.78, 'Australia/Sydney'],
+  canberra: ['Canberra', -35.28, 149.13, 'Australia/Sydney'],
+  melbourne: ['Melbourne', -37.81, 144.96, 'Australia/Melbourne'],
+  brisbane: ['Brisbane', -27.47, 153.03, 'Australia/Brisbane'],
+  adelaide: ['Adelaide', -34.93, 138.6, 'Australia/Adelaide'],
+  perth: ['Perth', -31.95, 115.86, 'Australia/Perth'],
+  hobart: ['Hobart', -42.88, 147.33, 'Australia/Hobart'],
+  darwin: ['Darwin', -12.46, 130.84, 'Australia/Darwin'],
+  auckland: ['Auckland', -36.85, 174.76, 'Pacific/Auckland'],
+  singapore: ['Singapore', 1.35, 103.82, 'Asia/Singapore'],
+  tokyo: ['Tokyo', 35.68, 139.69, 'Asia/Tokyo'],
+  johannesburg: ['Johannesburg', -26.2, 28.05, 'Africa/Johannesburg'],
+  london: ['London', 51.5, -0.13, 'Europe/London'],
+  newyork: ['New York', 40.71, -74.01, 'America/New_York'],
+  losangeles: ['Los Angeles', 34.05, -118.24, 'America/Los_Angeles'],
 };
 
+/** Minutes ahead of UTC for a time zone at a moment (includes daylight saving). */
+export function tzOffset(date, timeZone) {
+  if (!timeZone) return -date.getTimezoneOffset();
+  try {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' })
+      .formatToParts(date).map((p) => [p.type, p.value]));
+    const asUTC = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour % 24, +parts.minute, +parts.second);
+    return Math.round((asUTC - Math.floor(date.getTime() / 1000) * 1000) / 60000);
+  } catch {
+    return -date.getTimezoneOffset();
+  }
+}
+
+/** Pick a sensible place from this device's time zone (so the default isn't always Sydney). */
+export function guessPlace() {
+  let tz = '';
+  try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { /* ignore */ }
+  const exact = Object.entries(PLACES).find(([, p]) => p[3] === tz);
+  if (exact) return exact[0];
+  const off = tzOffset(new Date(2026, 0, 1));
+  let best = 'sydney';
+  let bestD = Infinity;
+  for (const [k, p] of Object.entries(PLACES)) {
+    const d = Math.abs(tzOffset(new Date(2026, 0, 1), p[3]) - off);
+    if (d < bestD) { bestD = d; best = k; }
+  }
+  return best;
+}
+
 /** Sun position from a date and place (good to a minute or so — plenty for a sundial). */
-export function sun(d, lat, lon) {
+export function sun(d, lat, lon, timeZone) {
   const start = new Date(d.getFullYear(), 0, 0);
   const n = Math.floor((d - start) / 86400000);
   const B = rad((360 / 364) * (n - 81));
   const eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B); // minutes
   const decl = 23.44 * Math.sin(rad((360 / 365) * (284 + n)));
-  const tz = -d.getTimezoneOffset() / 60; // includes daylight saving
-  const clockMin = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+  const off = tzOffset(d, timeZone); // this place's clock, minutes ahead of UTC (includes daylight saving)
+  const tz = off / 60;
+  const utcMin = d.getUTCHours() * 60 + d.getUTCMinutes() + d.getUTCSeconds() / 60;
+  const clockMin = (((utcMin + off) % 1440) + 1440) % 1440;
   const solarMin = clockMin + 4 * lon - 60 * tz + eot;
   let ha = (solarMin / 60 - 12) * 15; // hour angle, degrees (negative = morning)
   ha = ((((ha + 180) % 360) + 360) % 360) - 180;
   const alt = Math.asin(Math.sin(rad(lat)) * Math.sin(rad(decl)) + Math.cos(rad(lat)) * Math.cos(rad(decl)) * Math.cos(rad(ha)));
-  return { solarMin: ((solarMin % 1440) + 1440) % 1440, ha, decl, alt: (alt * 180) / Math.PI, diff: clockMin - solarMin };
+  // Break the clock-vs-sundial gap into its three causes (minutes).
+  const y = d.getFullYear();
+  const jan = tzOffset(new Date(y, 0, 1), timeZone);
+  const jul = tzOffset(new Date(y, 6, 1), timeZone);
+  const stdTz = Math.min(jan, jul) / 60;
+  const dst = off - Math.min(jan, jul); // daylight saving: clocks ahead of the sun
+  const lonMin = 4 * lon - 60 * stdTz; // + = east of the time-zone line, the sun arrives earlier
+  return {
+    solarMin: ((solarMin % 1440) + 1440) % 1440, ha, decl, alt: (alt * 180) / Math.PI, diff: clockMin - solarMin,
+    eot, dst, lonMin, stdTz, lon, clockMin, usesDst: jan !== jul,
+  };
+}
+
+/** Equation of time (minutes) for each day of the year, for the little chart. */
+export function eotYear(year) {
+  const out = [];
+  for (let n = 1; n <= 365; n++) {
+    const B = rad((360 / 364) * (n - 81));
+    out.push(9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B));
+  }
+  void year;
+  return out;
+}
+
+/** The "How does it work?" panel for the sundial — written for children to read. */
+function sundialExplainer(sp, d, name, lat) {
+  const r = (x) => Math.round(x);
+  const gap = r(sp.diff);
+  const south = lat < 0;
+  // How each reason moves the sundial compared with the clock.
+  const chip = (c) => {
+    const m = r(c);
+    if (!m) return 'no change';
+    return m > 0 ? `sundial ${m} min behind` : `sundial ${-m} min ahead`;
+  };
+
+  // Year chart: how fast or slow a sundial runs on each day, today marked.
+  const data = eotYear(d.getFullYear());
+  const W = 300;
+  const H = 96;
+  const x = (i) => 22 + (i / 364) * (W - 32);
+  const yy = (v) => H / 2 - 4 - v * 2.3;
+  const pts = data.map((v, i) => `${x(i).toFixed(1)},${yy(v).toFixed(1)}`).join(' ');
+  const n = Math.max(0, Math.min(364, Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000) - 1));
+  const months = 'JFMAMJJASOND'.split('').map((m, i) => `<text x="${x(i * 30.4 + 15).toFixed(1)}" y="${H - 2}" class="eq-m">${m}</text>`).join('');
+  const chartBox = h('div', { class: 'ex-chart' });
+  chartBox.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="eq-chart" role="img" aria-label="Chart: how fast or slow a sundial runs through the year">
+    <line x1="22" x2="${W - 10}" y1="${yy(0)}" y2="${yy(0)}" class="eq-zero"/>
+    <text x="${W - 10}" y="${yy(14)}" class="eq-y end">fast</text><text x="${W - 10}" y="${yy(-12)}" class="eq-y end">slow</text>
+    <polyline points="${pts}" class="eq-line"/>${months}
+    <circle cx="${x(n).toFixed(1)}" cy="${yy(data[n]).toFixed(1)}" r="5" class="eq-today"/>
+  </svg>`;
+
+  const row = (icon, title, text, c) =>
+    h('div', { class: 'ex-row' }, h('span', { class: 'ex-ic', 'aria-hidden': 'true' }, icon),
+      h('div', {}, h('b', {}, title), h('div', {}, text)),
+      h('span', { class: 'ex-min' }, chip(c)));
+
+  const lonM = r(sp.lonMin);
+  const eotM = r(sp.eot);
+  const dstH = r(sp.dst / 60);
+
+  return h('div', { class: 'ex' },
+    h('h4', {}, gap === 0 ? 'The sundial and the clock match today!' : `Why is the sundial ${Math.abs(gap)} minutes ${gap > 0 ? 'behind' : 'ahead of'} the clock?`),
+    h('p', {}, 'A sundial shows ', h('b', {}, 'sun time'), '. When the sun is highest in the sky, a sundial says 12 o’clock.'),
+    h('p', {}, 'A clock shows ', h('b', {}, 'clock time'), '. Everyone in a big area called a ', h('b', {}, 'time zone'), ' uses the same clock time, even though the sun is in a slightly different place for each of them.'),
+    h('p', {}, 'Here are the three reasons the times are different:'),
+
+    sp.dst
+      ? row('🕐', 'Daylight saving', `In summer, people move their clocks forward ${dstH === 1 ? '1 hour' : `${dstH} hours`}. The sun doesn’t change, so the clock gets ahead of the sundial.`, sp.dst)
+      : sp.usesDst
+        ? row('🕐', 'Daylight saving', 'Daylight saving is not on at this time of year, so it doesn’t change anything today.', 0)
+        : row('🕐', 'Daylight saving', `${name} doesn’t use daylight saving, so it doesn’t change anything.`, 0),
+
+    row('🌏', 'Where you are in your time zone',
+      Math.abs(lonM) < 1
+        ? `${name} is right in the middle of its time zone, so this doesn’t change much.`
+        : `The sun rises in the east first. ${name} is a little ${lonM > 0 ? 'east' : 'west'} of the middle of its time zone, so the sun is highest here about ${Math.abs(lonM)} minute${Math.abs(lonM) === 1 ? '' : 's'} ${lonM > 0 ? 'earlier' : 'later'} than in the middle.`,
+      -sp.lonMin),
+
+    row('📅', 'Time of year',
+      `The Earth goes around the sun in an oval path, and it is tilted. This makes sun time run a little fast or a little slow during the year. Today the sundial is ${Math.abs(eotM)} minute${Math.abs(eotM) === 1 ? '' : 's'} ${eotM >= 0 ? 'fast' : 'slow'}.`,
+      -sp.eot),
+    chartBox,
+    h('p', { class: 'ex-small' }, 'The orange line shows how fast or slow a sundial runs through the year. The red dot is today.'),
+    h('div', { class: 'ex-total' }, h('span', {}, 'Add them all up:'), h('b', {}, gap === 0 ? 'the times match' : `the sundial is about ${Math.abs(gap)} min ${gap > 0 ? 'behind' : 'ahead of'} the clock`)),
+
+    h('h4', {}, 'How to read a sundial'),
+    h('ul', {},
+      h('li', {}, 'The pointy part in the middle is called the ', h('b', {}, 'gnomon'), ' (say “NO-mon”). Its shadow is like the hand of a clock.'),
+      h('li', {}, 'Look at the number the shadow points to. That is the hour. The little lines show half past.'),
+      h('li', {}, 'The shadow always points ', h('b', {}, 'away'), ' from the sun. Drag the ☀️ along its path to watch the shadow move. Let go and it goes back to the real time.'),
+      h('li', {}, 'When the sun is low in the morning and afternoon, shadows are long. Around midday the sun is high and shadows are short.'),
+    ),
+
+    h('h4', {}, 'Things to notice'),
+    h('ul', {},
+      south
+        ? h('li', {}, 'In the southern half of the world, the shadow goes around ', h('b', {}, 'anticlockwise'), ' — the opposite way to clock hands! Clock hands turn the same way as sundial shadows in the northern half of the world, where clocks were invented.')
+        : h('li', {}, 'In the northern half of the world, the shadow goes around ', h('b', {}, 'clockwise'), ' — the same way as clock hands. Clocks were invented here, so clock hands copy the way sundial shadows move.'),
+      h('li', {}, 'The hour lines are not the same distance apart. They are closer together around midday. That is because the gnomon leans over at a special angle that matches how far your place is from the equator.'),
+      h('li', {}, 'At night there is no sunlight, so there is no shadow. A sundial can’t tell the time at night!'),
+      h('li', {}, 'People used sundials in ancient Egypt more than 3,000 years ago.'),
+    ),
+  );
 }
 
 const sundial = {
@@ -331,9 +471,32 @@ const sundial = {
     const [edgeL, edgeR] = el.querySelectorAll('.sd-edge');
     const info = h('div', { class: 'sd-info' });
     const fact = caption('');
-    host.append(h('div', { class: 'clock-text' }, info, fact));
+    const explain = h('div', { class: 'sd-explain', hidden: true });
+    const whyBtn = h('button', { class: 'btn small sd-why', 'aria-expanded': 'false' }, '❓ How does it work?');
+    let lastSp = null;
+    let lastKey = '';
+    whyBtn.addEventListener('click', () => {
+      explain.hidden = !explain.hidden;
+      whyBtn.setAttribute('aria-expanded', String(!explain.hidden));
+      whyBtn.textContent = explain.hidden ? '❓ How does it work?' : '✕ Close the explainer';
+      host.classList.toggle('explaining', !explain.hidden);
+      lastKey = '';
+      if (!explain.hidden) fillExplain();
+    });
+    function fillExplain() {
+      if (explain.hidden || !lastSp) return;
+      const [name, lat] = place();
+      const key = `${Math.round(lastSp.diff)}|${name}|${Math.round(lastSp.eot)}`;
+      if (key === lastKey) return;
+      lastKey = key;
+      explain.replaceChildren(sundialExplainer(lastSp, lastD, name, lat));
+    }
+    host.append(h('div', { class: 'clock-text' }, info, fact, whyBtn, explain));
 
-    const place = () => (s.place === 'custom' ? ['Your place', s.lat, s.lon] : PLACES[s.place] || PLACES.sydney);
+    const place = () => {
+      if (s.place === 'custom') return ['Your place', s.lat, s.lon, undefined];
+      return PLACES[s.place === 'auto' || !s.place ? guessPlace() : s.place] || PLACES.sydney;
+    };
     const lineAngle = (hourAngle, lat) => (Math.atan(Math.sin(rad(Math.abs(lat))) * Math.tan(rad(hourAngle))) * 180) / Math.PI;
     const fmt = (x) => x.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
@@ -381,10 +544,11 @@ const sundial = {
     let lastD = new Date();
 
     function draw(d) {
-      const [name, lat, lon] = place();
+      const [name, lat, lon, zone] = place();
       if (builtFor !== `${lat},${lon}`) { buildLines(lat); builtFor = `${lat},${lon}`; }
       const side = lat < 0 ? -1 : 1;
-      const sp = sun(d, lat, lon);
+      const sp = sun(d, lat, lon, zone);
+      const placeClock = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: zone });
       const H0 = dayLength(lat, sp.decl);
       const realU = (sp.ha + H0) / (2 * H0 || 1);
       const pretend = dragU !== null;
@@ -424,13 +588,15 @@ const sundial = {
       if (pretend) {
         info.replaceChildren(h('span', {}, h('b', {}, `Sun time ${fmt(solar)}`), ' · moving the sun… let go to return'));
       } else if (up) {
-        info.replaceChildren(h('span', {}, h('b', {}, `Sun time ${fmt(solar)}`), ` · clock says ${fmt(d)}`));
+        info.replaceChildren(h('span', {}, h('b', {}, `Sun time ${fmt(solar)}`), ` · clock says ${placeClock}`));
       } else {
         info.replaceChildren(h('span', {}, h('b', {}, 'The sun has set!'), ' Drag the ☀️ along its path to try it.'));
       }
       const diff = Math.round(sp.diff);
-      fact.textContent = s.facts === false ? '' :
-        `${name}: sundial time is ${Math.abs(diff)} min ${diff > 0 ? 'behind' : 'ahead of'} the clock${diff > 40 ? ' (daylight saving puts clocks an hour ahead of the sun)' : ''}. Sundials were used in ancient Egypt over 3,000 years ago.`;
+      fact.textContent = s.facts === false ? '' : diff === 0
+        ? `${name}: the sundial and the clock match right now.`
+        : `${name}: the sundial is ${Math.abs(diff)} min ${diff > 0 ? 'behind' : 'ahead of'} the clock. Tap “How does it work?” to find out why.`;
+      if (!pretend) { lastSp = sp; fillExplain(); }
       return { realU, side };
     }
 
