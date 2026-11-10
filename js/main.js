@@ -479,6 +479,8 @@ function buildDock() {
 
 // ---------- fullscreen + keys ----------
 $('#fullscreen-btn').addEventListener('click', toggleFullscreen);
+// iPhones can't make a web page full screen; hide the button where it wouldn't work.
+if (!document.fullscreenEnabled && !document.webkitFullscreenEnabled) $('#fullscreen-btn').hidden = true;
 function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen();
   else document.documentElement.requestFullscreen?.().catch(() => {});
