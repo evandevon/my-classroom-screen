@@ -6,6 +6,7 @@ import { WIDGETS, GROUPS, byGroup } from './widgets/index.js';
 import { TEMPLATES, GRADIENTS, SOLIDS } from './templates.js';
 import { makeShareLink, readShareHash, buildProjectFile, importProjectFile, prepareImportedScreen } from './share.js';
 import { h, uid, debounce, toast, pickFile, downloadBlob } from './util.js';
+import { showSoundHelp } from './help.js';
 
 const $ = (sel) => document.querySelector(sel);
 const boardEl = $('#board');
@@ -157,6 +158,10 @@ async function renderDrawer() {
       toggle('Snap widgets to a grid', board.snap, (v) => { board.snap = v; db.setMeta('snap', v); }),
       toggle('Hide widget title bars (tap a widget to show)', document.body.classList.contains('clean'), (v) => { document.body.classList.toggle('clean', v); db.setMeta('clean', v); }),
       toggle('Large buttons', document.body.classList.contains('large'), (v) => { document.body.classList.toggle('large', v); db.setMeta('large', v); }),
+    ),
+    h('h3', {}, 'Help'),
+    h('div', { class: 'menu-grid' },
+      menuBtn('🔔', 'Keep alarms ringing (stop tabs sleeping)', showSoundHelp),
     ),
     h('p', { class: 'hint' }, 'Everything is saved automatically in this browser. Use “Download all” now and then as a backup.'),
   );

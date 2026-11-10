@@ -1,5 +1,7 @@
 import { h, uid } from '../util.js';
-import { playRepeated, soundSelect, soundNotice, SOUND_LENGTH } from '../sound.js';
+import { playRepeated, soundSelect, soundNotice, scheduleSound, audioReady, SOUND_LENGTH } from '../sound.js';
+import { onTick } from '../ticker.js';
+import { showSoundHelp } from '../help.js';
 import { panel, textInput, select, field } from './_common.js';
 
 // Bell alarms with an optional "pack up" warning a few minutes before.
@@ -35,7 +37,7 @@ const dateKey = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 // One shared full-screen banner for all alarm widgets.
 let bannerEl = null;
 let stopSound = null;
-function showBanner({ icon, title, sub, sound, repeats, kind }) {
+function showBanner({ icon, title, sub, sound, repeats, kind, booked }) {
   hideBanner();
   bannerEl = h('div', { class: `alarm-banner ${kind}`, role: 'alertdialog', 'aria-live': 'assertive' },
     h('div', { class: 'ab-icon' }, icon),
@@ -44,7 +46,8 @@ function showBanner({ icon, title, sub, sound, repeats, kind }) {
     h('button', { class: 'btn big primary', onclick: hideBanner }, 'OK'),
   );
   document.body.append(bannerEl);
-  stopSound = playRepeated(sound, repeats);
+  // A sound booked earlier on the audio clock is already playing; OK stops it.
+  stopSound = booked ? () => booked.cancel() : playRepeated(sound, repeats);
   // Close by itself after the sound has finished plus a while.
   const ms = ((SOUND_LENGTH[sound] || 1.2) + 0.5) * repeats * 1000 + 25000;
   bannerEl.dataset.t = String(setTimeout(hideBanner, ms));
@@ -106,6 +109,40 @@ export default {
       return out.sort((x, y) => x.at - y.at);
     }
 
+    // Sounds booked on the audio clock for events in the next few minutes, keyed like s.fired.
+    // They play exactly on time even if the browser slows this tab down in the background.
+    const bookings = new Map();
+    const BOOK_AHEAD = 3 * 60; // seconds
+
+    function bookAhead(now, nowSec, dk) {
+      const wanted = new Set();
+      if (audioReady()) {
+        for (const a of s.alarms) {
+          if (!a.on || !a.days.includes(now.getDay())) continue;
+          const at = toMin(a.time) * 60;
+          const evs = [{ kind: 'alarm', at, sound: a.sound, times: s.repeats }];
+          if (a.warn > 0) evs.push({ kind: 'warn', at: at - a.warn * 60, sound: a.warnSound, times: Math.max(1, Math.min(2, s.repeats)) });
+          for (const ev of evs) {
+            const key = `${a.id}:${ev.kind}:${dk}`;
+            if (s.fired[key] || ev.at <= nowSec || ev.at - nowSec > BOOK_AHEAD) continue;
+            const atMs = new Date(now).setHours(0, 0, 0, 0) + ev.at * 1000;
+            const old = bookings.get(key);
+            wanted.add(key);
+            if (old && old.at === atMs && old.sound === ev.sound && old.times === ev.times && old.live) continue;
+            old?.cancel();
+            bookings.set(key, scheduleSound(ev.sound, atMs, ev.times));
+          }
+        }
+      }
+      // Cancel bookings for alarms that were changed, switched off or deleted.
+      for (const [key, b] of bookings) {
+        if (!wanted.has(key) && !s.fired[key]) {
+          b.cancel();
+          bookings.delete(key);
+        }
+      }
+    }
+
     function check() {
       const now = new Date();
       const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
@@ -125,15 +162,18 @@ export default {
           if (nowSec >= ev.at && nowSec < ev.at + 90 && !s.fired[key]) {
             s.fired[key] = 1;
             changed = true;
-            ring(a, ev.kind);
+            const b = bookings.get(key);
+            bookings.delete(key);
+            ring(a, ev.kind, b?.live ? b : null);
           }
         }
       }
+      bookAhead(now, nowSec, dk);
       if (changed) ctx.save();
       render();
     }
 
-    function ring(a, kind) {
+    function ring(a, kind, booked = null) {
       ctx.el.classList.add('flash');
       setTimeout(() => ctx.el.classList.remove('flash'), 1000);
       if (kind === 'warn') {
@@ -144,9 +184,10 @@ export default {
           sub: `${a.label || 'The bell'} in ${a.warn} minute${a.warn === 1 ? '' : 's'}`,
           sound: a.warnSound,
           repeats: Math.max(1, Math.min(2, s.repeats)),
+          booked,
         });
       } else {
-        showBanner({ kind: 'alarm', icon: '🔔', title: a.label || 'Alarm', sub: fmtClock(toMin(a.time)), sound: a.sound, repeats: s.repeats });
+        showBanner({ kind: 'alarm', icon: '🔔', title: a.label || 'Alarm', sub: fmtClock(toMin(a.time)), sound: a.sound, repeats: s.repeats, booked });
       }
     }
 
@@ -189,12 +230,23 @@ export default {
 
     render();
     check();
-    // Check at the start of every second.
-    let iv;
-    const startTick = setTimeout(() => { check(); iv = setInterval(check, 1000); }, 1000 - (Date.now() % 1000));
+    // Background clock (keeps running when the tab is hidden); check once per new second.
+    let lastSec = Math.floor(Date.now() / 1000);
+    const offTick = onTick((ms) => {
+      const sec = Math.floor(ms / 1000);
+      if (sec !== lastSec) {
+        lastSec = sec;
+        check();
+      }
+    });
 
     return {
-      destroy() { clearTimeout(startTick); clearInterval(iv); notice.cleanup?.(); },
+      destroy() {
+        offTick();
+        for (const b of bookings.values()) b.cancel();
+        bookings.clear();
+        notice.cleanup?.();
+      },
       openSettings() {
         const box = h('div', { class: 'stack' });
         const draw = () => {
@@ -244,7 +296,8 @@ export default {
           box,
           h('button', { class: 'btn', onclick: () => { s.alarms.push(newAlarm({ time: nowPlus(10), label: 'Alarm' })); ctx.save(); draw(); } }, '+ Add another alarm'),
           field('Play the bell sound', select([[1, 'Once'], [2, 'Twice'], [3, '3 times'], [5, '5 times']], s.repeats, (v) => { s.repeats = Number(v); ctx.save(); })),
-          h('p', { class: 'hint' }, 'Alarms ring while this page is open. Keep the screen showing (or the tab open) and tap the page once after loading so the browser allows sound.'),
+          h('p', { class: 'hint' }, 'Alarms ring while this page is open — it can be behind other tabs. Tap the page once after opening it so the browser allows sound.'),
+          h('button', { class: 'btn', onclick: showSoundHelp }, '🔔 How to keep alarms ringing in the background'),
         );
       },
       closeSettings: render,

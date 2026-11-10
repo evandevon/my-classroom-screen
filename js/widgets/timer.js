@@ -1,5 +1,6 @@
 import { h } from '../util.js';
-import { play, soundSelect } from '../sound.js';
+import { play, soundSelect, scheduleSound, audioReady } from '../sound.js';
+import { onTick } from '../ticker.js';
 import { panel, numberInput, textInput, field, fmtTime } from './_common.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -83,6 +84,17 @@ export default {
     const { state: s } = ctx;
     let raf;
     let finished = false;
+    let booking = null; // end sound booked on the audio clock (plays even in a background tab)
+
+    function book() {
+      booking?.cancel();
+      booking = null;
+      if (s.running && s.endAt && s.sound !== 'none') booking = scheduleSound(s.sound, s.endAt);
+    }
+    function unbook() {
+      booking?.cancel();
+      booking = null;
+    }
 
     // Restore a timer that was running when the page was closed.
     if (s.running && s.endAt) {
@@ -133,6 +145,7 @@ export default {
     ctx.view.append(h('div', { class: 'timer' }, face, controls, presets));
 
     function setDuration(sec) {
+      unbook();
       s.duration = Math.max(1, Math.round(sec));
       s.remaining = s.duration;
       s.running = false;
@@ -148,10 +161,12 @@ export default {
       ctx.el.classList.remove('times-up');
       s.running = true;
       s.endAt = Date.now() + s.remaining * 1000;
+      book();
       ctx.save();
       loop();
     }
     function pause() {
+      unbook();
       s.running = false;
       s.remaining = Math.max(0, (s.endAt - Date.now()) / 1000);
       s.endAt = null;
@@ -172,27 +187,33 @@ export default {
       }
       finished = false;
       ctx.el.classList.remove('times-up');
+      if (s.running) book();
       render();
       ctx.save();
+    }
+    /** Called by the screen redraw loop and by the background clock. */
+    function checkDone() {
+      if (!s.running || Date.now() < s.endAt) return false;
+      s.running = false;
+      s.endAt = null;
+      s.remaining = 0;
+      if (!finished) {
+        finished = true;
+        // If the sound was booked on the audio clock it has already played on time.
+        if (!booking?.live) play(s.sound);
+        booking = null;
+        ctx.el.classList.add('times-up');
+      }
+      ctx.save();
+      render();
+      return true;
     }
     function loop() {
       cancelAnimationFrame(raf);
       const tick = () => {
         if (!s.running) return;
+        if (checkDone()) return;
         s.remaining = Math.max(0, (s.endAt - Date.now()) / 1000);
-        if (s.remaining <= 0) {
-          s.running = false;
-          s.endAt = null;
-          s.remaining = 0;
-          if (!finished) {
-            finished = true;
-            play(s.sound);
-            ctx.el.classList.add('times-up');
-          }
-          ctx.save();
-          render();
-          return;
-        }
         render();
         raf = requestAnimationFrame(tick);
       };
@@ -220,10 +241,20 @@ export default {
     }
 
     render();
-    if (s.running) loop();
+    if (s.running) { book(); loop(); }
+
+    // Background clock: finishes the timer on time even when the tab is hidden
+    // (the redraw loop above is paused by the browser in background tabs).
+    const offTick = onTick(() => {
+      if (!s.running) return;
+      if (checkDone()) return;
+      // Sound wasn't allowed when the timer started? Book it as soon as it is.
+      if (!booking?.live && audioReady()) book();
+      if (document.hidden) s.remaining = Math.max(0, (s.endAt - Date.now()) / 1000);
+    });
 
     return {
-      destroy: () => cancelAnimationFrame(raf),
+      destroy: () => { cancelAnimationFrame(raf); offTick(); unbook(); },
       openSettings() {
         const mins = Math.floor(s.duration / 60);
         const secs = Math.round(s.duration % 60);
@@ -251,7 +282,7 @@ export default {
           ),
           field('Look', styleGrid),
           field('Label', textInput(s.label, (v) => { s.label = v; render(); ctx.save(); }, { placeholder: 'e.g. Pack up' })),
-          field('End sound', soundSelect(s.sound, (v) => { s.sound = v; ctx.save(); })),
+          field('End sound', soundSelect(s.sound, (v) => { s.sound = v; if (s.running) book(); ctx.save(); })),
           field('Quick buttons (minutes, comma separated)', textInput(s.presets.map((p) => +(p / 60).toFixed(2)).join(', '), (v) => {
             const list = v.split(/[,\s]+/).map(Number).filter((n) => n > 0).slice(0, 6);
             if (list.length) { s.presets = list.map((n) => Math.round(n * 60)); renderPresets(); ctx.save(); }
