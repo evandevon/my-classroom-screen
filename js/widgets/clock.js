@@ -1,6 +1,6 @@
 import { h } from '../util.js';
 import { panel, select, checkbox, field, textInput, swatches } from './_common.js';
-import { FACES, FACE_BY_ID, PLACES } from './clockfaces.js';
+import { FACES, FACE_BY_ID, PLACES, guessPlace } from './clockfaces.js';
 
 export default {
   type: 'clock',
@@ -28,7 +28,7 @@ export default {
     // word clock
     wordColor: '#ffd166',
     // sundial
-    place: 'sydney',
+    place: 'auto', // auto = guess from this device's time zone
     lat: -33.87,
     lon: 151.21,
     // candle / water / incense
@@ -110,7 +110,7 @@ export default {
           case 'sundial': {
             const status = h('span', { class: 'hint' });
             opts.push(
-              field('Place', select([...Object.entries(PLACES).map(([k, v]) => [k, v[0]]), ['custom', 'Custom / my location']], s.place, upd((v) => (s.place = v)))),
+              field('Place', select([['auto', `Automatic (${PLACES[guessPlace()][0]})`], ...Object.entries(PLACES).map(([k, v]) => [k, v[0]]), ['custom', 'Custom / my location (uses this computer’s time zone)']], s.place, upd((v) => (s.place = v)))),
               s.place === 'custom'
                 ? h('div', { class: 'row' },
                     field('Latitude', textInput(String(s.lat), (v) => { const n = parseFloat(v); if (!Number.isNaN(n)) { s.lat = n; build(); ctx.save(); } })),

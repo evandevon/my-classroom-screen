@@ -878,3 +878,30 @@ input.bg-swatch { min-height: 56px; }
 .cal-addterms { margin-left: auto; }
 .cal-termask { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #fff8e1; border: 2px solid #e9c46a; border-radius: 12px; padding: 6px 6px 6px 12px; font-weight: 700; }
 .cal-termask span { flex: 1; min-width: 12em; }
+
+/* sundial explainer */
+.sd-why { margin-top: 2px; }
+.sd-explain { width: 100%; max-height: 46cqh; overflow: auto; text-align: left; background: #fffaf0; border: 2px solid #f4d9a8; border-radius: 14px; padding: 10px 14px; touch-action: pan-y; font-size: max(13px, 2.6cqmin); line-height: 1.4; }
+@container (min-aspect-ratio: 3/2) { .clock-host.explaining .sd-explain { max-height: 62cqh; } }
+.clock-host.face-sundial.explaining { justify-content: flex-start; }
+.ex h4 { margin: 10px 0 6px; font-size: 1.12em; }
+.ex h4:first-child { margin-top: 0; }
+.ex p { margin: 4px 0 8px; }
+.ex ul { margin: 0 0 6px; padding-left: 1.2em; }
+.ex li { margin: 3px 0; }
+.ex-row { display: flex; gap: 10px; align-items: flex-start; background: #fff; border-radius: 10px; padding: 6px 10px; margin: 5px 0; }
+.ex-ic { font-size: 1.5em; line-height: 1.1; }
+.ex-row > div { flex: 1; }
+.ex-min { font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--accent); align-self: center; }
+.ex-total { display: flex; justify-content: space-between; gap: 10px; background: #3a5ccc; color: #fff; border-radius: 10px; padding: 8px 12px; margin: 6px 0; }
+.ex-chart { background: #fff; border-radius: 10px; padding: 4px; }
+.eq-chart { width: 100%; height: auto; display: block; }
+.eq-zero { stroke: #c9ced8; stroke-width: 1; stroke-dasharray: 3 3; }
+.eq-line { fill: none; stroke: #f4a261; stroke-width: 2.4; }
+.eq-today { fill: var(--red); stroke: #fff; stroke-width: 2; }
+.eq-m { font-size: 9px; font-weight: 800; fill: var(--muted); text-anchor: middle; }
+.eq-y { font-size: 8px; font-weight: 700; fill: var(--muted); text-anchor: end; }
+.eq-y.end { text-anchor: end; font-style: italic; }
+.ex-small { font-size: .9em; color: var(--muted); margin: 2px 0 6px; }
+.ex-min { font-size: .92em; text-align: right; max-width: 7.5em; white-space: normal !important; }
+.clock-host.face-sundial.explaining > svg { min-height: 34cqh; flex: 0 0 34cqh; }
