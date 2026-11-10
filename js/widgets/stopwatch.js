@@ -1,6 +1,7 @@
 import { h, setKids } from '../util.js';
 import { fmtTime, panel, checkbox, field, textInput } from './_common.js';
 import { logEvent, recBadge, RECORD_HINT } from '../datalog.js';
+import { namesFor } from '../classes.js';
 
 export default {
   type: 'stopwatch',
@@ -9,6 +10,7 @@ export default {
   group: 'core',
   size: [340, 260],
   hasSettings: true,
+  privateKeys: ['who'],
   defaultState: () => ({ running: false, startedAt: null, elapsed: 0, laps: [], record: false, label: 'Off-task', who: '', labels: 'Off-task, Transition, On-task, Packing up' }),
 
   mount(ctx) {
@@ -28,13 +30,17 @@ export default {
       recBar.hidden = !s.record;
       badge.hidden = !s.record;
       if (!s.record) return;
-      const who = h('input', { type: 'text', value: s.who, placeholder: 'Student (optional)', 'aria-label': 'Student', class: 'sw-who' });
+      // Suggest names from the current class as you type.
+      const listId = `swl-${ctx.rec.id}`;
+      const dl = h('datalist', { id: listId }, ...(namesFor('current') || []).map((n) => h('option', { value: n })));
+      const who = h('input', { type: 'text', value: s.who, placeholder: 'Student (optional)', 'aria-label': 'Student', class: 'sw-who', list: listId });
       who.addEventListener('input', () => { s.who = who.value.trim(); ctx.save(); });
       setKids(recBar,
         h('span', { class: 'hint' }, 'Timing:'),
         ...s.labels.split(',').map((x) => x.trim()).filter(Boolean).map((l) =>
           h('button', { class: `chip${s.label === l ? ' on' : ''}`, onclick: () => { s.label = l; ctx.save(); drawRec(); } }, l)),
         who,
+        dl,
       );
     }
     const playBtn = h('button', { class: 'btn big primary' });

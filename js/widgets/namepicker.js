@@ -1,6 +1,7 @@
 import { h, parseLines, shuffle } from '../util.js';
 import { play, soundSelect } from '../sound.js';
 import { panel, select, checkbox, textarea, field } from './_common.js';
+import { namesFor, sourceSelect, sourceName, onClassChange } from '../classes.js';
 import { logEvent, recBadge, RECORD_HINT } from '../datalog.js';
 
 const COLORS = ['#e63946', '#f4a261', '#e9c46a', '#2a9d8f', '#457b9d', '#7b2cbf', '#ff6fb5', '#8ac926', '#1982c4', '#fb8500'];
@@ -13,7 +14,7 @@ export default {
   size: [440, 460],
   hasSettings: true,
   privateKeys: ['names', 'picked', 'last'],
-  defaultState: () => ({ record: false, names: '', mode: 'wheel', removePicked: true, picked: [], last: '', sound: 'fanfare' }),
+  defaultState: () => ({ record: false, source: 'current', names: '', mode: 'wheel', removePicked: true, picked: [], last: '', sound: 'fanfare' }),
 
   mount(ctx) {
     const s = ctx.state;
@@ -24,7 +25,7 @@ export default {
     const stage = h('button', { class: 'pick-stage', title: 'Tap to pick', onclick: pick }, canvas, card, h('div', { class: 'wheel-pointer' }, '▼'));
     const info = h('div', { class: 'pick-info' });
     const empty = h('div', { class: 'empty' },
-      h('p', {}, 'Add your class list to start picking'),
+      h('p', {}, 'Choose a class (👥 at the top) or add names'),
       h('button', { class: 'btn primary', onclick: () => ctx.openSettings() }, 'Add names'),
     );
     const foot = h('div', { class: 'pick-foot' });
@@ -42,7 +43,8 @@ export default {
     let spinning = false;
     let raf;
 
-    const all = () => parseLines(s.names);
+    // Names come from the chosen class list, or the widget's own typed list.
+    const all = () => namesFor(s.source) || parseLines(s.names);
     const pool = () => {
       const a = all();
       if (!s.removePicked) return a;
@@ -168,7 +170,8 @@ export default {
 
     function updateInfo() {
       const total = all().length;
-      info.textContent = s.removePicked ? `${pool().length} of ${total} left` : `${total} names`;
+      const from = s.source !== 'own' && namesFor(s.source) ? `${sourceName(s.source)} · ` : '';
+      info.textContent = from + (s.removePicked ? `${pool().length} of ${total} left` : `${total} names`);
     }
 
     function render() {
@@ -190,17 +193,20 @@ export default {
       }
     }
     render();
+    const offClass = onClassChange(() => { if (!spinning) { s.picked = s.picked.filter((n) => all().includes(n)); render(); } });
 
     return {
-      destroy: () => { cancelAnimationFrame(raf); clearTimeout(raf); },
+      destroy: () => { cancelAnimationFrame(raf); clearTimeout(raf); offClass(); },
       resize: () => { if (!spinning) render(); },
       openSettings() {
+        const own = s.source === 'own' || !namesFor(s.source);
         panel(ctx, 'Name picker',
-          field('Names (one per line)', textarea(s.names, (v) => { s.names = v; s.picked = s.picked.filter((n) => parseLines(v).includes(n)); ctx.save(); }, { rows: 8, placeholder: 'Ava\nBen\nCharlie' })),
-          h('div', { class: 'row' },
+          field('Names from', sourceSelect(s.source, (v) => { s.source = v; s.picked = []; s.last = ''; ctx.save(); ctx.openSettings(); })),
+          own ? field(s.source === 'own' ? 'Names (one per line)' : 'That class has no names yet — type some here, or add them in ☰ → Classes', textarea(s.names, (v) => { s.names = v; s.picked = s.picked.filter((n) => parseLines(v).includes(n)); ctx.save(); }, { rows: 8, placeholder: 'Ava\nBen\nCharlie' })) : h('p', { class: 'hint' }, `Using ${all().length} names from ${sourceName(s.source)}. Edit them in ☰ → Classes & student lists.`),
+          own ? h('div', { class: 'row' },
             h('button', { class: 'btn', onclick: () => { s.names = shuffle(parseLines(s.names)).join('\n'); ctx.save(); ctx.closeSettings(); } }, 'Shuffle order'),
             h('button', { class: 'btn', onclick: () => { s.names = parseLines(s.names).sort((a, b) => a.localeCompare(b)).join('\n'); ctx.save(); ctx.closeSettings(); } }, 'Sort A–Z'),
-          ),
+          ) : null,
           field('Style', select([['wheel', 'Spinning wheel'], ['card', 'Flash card']], s.mode, (v) => { s.mode = v; ctx.save(); })),
           checkbox('Don’t pick the same person twice (until everyone has had a turn)', s.removePicked, (v) => { s.removePicked = v; ctx.save(); }),
           field('Sound', soundSelect(s.sound, (v) => { s.sound = v; ctx.save(); })),

@@ -3,6 +3,7 @@
 import { db } from './storage.js';
 import { blobToDataURL, dataURLToBlob, uid } from './util.js';
 import { WIDGETS } from './widgets/index.js';
+import { classLists } from './classes.js';
 
 const FORMAT = 'my-classroom-screen';
 const VERSION = 1;
@@ -61,6 +62,11 @@ export function linkSafeScreen(screen, { includeNames = false, dropHeavy = false
       }
     }
     if (!includeNames) {
+      // Widgets that can hold student names in other fields (e.g. scoreboard rows) scrub them.
+      if (def.scrubNames) {
+        const known = new Set(classLists().flatMap((c) => c.students.map((n) => n.toLowerCase())));
+        if (def.scrubNames(w.state, known)) dropped.add('student names');
+      }
       for (const k of def.privateKeys || []) {
         const v = w.state[k];
         if (v && (Array.isArray(v) ? v.length : String(v).length)) {
