@@ -52,6 +52,8 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 
 ## Smartboard tips
 
+- **Multi-touch:** several children can use different widgets at the same time (e.g. a calculator each, or dragging two widgets at once). Every finger is tracked separately.
+
 - Press **F** or tap ⛶ for full screen.
 - ☰ → *Hide widget title bars* gives a clean display. Tap a widget to show its controls again.
 - ☰ → *Large buttons* makes the controls bigger.

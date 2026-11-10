@@ -127,3 +127,45 @@ export function downloadBlob(blob, filename) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
+
+/**
+ * Multi-touch taps: browsers drop "click" when another finger is touching the screen, so two
+ * children using two widgets at once would lose presses. Here every finger is followed on its
+ * own and a tap on a button fires straight away when that finger lifts.
+ */
+export function enableMultiTouchTaps(root = document) {
+  const downs = new Map(); // pointerId -> { btn, x, y }
+  const SLOP = 12;
+  const tappable = (el) => el?.closest?.('button:not([disabled]), [role="button"]');
+  root.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch') return;
+    const btn = tappable(e.target);
+    if (btn && !btn.closest('[data-native-tap]')) downs.set(e.pointerId, { btn, x: e.clientX, y: e.clientY });
+  }, true);
+  const forget = (e) => downs.delete(e.pointerId);
+  root.addEventListener('pointercancel', forget, true);
+  root.addEventListener('pointermove', (e) => {
+    const d = downs.get(e.pointerId);
+    if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > SLOP) downs.delete(e.pointerId); // a drag or scroll, not a tap
+  }, true);
+  root.addEventListener('pointerup', (e) => {
+    const d = downs.get(e.pointerId);
+    downs.delete(e.pointerId);
+    if (!d || !d.btn.isConnected) return;
+    const r = d.btn.getBoundingClientRect();
+    if (e.clientX < r.left - SLOP || e.clientX > r.right + SLOP || e.clientY < r.top - SLOP || e.clientY > r.bottom + SLOP) return;
+    d.btn.dataset.tappedAt = String(Date.now());
+    d.btn.click();
+  }, true);
+  // Swallow the browser's own (late) click for a tap we've already handled.
+  root.addEventListener('click', (e) => {
+    if (!e.isTrusted) return;
+    const btn = tappable(e.target);
+    const t = Number(btn?.dataset.tappedAt || 0);
+    if (t && Date.now() - t < 800) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      delete btn.dataset.tappedAt;
+    }
+  }, true);
+}
