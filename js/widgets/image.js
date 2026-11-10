@@ -1,4 +1,4 @@
-import { h, uid, pickFile } from '../util.js';
+import { h, uid, pickFile, downloadBlob } from '../util.js';
 import { db, assetURL } from '../storage.js';
 import { panel, select, textInput, field } from './_common.js';
 
@@ -23,7 +23,12 @@ export default {
       ),
       h('p', { class: 'hint' }, 'or drag an image file here'),
     );
-    const wrap = h('div', { class: 'image-wrap' }, empty, img, cap);
+    // Download button for pictures kept on this computer (e.g. webcam photos).
+    const dl = h('button', { class: 'btn small image-dl', title: 'Download this picture', 'aria-label': 'Download this picture', onclick: async () => {
+      const a = s.imageAssetId && (await db.getAsset(s.imageAssetId));
+      if (a) downloadBlob(a.blob, a.name || 'picture.jpg');
+    } }, '⬇');
+    const wrap = h('div', { class: 'image-wrap' }, empty, img, cap, dl);
     ctx.view.append(wrap);
 
     async function setFile(file) {
@@ -53,6 +58,7 @@ export default {
       img.alt = s.caption || 'Image';
       cap.textContent = s.caption;
       cap.hidden = !s.caption;
+      dl.hidden = !s.imageAssetId;
     }
     render();
 

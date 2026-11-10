@@ -1167,3 +1167,5 @@ input.bg-swatch { min-height: 56px; }
 .paused-icon { font-size: 56px; line-height: 1; }
 .paused-held { margin: 0; padding: 8px 14px; list-style: none; background: #f2f4f8; border-radius: 12px; font-weight: 700; display: grid; gap: 2px; }
 body.screen-paused .dock-cats, body.screen-paused .dock-recent { opacity: .4; }
+.image-dl { position: absolute; right: 8px; top: 8px; background: #fffe; box-shadow: 0 2px 8px #0003; }
+.image-dl[hidden] { display: none; }
