@@ -12,12 +12,14 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 |---|---|---|
 | ⏳ Timer (ring, white→red circle, white→red rectangle, hourglass, bar or numbers) | 🔊 Noise meter (bouncy balls, level bar or emoji face) | ✏️ Whiteboard (pens, eraser, undo, grid/lined/chalkboard) |
 | ⏱️ Stopwatch with laps | 🚦 Traffic light with your own labels | 🧮 Calculator (works safely without `eval`) |
-| 🕒 Clock (analogue and/or digital) |
+| 🕒 Clock — 8 styles: analogue/digital, teaching clock (past/to, time in words, set-a-time & quiz), Roman numerals, word clock, sundial with draggable sun, candle, water and incense clocks |
+| 🗓️ School day timeline (coloured sessions with icons, now/next countdown, per-weekday plans, type-in quick entry) |
+| 📅 Calendar (tap a day to add events, repeats, “coming up” countdowns, NSW term & week numbers) |
 | ⏰ Alarms (school bells with a pack-up warning beforehand, choice of days and sounds) | | | 🤫 Work symbols (voice levels + how to work) | 🎲 Dice (1–6 dice, any number of sides from 2) |
 | 📝 Text (bold, lists, sizes, colours) | 🎡 Name picker (spinning wheel or flash card, no repeats) | 🏆 Scoreboard (2–8 teams) |
 | ✅ List / checklist | 👥 Group maker (by number of groups or group size) | 🔳 QR code (works offline) |
 | 🖼️ Image (upload or link) | | ➡️ Now / Next visual schedule |
-| 🎬 Video / Web (YouTube, Google Drive, Slides, Docs, Vimeo, Canva, Spotify, websites) | | |
+| 🎬 Video / Web (YouTube, Google Drive files & folders, Slides, Docs, Vimeo, Canva, Spotify, websites; pop-up window for sites that block embedding) | | |
 | 🎵 Audio (upload, MP3 link, Drive, YouTube, Spotify) | | |
 
 ## Saving and sharing
