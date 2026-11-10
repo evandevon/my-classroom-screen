@@ -1334,3 +1334,6 @@ body.clean .widget:not(.active):not(.settings-open) .w-head > * { pointer-events
   .wb-player .wb-scrub { order: -1; flex-basis: 100%; }
   .wb-player .wb-ptime { margin-right: auto; }
 }
+.screen-tile b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.screen-icons { font-size: 15px; letter-spacing: 1px; opacity: .85; }
+#screen-name::after, #class-pill::after { content: '▾'; font-size: .7em; opacity: .5; margin-left: 6px; }

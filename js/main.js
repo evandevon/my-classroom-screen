@@ -161,10 +161,39 @@ async function openDrawer() {
   drawer.setAttribute('aria-hidden', 'false');
 }
 $('#menu-btn').addEventListener('click', () => (drawer.classList.contains('open') ? closeDrawer() : openDrawer()));
-nameBtn.addEventListener('click', async () => {
-  const n = await ask('Rename this screen', screen.name);
-  if (n) { screen.name = n; nameBtn.textContent = n; document.title = `${n} · My Classroom Screen`; persist(); }
-});
+// Tap the screen name: quickly switch to another screen (like the class picker).
+nameBtn.setAttribute('aria-haspopup', 'dialog');
+nameBtn.title = 'Switch screen';
+nameBtn.addEventListener('click', () => showScreenPicker());
+
+async function showScreenPicker() {
+  persist.flush();
+  const screens = (await db.listScreens()).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+  const dlg = modal('Which screen?',
+    h('div', { class: 'class-grid screen-grid' },
+      ...screens.map((s) => {
+        const icons = [...new Set(s.widgets.map((w) => WIDGETS[w.type]?.icon).filter(Boolean))].slice(0, 6).join(' ');
+        return h('button', {
+          class: `class-tile screen-tile${s.id === screen.id ? ' on' : ''}`,
+          'aria-current': s.id === screen.id ? 'true' : null,
+          onclick: async () => {
+            dlg.close();
+            if (s.id !== screen.id) await openScreen((await db.getScreen(s.id)) || s);
+          },
+        },
+          h('b', {}, s.name),
+          h('small', {}, `${s.widgets.length} widget${s.widgets.length === 1 ? '' : 's'}${s.paused ? ' · ⏸ paused' : ''}`),
+          icons ? h('span', { class: 'screen-icons', 'aria-hidden': 'true' }, icons) : null,
+        );
+      }),
+    ),
+    h('div', { class: 'row' },
+      h('button', { class: 'btn', onclick: () => { dlg.close(); renameScreen(screen); } }, '✎ Rename this screen'),
+      h('button', { class: 'btn', onclick: () => { dlg.close(); newScreenDialog(); } }, '+ New screen'),
+      h('button', { class: 'btn', onclick: () => { dlg.close(); openDrawer(); } }, '☰ More…'),
+    ),
+  );
+}
 
 async function renderDrawer() {
   const screens = await sortedScreens();
@@ -231,7 +260,7 @@ async function renameScreen(s) {
   if (!n) return;
   const full = (await db.getScreen(s.id)) || s;
   full.name = n;
-  if (full.id === screen.id) { screen.name = n; nameBtn.textContent = n; persist.flush(); }
+  if (full.id === screen.id) { screen.name = n; nameBtn.textContent = n; document.title = `${n} · My Classroom Screen`; persist.flush(); }
   else await db.putScreen(full);
   renderDrawer();
 }
