@@ -111,12 +111,17 @@ export default {
       render();
     }
     // swipe left/right to change month
-    let sx = null;
-    grid.addEventListener('pointerdown', (e) => (sx = e.clientX));
+    // (one finger at a time, and only a clearly sideways swipe — not a scroll that drifts)
+    let swipe = null;
+    grid.addEventListener('pointerdown', (e) => { if (!swipe) swipe = { id: e.pointerId, x: e.clientX, y: e.clientY }; });
     grid.addEventListener('pointerup', (e) => {
-      if (sx !== null && Math.abs(e.clientX - sx) > 60) shift(e.clientX < sx ? 1 : -1);
-      sx = null;
+      if (!swipe || swipe.id !== e.pointerId) return;
+      const dx = e.clientX - swipe.x;
+      const dy = e.clientY - swipe.y;
+      swipe = null;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) shift(dx < 0 ? 1 : -1);
     });
+    grid.addEventListener('pointercancel', (e) => { if (swipe?.id === e.pointerId) swipe = null; });
 
     const eventsOn = (d) => s.events.filter((ev) => occurs(ev, d)).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 

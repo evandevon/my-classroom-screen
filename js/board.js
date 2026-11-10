@@ -340,6 +340,13 @@ export class Board {
     m.ro.observe(view);
 
     el.addEventListener('pointerdown', () => {
+      // "Hide title bars" mode: the tap that reveals the hidden buttons mustn't also press one.
+      if (document.body.classList.contains('clean') && !el.classList.contains('active')) {
+        el.classList.add('arming');
+        const done = () => setTimeout(() => el.classList.remove('arming'), 350);
+        window.addEventListener('pointerup', done, { once: true, capture: true });
+        window.addEventListener('pointercancel', done, { once: true, capture: true });
+      }
       this.bringToFront(rec);
       this.setActive(rec.id);
     }, true);

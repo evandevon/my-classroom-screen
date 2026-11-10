@@ -158,14 +158,16 @@ export function enableMultiTouchTaps(root = document) {
     if (!d || !d.btn.isConnected) return;
     const r = d.btn.getBoundingClientRect();
     if (e.clientX < r.left - SLOP || e.clientX > r.right + SLOP || e.clientY < r.top - SLOP || e.clientY > r.bottom + SLOP) return;
-    handled.push({ t: performance.now(), x: e.clientX, y: e.clientY });
+    handled.push({ t: performance.now(), x: e.clientX, y: e.clientY, id: e.pointerId });
     d.btn.click();
   }, true);
   root.addEventListener('click', (e) => {
     if (!e.isTrusted) return;
     const now = performance.now();
     while (handled.length && now - handled[0].t > 1000) handled.shift();
-    const k = handled.findIndex((t) => Math.hypot(t.x - e.clientX, t.y - e.clientY) < 40);
+    // Most browsers say which finger a click came from; otherwise go by position.
+    const id = typeof e.pointerId === 'number' && e.pointerId > 0 ? e.pointerId : null;
+    const k = handled.findIndex((t) => (id != null ? t.id === id : true) && Math.hypot(t.x - e.clientX, t.y - e.clientY) < 40);
     if (k >= 0) {
       handled.splice(k, 1);
       e.stopImmediatePropagation();
