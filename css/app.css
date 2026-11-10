@@ -1126,3 +1126,30 @@ input.bg-swatch { min-height: 56px; }
 .rp-bar { display: flex; align-items: center; gap: 8px; padding: 6px 34px 6px 8px; background: #000c; }
 .rp-count { flex: 1; font-size: 12px; font-weight: 700; opacity: .8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rp-progress { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #fff; color: #1d1d1f; border-radius: 12px; padding: 12px 18px; font-weight: 800; box-shadow: 0 6px 24px #0004; }
+
+/* ---------- webcam recording ---------- */
+.cam-rec { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; font-variant-numeric: tabular-nums; }
+.cam-rec-dot { width: 18px; height: 18px; border-radius: 50%; background: #e63946; box-shadow: 0 0 0 2px #fff inset; }
+.cam-rec.on .cam-rec-dot { border-radius: 4px; box-shadow: none; animation: recpulse 1s infinite; }
+.cam-rec.on { background: #e63946 !important; border-color: #e63946 !important; }
+.cam-rec.on .cam-rec-dot { background: #fff; }
+.cam-rec-t:empty { display: none; }
+.cam-recbadge { position: absolute; top: 8px; right: 8px; background: #e63946; color: #fff; font-weight: 900; font-size: 13px; padding: 3px 10px; border-radius: 99px; font-variant-numeric: tabular-nums; pointer-events: none; }
+@keyframes recpulse { 50% { opacity: .5; } }
+
+/* ---------- video loop ---------- */
+.vl { position: absolute; inset: 0; display: flex; flex-direction: column; background: #111; }
+.vl > .empty { position: absolute; inset: 0; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 14px; }
+.vl-stage { position: relative; flex: 1; min-height: 0; cursor: pointer; }
+.vl-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.vl-label { position: absolute; left: 8px; top: 8px; max-width: calc(100% - 16px); background: #ffd166; color: #1d1d1f; font-weight: 900; font-size: max(16px, 6cqmin); padding: 2px 12px; border-radius: 12px; box-shadow: 0 2px 8px #0005; }
+.vl.paused .vl-stage::after { content: '⏸'; position: absolute; inset: 0; display: grid; place-items: center; font-size: max(40px, 18cqmin); color: #fffc; text-shadow: 0 2px 10px #000; pointer-events: none; }
+.vl-progress { height: 4px; background: #333; }
+.vl-progress i { display: block; height: 100%; width: 0; background: #ffd166; }
+.vl-bar { display: flex; align-items: center; gap: 6px; padding: 5px 34px 5px 8px; background: #1d1f24; }
+.vl-bar .btn { background: #2c3038; border-color: #3a3f49; color: #fff; min-width: 40px; }
+.vl-spacer { flex: 1; }
+@container (max-height: 200px) { .vl-bar { display: none; } }
+.cam-rec.on .cam-rec-dot { animation: none; }
+@container (max-width: 700px) { .cam-res { display: none; } .cam-zoomwrap { min-width: 60px; } }
+@container (max-width: 560px) { .cam-zoomwrap { display: none; } }

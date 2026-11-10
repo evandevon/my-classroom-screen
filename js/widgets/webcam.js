@@ -4,7 +4,17 @@ import { play } from '../sound.js';
 import { panel, checkbox, field, select } from './_common.js';
 
 // Webcam / document camera: live view, freeze, mirror, rotate, zoom, and full-resolution photos
-// saved to this device. The picture never leaves the computer.
+// saved to this device, and short video recordings that loop in their own widget.
+// The picture never leaves the computer.
+
+const MAX_REC_S = 180;
+const REC_SIDE = 1280;
+/** Best format this browser can record: MP4 where possible (plays everywhere), else WebM. */
+export function recFormat() {
+  const options = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  const mime = typeof MediaRecorder !== 'undefined' ? options.find((m) => MediaRecorder.isTypeSupported(m)) : null;
+  return mime ? { mime, ext: mime.startsWith('video/mp4') ? 'mp4' : 'webm' } : null;
+}
 
 const stamp = () => {
   const d = new Date();
@@ -17,9 +27,9 @@ export default {
   title: 'Webcam',
   icon: '📷',
   group: 'core',
-  size: [560, 420],
+  size: [640, 460],
   hasSettings: true,
-  defaultState: () => ({ deviceId: '', mirror: false, flipV: false, rotate: 0, zoom: 1, fill: false }),
+  defaultState: () => ({ deviceId: '', mirror: false, flipV: false, rotate: 0, zoom: 1, fill: false, sound: false, afterRec: 'board', step: 0 }),
 
   mount(ctx) {
     const s = ctx.state;
@@ -35,8 +45,11 @@ export default {
     const flipBtn = h('button', { class: 'btn small', title: 'Flip upside down', 'aria-label': 'Flip upside down', onclick: () => { s.flipV = !s.flipV; apply(); ctx.save(); } }, '⇅');
     const rotL = h('button', { class: 'btn small', title: 'Rotate left 90°', 'aria-label': 'Rotate left', onclick: () => { s.rotate = (s.rotate + 270) % 360; apply(); ctx.save(); } }, '⟲');
     const rotR = h('button', { class: 'btn small', title: 'Rotate right 90°', 'aria-label': 'Rotate right', onclick: () => { s.rotate = (s.rotate + 90) % 360; apply(); ctx.save(); } }, '⟳');
+    const recBtn = h('button', { class: 'btn big cam-rec', title: 'Record a video clip', 'aria-label': 'Record a video clip', onclick: () => (recorder ? stopRec() : startRec()) }, h('span', { class: 'cam-rec-dot' }), h('span', { class: 'cam-rec-t' }, ''));
+    const recBadge = h('div', { class: 'cam-recbadge', hidden: true });
     const controls = h('div', { class: 'cam-controls' },
       h('button', { class: 'btn primary big cam-shot', title: 'Take a photo (full resolution) and save it', onclick: photo }, '📸'),
+      recBtn,
       freezeBtn,
       mirrorBtn,
       flipBtn,
@@ -46,10 +59,10 @@ export default {
       status,
     );
     const startBtn = h('button', { class: 'btn primary big' }, '📷 Turn on camera');
-    const msg = h('p', { class: 'hint' }, 'The picture stays on this computer — nothing is recorded or sent anywhere.');
+    const msg = h('p', { class: 'hint' }, 'The picture stays on this computer — nothing is sent anywhere.');
     const overlay = h('div', { class: 'empty cam-start' }, startBtn, msg);
     startBtn.addEventListener('click', start);
-    ctx.view.append(h('div', { class: 'cam' }, frame, flash, controls, overlay));
+    ctx.view.append(h('div', { class: 'cam' }, frame, recBadge, flash, controls, overlay));
 
     let stream = null;
     let frozen = false;
@@ -80,6 +93,7 @@ export default {
       apply();
     }
     function stop() {
+      if (recorder) stopRec();
       stream?.getTracks().forEach((t) => t.stop());
       stream = null;
     }
@@ -110,24 +124,133 @@ export default {
       rotL.title = `Rotate left 90° (now ${s.rotate}°)`;
     }
 
-    /** Capture the frame at the camera's full resolution (cropped to the zoom, turned and mirrored as shown). */
-    async function photo() {
-      if (!stream || !video.videoWidth) { toast('Turn the camera on first.'); return; }
+    /** Source crop (zoom) and output size, turned and flipped as shown on screen. */
+    function geometry(maxSide = Infinity) {
       const vw = video.videoWidth;
       const vh = video.videoHeight;
       const cw = Math.round(vw / s.zoom);
       const ch = Math.round(vh / s.zoom);
-      const sx = Math.round((vw - cw) / 2);
-      const sy = Math.round((vh - ch) / 2);
       const sideways = s.rotate % 180 !== 0;
-      const c = document.createElement('canvas');
-      c.width = sideways ? ch : cw;
-      c.height = sideways ? cw : ch;
-      const g = c.getContext('2d');
-      g.translate(c.width / 2, c.height / 2);
+      const k = Math.min(1, maxSide / Math.max(cw, ch));
+      // Even sizes keep video encoders happy.
+      const ow = 2 * Math.round(((sideways ? ch : cw) * k) / 2);
+      const oh = 2 * Math.round(((sideways ? cw : ch) * k) / 2);
+      return { sx: Math.round((vw - cw) / 2), sy: Math.round((vh - ch) / 2), cw, ch, ow, oh, k };
+    }
+    function drawTo(g, geo) {
+      const { sx, sy, cw, ch, ow, oh, k } = geo;
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.fillStyle = '#000';
+      g.fillRect(0, 0, ow, oh);
+      g.translate(ow / 2, oh / 2);
       g.rotate((s.rotate * Math.PI) / 180);
-      g.scale(s.mirror ? -1 : 1, s.flipV ? -1 : 1);
+      g.scale((s.mirror ? -1 : 1) * k, (s.flipV ? -1 : 1) * k);
       g.drawImage(video, sx, sy, cw, ch, -cw / 2, -ch / 2, cw, ch);
+    }
+
+    // ---------- recording ----------
+    let recorder = null;
+    let recTimer = 0;
+    let recStart = 0;
+    let micStream = null;
+    let drawing = false;
+
+    async function startRec() {
+      if (!stream || !video.videoWidth) { toast('Turn the camera on first.'); return; }
+      const fmt = recFormat();
+      if (!fmt) { toast('This browser can’t record video. Try Chrome or Edge.'); return; }
+      const geo = geometry(REC_SIDE);
+      const c = document.createElement('canvas');
+      c.width = geo.ow;
+      c.height = geo.oh;
+      const g = c.getContext('2d');
+      drawTo(g, geo);
+      const out = c.captureStream(30);
+      if (s.sound) {
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+          micStream.getAudioTracks().forEach((t) => out.addTrack(t));
+        } catch { toast('Microphone not available — recording without sound.'); }
+      }
+      // Copy each camera frame (turned/flipped/zoomed as shown) onto the canvas being recorded.
+      drawing = true;
+      const loop = () => {
+        if (!drawing) return;
+        drawTo(g, geo);
+        if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(loop); else requestAnimationFrame(loop);
+      };
+      loop();
+      const chunks = [];
+      try {
+        recorder = new MediaRecorder(out, { mimeType: fmt.mime, videoBitsPerSecond: 4_000_000 });
+      } catch {
+        recorder = new MediaRecorder(out);
+      }
+      recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      recorder.onstop = () => {
+        drawing = false;
+        out.getTracks().forEach((t) => t.stop());
+        micStream?.getTracks().forEach((t) => t.stop());
+        micStream = null;
+        const secs = (Date.now() - recStart) / 1000;
+        const blob = new Blob(chunks, { type: (recorder?.mimeType || fmt.mime).split(';')[0] });
+        recorder = null;
+        if (blob.size) finished(blob, fmt.ext, secs);
+      };
+      recorder.start(1000);
+      recStart = Date.now();
+      play('tick');
+      recBtn.classList.add('on');
+      recBtn.title = 'Stop recording';
+      recBtn.setAttribute('aria-label', 'Stop recording');
+      recBadge.hidden = false;
+      const tick = () => {
+        const t = Math.floor((Date.now() - recStart) / 1000);
+        const txt = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+        recBtn.lastChild.textContent = txt;
+        recBadge.textContent = `● REC ${txt}`;
+        if (t >= MAX_REC_S) stopRec();
+      };
+      tick();
+      recTimer = setInterval(tick, 250);
+    }
+    function stopRec() {
+      clearInterval(recTimer);
+      recBtn.classList.remove('on');
+      recBtn.title = 'Record a video clip';
+      recBtn.setAttribute('aria-label', 'Record a video clip');
+      recBtn.lastChild.textContent = '';
+      recBadge.hidden = true;
+      if (recorder?.state === 'recording') recorder.stop();
+    }
+    async function finished(blob, ext, secs) {
+      s.step = (s.step || 0) + 1;
+      ctx.save();
+      const label = `Step ${s.step}`;
+      const name = `clip_${stamp()}.${ext}`;
+      const keep = async () => {
+        const id = uid('asset');
+        await db.putAsset({ id, blob, name, type: blob.type });
+        ctx.addWidget?.('videoloop', { clipAssetId: id, fileName: name, label });
+      };
+      const mb = (blob.size / 1e6).toFixed(1);
+      if (s.afterRec === 'download') {
+        downloadBlob(blob, name);
+        toast(`Saved ${name} (${Math.round(secs)} s, ${mb} MB) to your Downloads.`, { action: '🔁 Loop on board', onAction: keep, ms: 9000 });
+      } else {
+        await keep();
+        toast(`${label} is looping on the board (${Math.round(secs)} s).`, { action: '⬇ Download', onAction: () => downloadBlob(blob, name), ms: 7000 });
+      }
+    }
+
+    /** Capture the frame at the camera's full resolution (cropped to the zoom, turned and mirrored as shown). */
+    async function photo() {
+      if (!stream || !video.videoWidth) { toast('Turn the camera on first.'); return; }
+      const geo = geometry();
+      const c = document.createElement('canvas');
+      c.width = geo.ow;
+      c.height = geo.oh;
+      drawTo(c.getContext('2d'), geo);
       flash.classList.remove('go');
       void flash.offsetWidth;
       flash.classList.add('go');
@@ -172,6 +295,14 @@ export default {
           checkbox('Flip upside down (for a camera mounted the other way up)', s.flipV, (v) => { s.flipV = v; apply(); ctx.save(); }),
           field('Rotate', select([[0, 'No rotation'], [90, '90° right'], [180, '180° (upside down)'], [270, '90° left']], s.rotate, (v) => { s.rotate = Number(v); apply(); ctx.save(); })),
           h('p', { class: 'hint' }, '📸 saves a full-resolution JPEG to your Downloads folder. Nothing is uploaded.'),
+          h('h4', {}, '⏺ Recording'),
+          field('When you stop recording', select([['board', 'Loop the clip in its own widget'], ['download', 'Save it to Downloads']], s.afterRec, (v) => { s.afterRec = v; ctx.save(); })),
+          checkbox('Record sound from the microphone too', s.sound, (v) => { s.sound = v; ctx.save(); }),
+          h('div', { class: 'row' },
+            h('span', {}, `Next clip: Step ${(s.step || 0) + 1}`),
+            h('button', { class: 'btn small', onclick: (e) => { s.step = 0; ctx.save(); e.target.previousSibling.textContent = 'Next clip: Step 1'; } }, 'Start again at Step 1'),
+          ),
+          h('p', { class: 'hint' }, `Clips are up to ${MAX_REC_S / 60} minutes, recorded as you see them (zoomed, turned, flipped). Great for one step of a craft per clip.`),
         );
       },
     };
