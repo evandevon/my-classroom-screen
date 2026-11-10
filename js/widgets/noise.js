@@ -12,7 +12,7 @@ export default {
   group: 'manage',
   size: [400, 320],
   hasSettings: true,
-  defaultState: () => ({ record: false, style: 'balls', threshold: 60, sensitivity: 5, alarm: 'beep' }),
+  defaultState: () => ({ record: false, perMinute: true, style: 'balls', threshold: 60, sensitivity: 5, alarm: 'beep' }),
 
   mount(ctx) {
     const s = ctx.state;
@@ -44,6 +44,11 @@ export default {
     let levelSum = 0;
     let levelN = 0;
     let startedAt = 0;
+    // per-minute readings
+    let minSum = 0;
+    let minN = 0;
+    let minPeak = 0;
+    let minStart = 0;
     const balls = Array.from({ length: 24 }, (_, i) => ({
       x: Math.random(), y: Math.random(), vx: 0, vy: 0, r: 0.035 + Math.random() * 0.03, hue: (i * 47) % 360,
     }));
@@ -69,6 +74,8 @@ export default {
       levelSum = 0;
       levelN = 0;
       startedAt = Date.now();
+      minSum = minN = minPeak = 0;
+      minStart = Date.now();
       loop();
     }
 
@@ -102,6 +109,15 @@ export default {
       measure();
       levelSum += level;
       levelN += 1;
+      minSum += level;
+      minN += 1;
+      minPeak = Math.max(minPeak, level);
+      // Save one reading per minute (average and loudest moment).
+      if (s.record && s.perMinute && Date.now() - minStart >= 60000 && minN) {
+        logEvent({ widget: 'noise', widgetId: ctx.rec.id, kind: 'noise-minute', label: 'Noise level (each minute)', value: minSum / minN, unit: 'level', note: `loudest ${Math.round(minPeak)}` });
+        minSum = minN = minPeak = 0;
+        minStart = Date.now();
+      }
       const now = performance.now();
       const loud = level > s.threshold;
       // Ignore the room while our own warning sound is playing (the mic would hear it).
@@ -224,7 +240,9 @@ export default {
             return r;
           })()),
           field('Too-loud sound', soundSelect(s.alarm, (v) => { s.alarm = v; ctx.save(); })),
-          checkbox('📊 Record too-loud warnings and the average level', s.record, (v) => { s.record = v; badge.hidden = !v; ctx.save(); }),
+          checkbox('📊 Record too-loud warnings and the average level', s.record, (v) => { s.record = v; badge.hidden = !v; ctx.save(); ctx.openSettings(); }),
+          s.record ? checkbox('Also save a reading every minute (shows how noise changed through the lesson)', s.perMinute, (v) => { s.perMinute = v; ctx.save(); }) : null,
+          s.record ? h('p', { class: 'hint' }, 'Levels go from 0 (silent) to 100 (very loud). They depend on the microphone and the sensitivity setting, so compare lessons recorded on the same device and settings.') : null,
           h('p', { class: 'hint' }, 'Tip: start listening, then drag the “Too loud at” slider to just above your normal working noise.'),
         );
       },
