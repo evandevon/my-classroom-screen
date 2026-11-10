@@ -222,11 +222,11 @@ export class Board {
     this.el.style.setProperty('--cols', cols);
     const colW = (W - 20 - 12 * (cols - 1)) / cols;
     const def = WIDGETS[rec.type];
-    // Keep roughly the shape it has on a 16:9 screen.
-    let aspect = (rec.w * 16) / (rec.h * 9);
-    if (!Number.isFinite(aspect) || aspect <= 0) aspect = def?.size ? def.size[0] / def.size[1] : 4 / 3;
+    // Use the widget's natural shape (its default size), not the stored layout, which was made
+    // for a different screen — and never squash it much below its designed height.
+    const [dw, dh] = def?.size || [400, 300];
     const maxH = Math.max(260, innerHeight - 140);
-    const hh = Math.round(clamp(colW / aspect, 230, maxH));
+    const hh = Math.round(clamp(Math.max(colW * (dh / dw), Math.min(dh, 520) * 0.85), 230, maxH));
     el.style.left = '';
     el.style.top = '';
     el.style.width = '';
