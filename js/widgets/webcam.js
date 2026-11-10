@@ -1,7 +1,7 @@
 import { h, uid, toast, downloadBlob } from '../util.js';
 import { db } from '../storage.js';
 import { play } from '../sound.js';
-import { panel, checkbox, field } from './_common.js';
+import { panel, checkbox, field, select } from './_common.js';
 
 // Webcam / document camera: live view, freeze, mirror, rotate, zoom, and full-resolution photos
 // saved to this device. The picture never leaves the computer.
@@ -19,7 +19,7 @@ export default {
   group: 'core',
   size: [560, 420],
   hasSettings: true,
-  defaultState: () => ({ deviceId: '', mirror: false, rotate: 0, zoom: 1, fill: false }),
+  defaultState: () => ({ deviceId: '', mirror: false, flipV: false, rotate: 0, zoom: 1, fill: false }),
 
   mount(ctx) {
     const s = ctx.state;
@@ -31,11 +31,17 @@ export default {
     const freezeBtn = h('button', { class: 'btn small', title: 'Freeze the picture', onclick: toggleFreeze }, '❄️ Freeze');
     const zoomIn = h('input', { type: 'range', min: 1, max: 4, step: 0.1, value: s.zoom, 'aria-label': 'Zoom', class: 'cam-zoom' });
     zoomIn.addEventListener('input', () => { s.zoom = Number(zoomIn.value); apply(); ctx.save(); });
+    const mirrorBtn = h('button', { class: 'btn small', title: 'Flip left ↔ right', 'aria-label': 'Flip left to right', onclick: () => { s.mirror = !s.mirror; apply(); ctx.save(); } }, '⇋');
+    const flipBtn = h('button', { class: 'btn small', title: 'Flip upside down', 'aria-label': 'Flip upside down', onclick: () => { s.flipV = !s.flipV; apply(); ctx.save(); } }, '⇅');
+    const rotL = h('button', { class: 'btn small', title: 'Rotate left 90°', 'aria-label': 'Rotate left', onclick: () => { s.rotate = (s.rotate + 270) % 360; apply(); ctx.save(); } }, '⟲');
+    const rotR = h('button', { class: 'btn small', title: 'Rotate right 90°', 'aria-label': 'Rotate right', onclick: () => { s.rotate = (s.rotate + 90) % 360; apply(); ctx.save(); } }, '⟳');
     const controls = h('div', { class: 'cam-controls' },
       h('button', { class: 'btn primary big cam-shot', title: 'Take a photo (full resolution) and save it', onclick: photo }, '📸'),
       freezeBtn,
-      h('button', { class: 'btn small', title: 'Mirror left/right', onclick: () => { s.mirror = !s.mirror; apply(); ctx.save(); } }, '⇋'),
-      h('button', { class: 'btn small', title: 'Rotate', onclick: () => { s.rotate = (s.rotate + 90) % 360; apply(); ctx.save(); } }, '⟳'),
+      mirrorBtn,
+      flipBtn,
+      rotL,
+      rotR,
       h('label', { class: 'cam-zoomwrap', title: 'Zoom' }, '🔍', zoomIn),
       status,
     );
@@ -84,12 +90,24 @@ export default {
       freezeBtn.textContent = frozen ? '▶ Live' : '❄️ Freeze';
       frame.classList.toggle('frozen', frozen);
     }
+    /** Same order as the photo: flip/zoom first, then rotate. */
     function apply() {
       const sideways = s.rotate % 180 !== 0;
-      video.style.transform = `rotate(${s.rotate}deg) scale(${(s.mirror ? -1 : 1) * s.zoom}, ${s.zoom})`;
+      const sx = (s.mirror ? -1 : 1) * s.zoom;
+      const sy = (s.flipV ? -1 : 1) * s.zoom;
+      // Centred explicitly (a turned box is taller/wider than the frame, so it can't rely on layout).
+      video.style.transform = `translate(-50%, -50%) rotate(${s.rotate}deg) scale(${sx}, ${sy})`;
       video.style.objectFit = s.fill ? 'cover' : 'contain';
-      frame.classList.toggle('sideways', sideways);
+      // Turned sideways, the video box swaps width and height so the picture still fills the frame.
+      const fw = frame.clientWidth;
+      const fh = frame.clientHeight;
+      video.style.width = `${sideways ? fh : fw}px`;
+      video.style.height = `${sideways ? fw : fh}px`;
       zoomIn.value = s.zoom;
+      mirrorBtn.classList.toggle('on', s.mirror);
+      flipBtn.classList.toggle('on', s.flipV);
+      rotR.title = `Rotate right 90° (now ${s.rotate}°)`;
+      rotL.title = `Rotate left 90° (now ${s.rotate}°)`;
     }
 
     /** Capture the frame at the camera's full resolution (cropped to the zoom, turned and mirrored as shown). */
@@ -108,7 +126,7 @@ export default {
       const g = c.getContext('2d');
       g.translate(c.width / 2, c.height / 2);
       g.rotate((s.rotate * Math.PI) / 180);
-      if (s.mirror) g.scale(-1, 1);
+      g.scale(s.mirror ? -1 : 1, s.flipV ? -1 : 1);
       g.drawImage(video, sx, sy, cw, ch, -cw / 2, -ch / 2, cw, ch);
       flash.classList.remove('go');
       void flash.offsetWidth;
@@ -129,8 +147,11 @@ export default {
       });
     }
 
+    apply();
+
     return {
       destroy: stop,
+      resize: apply,
       async openSettings() {
         const camSel = h('select', { 'aria-label': 'Camera' });
         camSel.append(h('option', { value: '' }, 'Default camera'));
@@ -147,7 +168,9 @@ export default {
           field('Camera (document cameras show up here too)', camSel),
           h('p', { class: 'hint' }, 'Camera names appear after you turn the camera on once.'),
           checkbox('Fill the box (crop the edges)', s.fill, (v) => { s.fill = v; apply(); ctx.save(); }),
-          checkbox('Mirror left/right (like a mirror — turn off for documents)', s.mirror, (v) => { s.mirror = v; apply(); ctx.save(); }),
+          checkbox('Flip left ↔ right (like a mirror — turn off for documents)', s.mirror, (v) => { s.mirror = v; apply(); ctx.save(); }),
+          checkbox('Flip upside down (for a camera mounted the other way up)', s.flipV, (v) => { s.flipV = v; apply(); ctx.save(); }),
+          field('Rotate', select([[0, 'No rotation'], [90, '90° right'], [180, '180° (upside down)'], [270, '90° left']], s.rotate, (v) => { s.rotate = Number(v); apply(); ctx.save(); })),
           h('p', { class: 'hint' }, '📸 saves a full-resolution JPEG to your Downloads folder. Nothing is uploaded.'),
         );
       },
