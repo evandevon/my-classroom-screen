@@ -1,4 +1,4 @@
-import { h, uid, toast, downloadBlob } from '../util.js';
+import { h, uid, toast } from '../util.js';
 import { db } from '../storage.js';
 import { play } from '../sound.js';
 import { panel, checkbox, field, select } from './_common.js';
@@ -29,7 +29,7 @@ export default {
   group: 'core',
   size: [640, 460],
   hasSettings: true,
-  defaultState: () => ({ deviceId: '', mirror: false, flipV: false, rotate: 0, zoom: 1, fill: false, sound: false, afterRec: 'board', afterPhoto: 'board', step: 0 }),
+  defaultState: () => ({ deviceId: '', mirror: false, flipV: false, rotate: 0, zoom: 1, fill: false, sound: false, step: 0 }),
 
   mount(ctx) {
     const s = ctx.state;
@@ -192,10 +192,9 @@ export default {
         out.getTracks().forEach((t) => t.stop());
         micStream?.getTracks().forEach((t) => t.stop());
         micStream = null;
-        const secs = (Date.now() - recStart) / 1000;
         const blob = new Blob(chunks, { type: (recorder?.mimeType || fmt.mime).split(';')[0] });
         recorder = null;
-        if (blob.size) finished(blob, fmt.ext, secs);
+        if (blob.size) finished(blob, fmt.ext);
       };
       recorder.start(1000);
       recStart = Date.now();
@@ -223,26 +222,13 @@ export default {
       recBadge.hidden = true;
       if (recorder?.state === 'recording') recorder.stop();
     }
-    async function finished(blob, ext, secs) {
+    async function finished(blob, ext) {
       s.step = (s.step || 0) + 1;
       ctx.save();
-      const label = `Step ${s.step}`;
       const name = `clip_${stamp()}.${ext}`;
-      const keep = async () => {
-        const id = uid('asset');
-        await db.putAsset({ id, blob, name, type: blob.type });
-        ctx.addWidget?.('videoloop', { clipAssetId: id, fileName: name, label });
-      };
-      const mb = (blob.size / 1e6).toFixed(1);
-      const save = () => downloadBlob(blob, name);
-      if (s.afterRec === 'download') {
-        save();
-        toast(`Saved ${name} (${Math.round(secs)} s, ${mb} MB) to your Downloads.`, { action: '🔁 Loop in a new widget', onAction: keep, ms: 9000 });
-      } else {
-        await keep();
-        if (s.afterRec === 'both') { save(); toast(`${label} is looping on the board and saved to Downloads.`); }
-        else toast(`${label} is looping on the board (${Math.round(secs)} s).`, { action: '⬇ Download', onAction: save, ms: 7000 });
-      }
+      const id = uid('asset');
+      await db.putAsset({ id, blob, name, type: blob.type });
+      ctx.addWidget?.('videoloop', { clipAssetId: id, fileName: name, label: `Step ${s.step}` });
     }
 
     /** Capture the frame at the camera's full resolution (cropped to the zoom, turned and mirrored as shown). */
@@ -260,22 +246,9 @@ export default {
       const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.95));
       if (!blob) return;
       const name = `photo_${stamp()}.jpg`;
-      const size = `${c.width}×${c.height}`;
-      const keep = async () => {
-        const id = uid('asset');
-        await db.putAsset({ id, blob, name, type: 'image/jpeg' });
-        ctx.addWidget?.('image', { imageAssetId: id, fit: 'contain', caption: '' });
-      };
-      const save = () => downloadBlob(blob, name);
-      const mode = s.afterPhoto || 'board';
-      if (mode === 'download') {
-        save();
-        toast(`Saved ${name} (${size}) to your Downloads.`, { action: '📌 Put in a new widget', onAction: keep, ms: 9000 });
-      } else {
-        await keep();
-        if (mode === 'both') { save(); toast(`Photo added to the board and saved to Downloads (${size}).`); }
-        else toast(`Photo added to the board (${size}).`, { action: '⬇ Download', onAction: save, ms: 7000 });
-      }
+      const id = uid('asset');
+      await db.putAsset({ id, blob, name, type: 'image/jpeg' });
+      ctx.addWidget?.('image', { imageAssetId: id, fit: 'contain', caption: '' });
     }
 
     apply();
@@ -302,16 +275,14 @@ export default {
           checkbox('Flip left ↔ right (like a mirror — turn off for documents)', s.mirror, (v) => { s.mirror = v; apply(); ctx.save(); }),
           checkbox('Flip upside down (for a camera mounted the other way up)', s.flipV, (v) => { s.flipV = v; apply(); ctx.save(); }),
           field('Rotate', select([[0, 'No rotation'], [90, '90° right'], [180, '180° (upside down)'], [270, '90° left']], s.rotate, (v) => { s.rotate = Number(v); apply(); ctx.save(); })),
-          field('📸 When you take a photo', select([['board', 'Put it in a new widget'], ['download', 'Save it to Downloads'], ['both', 'Both']], s.afterPhoto || 'board', (v) => { s.afterPhoto = v; ctx.save(); })),
-          h('p', { class: 'hint' }, 'Photos are full resolution (as zoomed, turned and flipped). Nothing is uploaded.'),
+          h('p', { class: 'hint' }, '📸 Each photo opens in its own picture widget at full resolution (as zoomed, turned and flipped) — use its ⬇ button to save it. Nothing is uploaded.'),
           h('h4', {}, '⏺ Recording'),
-          field('When you stop recording', select([['board', 'Loop it in a new widget'], ['download', 'Save it to Downloads'], ['both', 'Both']], s.afterRec, (v) => { s.afterRec = v; ctx.save(); })),
           checkbox('Record sound from the microphone too', s.sound, (v) => { s.sound = v; ctx.save(); }),
           h('div', { class: 'row' },
             h('span', {}, `Next clip: Step ${(s.step || 0) + 1}`),
             h('button', { class: 'btn small', onclick: (e) => { s.step = 0; ctx.save(); e.target.previousSibling.textContent = 'Next clip: Step 1'; } }, 'Start again at Step 1'),
           ),
-          h('p', { class: 'hint' }, `Clips are up to ${MAX_REC_S / 60} minutes, recorded as you see them (zoomed, turned, flipped). Great for one step of a craft per clip.`),
+          h('p', { class: 'hint' }, `Clips are up to ${MAX_REC_S / 60} minutes, recorded as you see them (zoomed, turned, flipped). Each clip loops in its own widget — use its ⬇ button to save it.`),
         );
       },
     };
