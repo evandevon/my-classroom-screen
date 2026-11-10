@@ -1,0 +1,13 @@
+{
+  "name": "My Classroom Screen",
+  "short_name": "Class Screen",
+  "description": "Classroom display with timers, noise meter, name picker, whiteboard and more.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "background_color": "#dfe7f1",
+  "theme_color": "#3a5ccc",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
