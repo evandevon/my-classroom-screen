@@ -38,6 +38,9 @@ async function inflate(bytes) {
 export function linkSafeScreen(screen, { includeNames = false, dropHeavy = false } = {}) {
   const copy = structuredClone(screen);
   const dropped = new Set();
+  // A paused screen is shared ready to go (held timers simply show their time left).
+  delete copy.paused;
+  for (const w of copy.widgets) if (w.state?.held) w.state.held = false;
   if (copy.background?.assetId) {
     delete copy.background.assetId;
     copy.background.type = 'color';

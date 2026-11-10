@@ -69,6 +69,20 @@ export default {
   group: 'core',
   size: [380, 320],
   hasSettings: true,
+  /** Screen paused: keep the time left. Returns a line for the paused screen. */
+  hold(s) {
+    if (!s.running) return null;
+    s.remaining = Math.max(0, (s.endAt - Date.now()) / 1000);
+    s.running = false;
+    s.endAt = null;
+    s.held = true;
+    return `${s.label || 'Timer'}: ${fmtTime(Math.ceil(s.remaining))} left`;
+  },
+  unhold(s) {
+    if (!s.held) return;
+    s.held = false;
+    if (s.remaining > 0) { s.running = true; s.endAt = Date.now() + s.remaining * 1000; }
+  },
   defaultState: () => ({
     duration: 300, // seconds
     remaining: 300,

@@ -11,6 +11,22 @@ export default {
   size: [340, 260],
   hasSettings: true,
   privateKeys: ['who'],
+  hold(s, rec) {
+    if (!s.running) return null;
+    const sec = (Date.now() - s.startedAt) / 1000;
+    if (s.record && sec >= 1) logEvent({ widget: 'stopwatch', widgetId: rec.id, kind: 'timed', label: s.label || 'Timed', who: s.who, value: sec, unit: 'seconds' });
+    s.elapsed += Date.now() - s.startedAt;
+    s.running = false;
+    s.startedAt = null;
+    s.held = true;
+    return `Stopwatch: stopped at ${fmtTime(Math.floor(s.elapsed / 1000))}`;
+  },
+  unhold(s) {
+    if (!s.held) return;
+    s.held = false;
+    s.running = true;
+    s.startedAt = Date.now();
+  },
   defaultState: () => ({ running: false, startedAt: null, elapsed: 0, laps: [], record: false, label: 'Off-task', who: '', labels: 'Off-task, Transition, On-task, Packing up' }),
 
   mount(ctx) {

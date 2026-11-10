@@ -1153,3 +1153,17 @@ input.bg-swatch { min-height: 56px; }
 .cam-rec.on .cam-rec-dot { animation: none; }
 @container (max-width: 700px) { .cam-res { display: none; } .cam-zoomwrap { min-width: 60px; } }
 @container (max-width: 560px) { .cam-zoomwrap { display: none; } }
+
+/* ---------- share warning ---------- */
+.share-warn { background: #fff4d6; border: 2px solid #f4a261; border-radius: 12px; padding: 8px 12px; display: grid; gap: 4px; }
+.share-warn p { margin: 0; }
+
+/* ---------- paused screen ---------- */
+.ghost { position: absolute; border: 2px dashed #0003; border-radius: 16px; background: #ffffff55; display: grid; place-items: center; color: #0007; font-weight: 800; pointer-events: none; overflow: hidden; }
+.paused-cover { position: absolute; inset: 0; z-index: 5000; display: grid; place-items: center; background: #1d1f2433; backdrop-filter: grayscale(.6); }
+.paused-card { background: #fff; border-radius: 20px; padding: 24px 28px; max-width: min(460px, 90vw); text-align: center; box-shadow: 0 12px 40px #0004; display: grid; gap: 8px; justify-items: center; }
+.paused-card h2 { margin: 0; }
+.paused-card p { margin: 0; }
+.paused-icon { font-size: 56px; line-height: 1; }
+.paused-held { margin: 0; padding: 8px 14px; list-style: none; background: #f2f4f8; border-radius: 12px; font-weight: 700; display: grid; gap: 2px; }
+body.screen-paused .dock-cats, body.screen-paused .dock-recent { opacity: .4; }

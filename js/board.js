@@ -35,7 +35,32 @@ export class Board {
     this.screen = screen;
     // Keep z-index small and tidy (it only ever counts up while you tap widgets).
     [...screen.widgets].sort((a, b) => (a.z || 0) - (b.z || 0)).forEach((w, i) => (w.z = i + 1));
+    this.el.querySelectorAll('.ghost, .paused-cover').forEach((e) => e.remove());
+    this.el.classList.toggle('paused', !!screen.paused);
+    if (screen.paused) { this.drawPaused(); return; }
     for (const rec of screen.widgets) this.mount(rec);
+  }
+
+  /** Paused screen: nothing runs (no timers, sounds, cameras or microphones) — just outlines of the widgets. */
+  drawPaused() {
+    for (const rec of this.screen.widgets) {
+      const def = WIDGETS[rec.type];
+      this.el.append(h('div', { class: 'ghost', style: { left: `${rec.x * 100}%`, top: `${rec.y * 100}%`, width: `${rec.w * 100}%`, height: `${rec.h * 100}%`, zIndex: rec.z } },
+        h('span', {}, `${def?.icon || '▫️'} ${rec.state?.label && typeof rec.state.label === 'string' ? rec.state.label : def?.title || rec.type}`)));
+    }
+    const p = this.screen.paused;
+    const when = new Date(p.at);
+    const sameDay = when.toDateString() === new Date().toDateString();
+    const at = `${sameDay ? 'today' : when.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' })} at ${when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+    this.el.append(h('div', { class: 'paused-cover' },
+      h('div', { class: 'paused-card', role: 'dialog', 'aria-label': 'Screen paused' },
+        h('div', { class: 'paused-icon', 'aria-hidden': 'true' }, '⏸'),
+        h('h2', {}, 'Screen paused'),
+        h('p', {}, `Paused ${at}.`),
+        p.held?.length ? h('ul', { class: 'paused-held' }, ...p.held.map((t) => h('li', {}, t))) : null,
+        h('p', { class: 'hint' }, 'Timers and stopwatches are held where they were. Alarms, cameras, microphones and videos are off until you carry on.'),
+        h('button', { class: 'btn primary big', onclick: () => this.onResume?.() }, '▶ Carry on'),
+      )));
   }
 
   changed() {
@@ -49,6 +74,7 @@ export class Board {
   addWidget(type, { state, x, y, w, h: hh } = {}) {
     const def = WIDGETS[type];
     if (!def) return;
+    if (this.screen.paused) { toast('This screen is paused — press “Carry on” first.'); return; }
     const r = this.rect;
     const pw = Math.min(def.size?.[0] ?? 340, r.width * 0.9);
     const ph = Math.min(def.size?.[1] ?? 260, r.height * 0.9);
