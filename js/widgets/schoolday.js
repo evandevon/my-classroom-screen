@@ -3,7 +3,7 @@ import { play, soundSelect } from '../sound.js';
 import { onTick } from '../ticker.js';
 import { panel, checkbox, field, select } from './_common.js';
 
-// School day timeline: coloured sessions with icons, a moving "now" marker,
+// Activity timeline: coloured sessions with icons, a moving "now" marker,
 // and "Now / Next" countdowns. Plans can be the same every day or differ by weekday.
 
 export const ICONS = [
@@ -96,7 +96,7 @@ export function parsePlan(text, h12guess = true) {
   rows.sort((a, b) => a.start - b.start);
   return rows.map((r, i) => s_(toHHMM(r.start), toHHMM(r.end ?? rows[i + 1]?.start ?? r.start + 30), r.icon, r.name, COLOURS[i % 10]));
 }
-/** The session running now in a School day widget's state (or null). Used for the class label. */
+/** The session running now in an Activity timeline widget's state (or null). Used for the class label. */
 export function currentSession(state, d = new Date()) {
   const plan = state?.plans?.[String(d.getDay())] || state?.plans?.all || [];
   const now = d.getHours() * 60 + d.getMinutes();
@@ -107,7 +107,7 @@ const planToText = (plan) => plan.map((p) => `${p.start}-${p.end} ${p.icon} ${p.
 
 export default {
   type: 'schoolday',
-  title: 'School day',
+  title: 'Activity timeline',
   icon: '🗓️',
   group: 'core',
   size: [860, 260],
@@ -131,12 +131,18 @@ export default {
 
     const planFor = (d) => s.plans[String(d.getDay())] || s.plans.all || [];
     let lastKey = '';
+    let spans = []; // [{ el, st, en }] for placing the "now" line
 
     function render(force = false) {
       const d = new Date();
       const plan = [...planFor(d)].sort((a, b) => toMin(a.start) - toMin(b.start));
       const now = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
       wrap.dataset.layout = s.layout;
+      // Across or down: chosen, or automatic from the widget's shape.
+      const vw = ctx.view.clientWidth || 1;
+      const vh = ctx.view.clientHeight || 1;
+      const down = s.layout === 'down' || (s.layout !== 'across' && vh > vw * 0.9);
+      wrap.dataset.dir = down ? 'down' : 'across';
       if (!plan.length) {
         head.replaceChildren(h('div', { class: 'sday-big' }, 'No sessions for today'), h('button', { class: 'btn', onclick: () => ctx.openSettings() }, 'Add sessions'));
         track.replaceChildren();
@@ -181,34 +187,39 @@ export default {
       head.replaceChildren(nowBox, ...(nextBox ? [nextBox] : []));
 
       // track (rebuild only when the minute or plan changes; marker moves every tick)
-      const key = `${Math.floor(now)}|${JSON.stringify(plan)}|${s.showTimes}|${s.layout}`;
+      const key = `${Math.floor(now)}|${JSON.stringify(plan)}|${s.showTimes}|${wrap.dataset.dir}`;
       if (force || key !== lastKey) {
         lastKey = key;
         const items = [];
         let t = first;
         for (const p of plan) {
           const st = toMin(p.start);
-          if (st > t) items.push({ gap: true, len: st - t });
+          if (st > t) items.push({ gap: true, st: t, len: st - t });
           const len = Math.max(1, toMin(p.end) - st);
           items.push({ p, len });
           t = Math.max(t, toMin(p.end));
         }
         const totalLen = items.reduce((a, it) => a + it.len, 0) || 1;
-        const vertical = getComputedStyle(track).flexDirection === 'column';
-        const trackSize = vertical ? track.clientHeight : track.clientWidth;
+        const nBlocks = items.filter((it) => !it.gap).length || 1;
+        // Size by time, but every session gets a fair minimum so short ones (arrival, home time)
+        // stay readable; long gaps are shrunk.
+        const floor = (totalLen * 0.45) / nBlocks;
+        spans = [];
         track.replaceChildren(
           ...items.map((it) => {
-            if (it.gap) return h('div', { class: 'sday-gap', style: { flexGrow: it.len } });
+            if (it.gap) {
+              const g = h('div', { class: 'sday-gap', style: { flexGrow: Math.min(it.len, floor * 0.6) } });
+              spans.push({ el: g, st: it.st, en: it.st + it.len });
+              return g;
+            }
             const p = it.p;
             const st = toMin(p.start);
             const en = toMin(p.end);
             const state = now >= en ? 'past' : now >= st ? 'current' : 'future';
             const frac = state === 'current' ? (now - st) / (en - st) : state === 'past' ? 1 : 0;
-            const px = (it.len / totalLen) * trackSize;
-            const tight = px < (vertical ? 26 : 74);
-            return h('div', {
-              class: `sday-block ${state}${tight ? ' tight' : ''}`,
-              style: { flexGrow: it.len, '--c': p.color, '--ink': inkFor(p.color), '--done': `${frac * 100}%` },
+            const el = h('div', {
+              class: `sday-block ${state}`,
+              style: { flexGrow: it.len + floor, '--c': p.color, '--ink': inkFor(p.color), '--done': `${frac * 100}%` },
               title: `${fmt(p.start)} – ${fmt(p.end)} ${p.name}`,
             },
               h('span', { class: 'sday-ic' }, p.icon),
@@ -216,13 +227,19 @@ export default {
               s.showTimes ? h('span', { class: 'sday-time' }, fmt(p.start)) : null,
               state === 'past' ? h('span', { class: 'sday-tick', 'aria-label': 'done' }, '✓') : null,
             );
+            spans.push({ el, st, en });
+            return el;
           }),
         );
       }
-      // now marker position along the whole day
-      const pos = (now - first) / Math.max(1, last - first);
-      marker.hidden = pos < 0 || pos > 1;
-      marker.style.setProperty('--pos', `${Math.max(0, Math.min(1, pos)) * 100}%`);
+      // "Now" line: placed on the actual blocks (they aren't exactly to scale).
+      const span = spans.find((x) => now >= x.st && now < x.en);
+      marker.hidden = !span;
+      if (span) {
+        const f = (now - span.st) / Math.max(1, span.en - span.st);
+        const at = wrap.dataset.dir === 'down' ? span.el.offsetTop + f * span.el.offsetHeight : span.el.offsetLeft + f * span.el.offsetWidth;
+        marker.style.setProperty('--pos', `${at}px`);
+      }
 
       // optional chime at the start of each session
       if (s.chime) {
@@ -405,7 +422,7 @@ export default {
         } }, 'Use this list'),
       );
 
-      panel(ctx, 'School day',
+      panel(ctx, 'Activity timeline',
         field('Plan for', dayChips),
         editDay !== 'all' && !usesAll ? h('button', { class: 'btn small', onclick: () => { delete s.plans[editDay]; changed(); openEditor(); } }, `↩ Make ${DAYS[Number(editDay)]} the same as every day`) : null,
         rows,

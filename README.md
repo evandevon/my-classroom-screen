@@ -15,7 +15,7 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 | ✏️ Whiteboard (pens, eraser, undo, grid/lined/chalkboard; several fingers draw at once; ⏺ record sessions with optional voice, play back at ½–4× with loop, save as an MP4 quickly even in a background tab) |
 | ⏱️ Stopwatch with laps | 🚦 Traffic light with your own labels | 🧮 Calculator (works safely without `eval`) |
 | 🕒 Clock — 8 styles: analogue/digital, teaching clock (past/to, time in words, set-a-time & quiz), Roman numerals, word clock, sundial with draggable sun, candle, water and incense clocks |
-| 🗓️ School day timeline (coloured sessions with icons, now/next countdown, per-weekday plans, type-in quick entry) |
+| 🗓️ Activity timeline (coloured sessions with icons, now/next countdown, per-weekday plans, type-in quick entry) |
 | 📅 Calendar (tap a day to add events, repeats, “coming up” countdowns, NSW term & week numbers) |
 | ⏰ Alarms (school bells with a pack-up warning beforehand, choice of days and sounds) | | | 🤫 Work symbols (voice levels + how to work) | 🎲 Dice (1–6 dice, any number of sides from 2) |
 | 📝 Text (bold, lists, sizes, colours) | 🎡 Name picker (spinning wheel or flash card, no repeats) | 🏆 Scoreboard (2–8 teams) |
@@ -45,7 +45,7 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 ## Classes and student lists (stay on this device)
 
 - **☰ → Classes & student lists:** make a class, then type names or paste a column from a spreadsheet. You can also import or export CSV to move lists to another computer.
-- **👥 button in the top bar:** choose the current class. It can also switch automatically when the School day timeline's session name contains a class name.
+- **👥 button in the top bar:** choose the current class. It can also switch automatically when the Activity timeline's session name contains a class name.
 - The Name picker, Group maker, Tally (per student), Scoreboard ("a row for each student") and Stopwatch use the current class's names, or their own typed list.
 - Class lists are never put into share links or screen files. Student names in widgets are taken out of share links unless you choose to include them.
 
