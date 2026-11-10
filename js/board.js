@@ -249,6 +249,7 @@ export class Board {
       rec,
       closeSettings: () => toggleSettings(false),
       openSettings: () => toggleSettings(true),
+      addWidget: (type, state) => this.addWidget(type, { state }),
     };
 
     const toggleSettings = (force) => {

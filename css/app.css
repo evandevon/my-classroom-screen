@@ -1020,3 +1020,46 @@ input.bg-swatch { min-height: 56px; }
 /* Keep the bottom-right corner free for the resize handle, so footer buttons are always tappable. */
 .noise-foot, .tally-foot, .pick-foot, .list-add, .group-foot, .dice-foot, .spin-foot, .nn-foot, .al-foot, .timer-controls, .wb-bar, .audio-vol { padding-right: 34px; }
 .calc-pad { margin-right: 22px; }
+
+/* ---------- dock categories + pop-up ---------- */
+.dock-cat { min-width: 92px; }
+.dock-cat.open { background: #e5ebfb; }
+.dock-cat .caret { font-style: normal; margin-left: 3px; font-size: 10px; opacity: .6; }
+.dock-recent::before { content: 'Recent'; writing-mode: vertical-rl; transform: rotate(180deg); font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; align-self: center; }
+.dock-pop { position: fixed; z-index: 100003; width: min(560px, calc(100vw - 16px)); background: #fff; border-radius: 22px; box-shadow: var(--shadow); padding: 10px 12px 12px; animation: popup .18s ease; }
+@keyframes popup { from { transform: translateY(10px); opacity: 0; } }
+.dock-pop-head { display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 17px; padding: 0 0 6px 4px; }
+.dock-pop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
+.pop-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 88px; border: 2px solid var(--line); border-radius: 16px; background: #f8f9fc; padding: 6px; }
+.pop-tile:hover { background: #eef2ff; border-color: #c9d4f5; }
+.pop-tile:active { transform: scale(.96); }
+.pop-tile .di { font-size: 34px; line-height: 1; }
+.pop-tile .dl { font-weight: 800; font-size: 13px; text-align: center; }
+
+/* ---------- webcam ---------- */
+.cam { position: absolute; inset: 0; background: #111; }
+.cam-frame { position: absolute; inset: 0 0 52px; overflow: hidden; display: grid; place-items: center; }
+.cam-video { width: 100%; height: 100%; object-fit: contain; transition: transform .2s; background: #111; }
+.cam-frame.sideways .cam-video { width: 100cqh; height: calc(100cqw); }
+.cam-frame.frozen::after { content: '❄️ Frozen'; position: absolute; top: 8px; left: 8px; background: #fffd; color: var(--ink); font-weight: 800; font-size: 13px; padding: 2px 10px; border-radius: 99px; }
+.cam-controls { position: absolute; left: 0; right: 0; bottom: 0; height: 52px; display: flex; align-items: center; gap: 6px; padding: 0 40px 0 8px; background: #1d1f24; color: #fff; }
+.cam-controls .btn { background: #2c3038; border-color: #3a3f49; color: #fff; }
+.cam-controls .btn.primary { background: var(--accent); border-color: var(--accent); }
+.cam-shot { width: 52px; height: 44px; min-height: 44px; font-size: 22px; }
+.cam-zoomwrap { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 80px; max-width: 200px; }
+.cam-zoom { flex: 1; }
+.cam-res { font-size: 11px; color: #aab; margin-left: auto; font-variant-numeric: tabular-nums; }
+.cam-start { background: #1d1f24; color: #fff; }
+.cam-start .hint { color: #c9ced8; max-width: 26em; }
+.cam-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.cam-flash.go { animation: camflash .35s ease-out; }
+@keyframes camflash { from { opacity: .9; } to { opacity: 0; } }
+
+/* ---------- countdown ---------- */
+.cd { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 3cqmin; background: linear-gradient(160deg, color-mix(in srgb, var(--c) 12%, white), color-mix(in srgb, var(--c) 28%, white)); }
+.cd-icon { font-size: 16cqmin; line-height: 1; }
+.cd-big { font-size: 26cqmin; font-weight: 900; line-height: 1; color: var(--c); font-variant-numeric: tabular-nums; }
+.cd-unit { font-size: max(16px, 6cqmin); font-weight: 900; }
+.cd-title { font-size: max(15px, 6.5cqmin); font-weight: 900; margin-top: 1.5cqmin; }
+.cd-date { font-size: max(12px, 3.6cqmin); color: var(--muted); font-weight: 700; }
+.cd-sub { font-size: max(11px, 3cqmin); color: var(--muted); }
