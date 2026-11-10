@@ -133,17 +133,17 @@ const teaching = {
       api.save();
       draw();
     }
-    let dragging = false;
+    let dragging = null; // the pointer moving the hands (a second finger can't take over)
     let lastM = 0;
     face.el.addEventListener('pointerdown', (e) => {
-      if (!s.teachSet) return;
-      dragging = true;
+      if (!s.teachSet || dragging != null) return;
+      dragging = e.pointerId;
       lastM = s.setMin % 60;
       face.el.setPointerCapture(e.pointerId);
       e.preventDefault();
     });
     face.el.addEventListener('pointermove', (e) => {
-      if (!dragging) return;
+      if (dragging !== e.pointerId) return;
       const r = face.el.getBoundingClientRect();
       const ang = (Math.atan2(e.clientX - (r.left + r.width / 2), -(e.clientY - (r.top + r.height / 2))) * 180) / Math.PI;
       const m = Math.round((((ang + 360) % 360) / 6)) % 60;
@@ -155,7 +155,10 @@ const teaching = {
       reveal = !s.quiz;
       draw();
     });
-    face.el.addEventListener('pointerup', () => { if (dragging) { dragging = false; api.save(); } });
+    const endDrag = (e) => { if (dragging === e.pointerId) { dragging = null; api.save(); } };
+    face.el.addEventListener('pointerup', endDrag);
+    face.el.addEventListener('pointercancel', endDrag);
+    face.el.addEventListener('lostpointercapture', endDrag);
 
     let last = new Date();
     function draw(d = last) {

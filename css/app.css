@@ -1313,3 +1313,16 @@ body.compact::before { content: ''; position: fixed; top: 0; left: 0; right: 0; 
 @container (max-width: 460px) { .wx-foot > span:not(.error) { display: none; } .wx-foot .btn { display: none; } }
 .wx-foot { flex-wrap: wrap; row-gap: 2px; }
 .wx-placechip { max-width: 100%; }
+
+/* ---------- touch safety ---------- */
+/* No double-tap zoom delay on any control (pinch-zoom still works). */
+html { touch-action: manipulation; }
+/* Long-pressing a button shouldn't select its text or pop up a menu. */
+button { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+/* Touch screens have no hover: never leave a tappable button invisible. */
+@media (hover: none) {
+  .li-del { opacity: .45; }
+}
+/* Clean mode: hidden title-bar buttons can't be hit by accident — the first tap shows them. */
+body.clean .widget:not(.active):not(.settings-open) .w-head > * { pointer-events: none; }
+.widget.arming .w-head > * { pointer-events: none !important; }
