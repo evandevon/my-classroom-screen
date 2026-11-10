@@ -2,6 +2,7 @@ import { h, uid, toast, downloadBlob } from '../util.js';
 import { db, assetURL } from '../storage.js';
 import { panel, select, field, checkbox } from './_common.js';
 import { recFormat } from './webcam.js';
+import { encodeMP4, canEncodeOffline, decodeAudio } from '../videoencode.js';
 
 // Strokes are stored as vectors in 0..1 coordinates, so the drawing stays sharp at any widget size.
 // Every finger or pen draws its own line, so several children can draw on one board at once.
@@ -43,6 +44,34 @@ function drawAll(g, list, W, H) {
   g.clearRect(0, 0, W, H);
   for (const it of list) strokePath(g, it.st || it, W, H, it.upto);
   g.globalCompositeOperation = 'source-over';
+}
+
+/**
+ * Finished lines are kept on a cached layer, so each frame only draws the lines still in progress
+ * (redrawing hundreds of strokes 30–60 times a second is what makes big boards slow).
+ */
+class Ink {
+  constructor() {
+    this.done = document.createElement('canvas');
+    this.dg = this.done.getContext('2d');
+    this.keys = [];
+  }
+  /** items: [{ st, upto?, live? }] → draws onto g (W×H). */
+  render(g, items, W, H) {
+    if (this.done.width !== W || this.done.height !== H) { this.done.width = W; this.done.height = H; this.keys = []; this.dg.clearRect(0, 0, W, H); }
+    let n = 0;
+    while (n < items.length && !items[n].live && (items[n].upto == null || items[n].upto >= items[n].st.p.length)) n++;
+    let same = this.keys.length <= n;
+    for (let i = 0; same && i < this.keys.length; i++) same = this.keys[i] === items[i].st;
+    if (!same) { this.dg.clearRect(0, 0, W, H); this.keys = []; }
+    for (let i = this.keys.length; i < n; i++) { strokePath(this.dg, items[i].st, W, H); this.keys.push(items[i].st); }
+    this.dg.globalCompositeOperation = 'source-over';
+    g.globalCompositeOperation = 'source-over';
+    g.clearRect(0, 0, W, H);
+    g.drawImage(this.done, 0, 0);
+    for (let i = n; i < items.length; i++) strokePath(g, items[i].st, W, H, items[i].upto);
+    g.globalCompositeOperation = 'source-over';
+  }
 }
 
 /** Paper for saved pictures and videos (the live board uses CSS). */
@@ -124,7 +153,7 @@ export default {
   size: [640, 460],
   hasSettings: true,
   heavyKeys: ['strokes', 'rec'],
-  defaultState: () => ({ strokes: [], bg: 'white', rec: null, recAudioAssetId: null, recVoice: false, skipPauses: true }),
+  defaultState: () => ({ strokes: [], bg: 'white', rec: null, recAudioAssetId: null, recVoice: false, skipPauses: true, loop: false }),
 
   mount(ctx) {
     const s = ctx.state;
@@ -174,12 +203,14 @@ export default {
     const pScrub = h('input', { type: 'range', min: 0, max: 1000, value: 0, class: 'wb-scrub', 'aria-label': 'Position' });
     const pTime = h('span', { class: 'wb-ptime' });
     const pSpeed = h('button', { class: 'wb-tool wb-speed', title: 'Speed' });
+    const pLoop = h('button', { class: 'wb-tool', title: 'Loop (play again and again)', 'aria-label': 'Loop', onclick: () => { s.loop = !s.loop; ctx.save(); drawPlayer(); } }, '🔁');
     const player = h('div', { class: 'wb-bar wb-player', hidden: true },
       pPlay,
       toolBtn('⏮', 'Back to the start', () => seek(0)),
       pScrub,
       pTime,
       pSpeed,
+      pLoop,
       toolBtn('🎞️', 'Save as a video', () => exportVideo()),
       toolBtn('✕', 'Close the player', () => closePlayer()),
     );
@@ -215,10 +246,14 @@ export default {
       queued = true;
       requestAnimationFrame(() => { queued = false; drawNow(); });
     }
+    const ink = new Ink();
     function drawNow() {
       fit();
-      if (pb) drawAll(g, frameAt(s.rec, pb.ops, pb.T), canvas.width, canvas.height);
-      else drawAll(g, s.strokes, canvas.width, canvas.height);
+      if (pb) ink.render(g, frameAt(s.rec, pb.ops, pb.T), canvas.width, canvas.height);
+      else {
+        const live = new Set([...active.values()].map((a) => a.st));
+        ink.render(g, s.strokes.map((st) => ({ st, live: live.has(st) })), canvas.width, canvas.height);
+      }
     }
 
     // ---------- editing (logged while recording) ----------
@@ -351,7 +386,7 @@ export default {
         const url = await assetURL(s.recAudioAssetId);
         if (url) {
           pb.audio = new Audio(url);
-          pb.audio.addEventListener('ended', () => { if (pb) { pb.T = pb.dur; pausePb(); } });
+          pb.audio.addEventListener('ended', () => { if (!pb) return; if (s.loop) { pb.T = 0; playPb(true); } else { pb.T = pb.dur; pausePb(); } });
         }
       }
       bar.hidden = true;
@@ -385,7 +420,14 @@ export default {
         if (pb.audio && !pb.audio.paused) pb.T = pb.audio.currentTime * 1000;
         else pb.T += (now - pb.last) * pb.speed;
         pb.last = now;
-        if (pb.T >= pb.dur) { pb.T = pb.dur; pausePb(); }
+        if (pb.T >= pb.dur) {
+          if (s.loop && !pb.audio) {
+            // Hold the finished drawing for a moment, then start again.
+            pb.T = pb.dur;
+            if (!pb.holdUntil) pb.holdUntil = now + 1500;
+            else if (now >= pb.holdUntil) { pb.holdUntil = 0; pb.T = 0; }
+          } else if (!pb.audio) { pb.T = pb.dur; pausePb(); }
+        }
         drawPlayer();
         if (pb?.playing) pb.raf = requestAnimationFrame(step);
       };
@@ -411,13 +453,17 @@ export default {
       pScrub.value = String(Math.round((pb.T / (pb.dur || 1)) * 1000));
       pTime.textContent = `${fmt(pb.T)} / ${fmt(pb.dur)}`;
       pSpeed.textContent = pb.speed === 0.5 ? '½×' : `${pb.speed}×`;
+      pLoop.classList.toggle('on', !!s.loop);
       drawNow();
     }
 
-    /** Play the recording into a video file (real time, with the voice if there is one). */
+    /**
+     * Save the recording as a video. Preferred: draw and encode every frame directly (fast, and
+     * works with this tab in the background). Fallback: play it in real time and record the canvas.
+     */
     async function exportVideo() {
       const fmtV = recFormat();
-      if (!fmtV) { toast('This browser can’t make videos. Try Chrome or Edge.'); return; }
+      if (!fmtV && !canEncodeOffline()) { toast('This browser can’t make videos. Try Chrome or Edge.'); return; }
       const src = pb || (await openPlayer(), pb);
       if (!src) return;
       pausePb();
@@ -429,16 +475,53 @@ export default {
       out.width = W;
       out.height = H;
       const o = out.getContext('2d');
-      const ink = document.createElement('canvas');
-      ink.width = W;
-      ink.height = H;
-      const ig = ink.getContext('2d');
+      const inkC = document.createElement('canvas');
+      inkC.width = W;
+      inkC.height = H;
+      const ig = inkC.getContext('2d');
+      const cache = new Ink();
       const paint = (T) => {
         paintPaper(o, s.bg, W, H);
-        drawAll(ig, frameAt(s.rec, src.ops, T), W, H);
-        o.drawImage(ink, 0, 0);
+        cache.render(ig, frameAt(s.rec, src.ops, T), W, H);
+        o.drawImage(inkC, 0, 0);
       };
       paint(0);
+      let cancelled = false;
+      const note = h('div', { class: 'wb-export' },
+        h('span', {}, 'Making the video…'),
+        h('button', { class: 'btn small', onclick: () => { cancelled = true; } }, 'Cancel'),
+      );
+      surface.append(note);
+      const d = new Date();
+      const p2 = (n) => String(n).padStart(2, '0');
+      const fileBase = `whiteboard_${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}_${p2(d.getHours())}-${p2(d.getMinutes())}`;
+
+      if (canEncodeOffline()) {
+        let voice = null;
+        if (s.recAudioAssetId) {
+          const a = await db.getAsset(s.recAudioAssetId);
+          try { voice = a && (await decodeAudio(a.blob)); } catch { voice = null; }
+        }
+        const sp = voice ? 1 : src.speed;
+        const res = await encodeMP4({
+          canvas: out,
+          paint: (ms) => paint(ms * sp),
+          durationMs: src.dur / sp,
+          audio: voice,
+          onProgress: (f) => { note.firstChild.textContent = `Making the video… ${Math.round(f * 100)}%`; },
+          cancelled: () => cancelled,
+        });
+        if (res === 'cancelled') { note.remove(); toast('Video cancelled.'); return; }
+        if (res) {
+          note.remove();
+          downloadBlob(res, `${fileBase}.mp4`);
+          toast('Video saved to your Downloads.');
+          return;
+        }
+        if (!fmtV) { note.remove(); toast('Couldn’t make the video in this browser.'); return; }
+      }
+
+      // Fallback: real-time recording (keep this tab in front while it runs).
       const stream = out.captureStream(30);
       let audio = null;
       let actx = null;
@@ -457,12 +540,6 @@ export default {
       mr.ondataavailable = (ev) => ev.data.size && chunks.push(ev.data);
       const done = new Promise((res) => (mr.onstop = res));
       const speed = audio ? 1 : src.speed;
-      let cancelled = false;
-      const note = h('div', { class: 'wb-export' },
-        h('span', {}, 'Making the video…'),
-        h('button', { class: 'btn small', onclick: () => { cancelled = true; } }, 'Cancel'),
-      );
-      surface.append(note);
       mr.start(1000);
       if (audio) await audio.play().catch(() => {});
       const t0 = performance.now();
@@ -483,9 +560,7 @@ export default {
       stream.getTracks().forEach((t) => t.stop());
       note.remove();
       if (cancelled) { toast('Video cancelled.'); return; }
-      const d = new Date();
-      const p2 = (n) => String(n).padStart(2, '0');
-      downloadBlob(new Blob(chunks, { type: fmtV.mime.split(';')[0] }), `whiteboard_${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}_${p2(d.getHours())}-${p2(d.getMinutes())}.${fmtV.ext}`);
+      downloadBlob(new Blob(chunks, { type: fmtV.mime.split(';')[0] }), `${fileBase}.${fmtV.ext}`);
       toast('Video saved to your Downloads.');
     }
 
@@ -510,7 +585,7 @@ export default {
             h('button', { class: 'btn', onclick: () => { ctx.closeSettings(); exportVideo(); } }, '🎞️ Save recording as a video'),
             h('button', { class: 'btn danger', onclick: () => { if (confirm('Delete the recording?')) { s.rec = null; s.recAudioAssetId = null; ctx.save(); ctx.closeSettings(); sync(); } } }, '🗑 Delete recording'),
           ) : null,
-          h('p', { class: 'hint' }, 'Recordings stay in this browser. Saving as a video plays the recording through once, so it takes as long as the playback.'),
+          h('p', { class: 'hint' }, 'Recordings stay in this browser. Saving as a video is usually much quicker than the recording, and you can switch to another tab while it works.'),
         );
       },
       closeSettings: sync,

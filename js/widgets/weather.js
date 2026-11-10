@@ -37,7 +37,7 @@ const UV = (u) =>
 const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 const compass = (deg) => COMPASS[Math.round(((deg % 360) / 22.5)) % 16];
 
-export default {
+const weather = {
   type: 'weather',
   title: 'Weather',
   icon: '🌦️',
@@ -52,7 +52,8 @@ export default {
 
   mount(ctx) {
     const s = ctx.state;
-    const box = h('div', { class: 'wx' });
+    const isToday = ctx.rec?.type === 'weathertoday';
+    const box = h('div', { class: isToday ? 'wx wxt' : 'wx' });
     ctx.view.append(box);
     let timer;
     let error = '';
@@ -106,6 +107,7 @@ export default {
         ));
         return;
       }
+      if (isToday) { renderToday(d); return; }
       const c = d.current;
       const now = describe(c.weather_code, c.is_day);
       const today = d.daily;
@@ -154,6 +156,52 @@ export default {
       box.dataset.show = s.show;
     }
 
+    /** "Weather today": one big, simple picture of the school day, with what to bring. */
+    function renderToday(d) {
+      const c = d.current;
+      const dl = d.daily;
+      const w = describe(dl.weather_code[0], 1);
+      const hi = dl.temperature_2m_max[0];
+      const lo = dl.temperature_2m_min[0];
+      const rain = dl.precipitation_probability_max?.[0] ?? 0;
+      const uvv = dl.uv_index_max?.[0];
+      const uv = UV(uvv);
+      const tips = [];
+      if (uvv >= 3) tips.push(['🧢', 'Hat & sunscreen']);
+      if (rain >= 50) tips.push(['☂️', 'Umbrella or raincoat']);
+      else if (rain >= 25) tips.push(['🌂', 'Maybe a raincoat']);
+      if (hi != null && hi < 16) tips.push(['🧥', 'Jumper or jacket']);
+      if (hi != null && hi >= 30) tips.push(['💧', 'Drink lots of water']);
+      if (!tips.length) tips.push(['😊', 'A nice day']);
+      const day = new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+      // The school day at a glance: 9 am, 11 am, 1 pm, 3 pm (today).
+      const ymd = dl.time[0];
+      const slots = [9, 11, 13, 15].map((hr) => {
+        const i = d.hourly.time.indexOf(`${ymd}T${String(hr).padStart(2, '0')}:00`);
+        if (i < 0) return null;
+        const hw = describe(d.hourly.weather_code[i], d.hourly.is_day?.[i] ?? 1);
+        return h('div', { class: 'wxt-slot' }, h('small', {}, `${hr % 12 || 12}${hr < 12 ? 'am' : 'pm'}`), h('span', { class: 'wxt-si', title: hw.text }, hw.icon), h('b', {}, temp(d.hourly.temperature_2m[i])));
+      }).filter(Boolean);
+      setKids(box,
+        h('div', { class: 'wxt-head' }, h('span', {}, day), h('span', {}, `📍 ${s.name}`)),
+        h('div', { class: 'wxt-main' },
+          h('div', { class: 'wxt-icon', 'aria-hidden': 'true' }, w.icon),
+          h('div', { class: 'wxt-words' },
+            h('div', { class: 'wxt-desc' }, w.text),
+            h('div', { class: 'wxt-range' }, h('span', { class: 'wxt-hi' }, `↑ ${temp(hi)}`), h('span', { class: 'wxt-lo' }, `↓ ${temp(lo)}`)),
+            h('div', { class: 'wxt-now' }, `Now ${temp(c.temperature_2m)} · Rain ${rain}%${uv ? ` · UV ${Math.round(uvv)} ${uv.level}` : ''}`),
+          ),
+        ),
+        slots.length ? h('div', { class: 'wxt-slots' }, ...slots) : null,
+        h('div', { class: 'wxt-tips' }, ...tips.map(([i, t]) => h('div', { class: 'wxt-tip' }, h('span', { class: 'wxt-ti' }, i), h('span', {}, t)))),
+        h('div', { class: 'wx-foot' },
+          error ? h('span', { class: 'error' }, error) : null,
+          h('a', { href: 'https://open-meteo.com/', target: '_blank', rel: 'noopener', class: 'wx-credit' }, 'Weather data by Open-Meteo.com'),
+        ),
+      );
+      box.dataset.show = 'today';
+    }
+
     load();
     timer = setInterval(() => load(), REFRESH_MS);
     const onOnline = () => load(true);
@@ -199,7 +247,7 @@ export default {
             status,
           ),
           field('Temperature', select([['C', '°C'], ['F', '°F']], s.unit, (v) => { s.unit = v; ctx.save(); render(); })),
-          field('Show', select([['auto', 'Fit to the widget size'], ['now', 'Just the weather now'], ['full', 'Everything']], s.show, (v) => { s.show = v; ctx.save(); render(); })),
+          isToday ? null : field('Show', select([['auto', 'Fit to the widget size'], ['now', 'Just the weather now'], ['full', 'Everything']], s.show, (v) => { s.show = v; ctx.save(); render(); })),
           h('p', { class: 'hint' }, 'Updates every 15 minutes. Only the place’s rough position (about 1 km) is sent to Open-Meteo, a free weather service. UV advice follows the usual sun-safety steps: slip, slop, slap, seek, slide.'),
         );
       },
@@ -207,3 +255,8 @@ export default {
     };
   },
 };
+
+export default weather;
+
+/** Just today, big and simple — with what to bring (hat, umbrella, jumper, water). */
+export const weatherToday = { ...weather, type: 'weathertoday', title: 'Weather today', icon: '☀️', size: [440, 440] };

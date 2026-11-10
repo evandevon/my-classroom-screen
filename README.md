@@ -10,7 +10,7 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 
 | Basics | Class management | Extras |
 |---|---|---|
-| ⏳ Timer (ring, white→red circle, white→red rectangle, hourglass, bar or numbers) | 🔊 Noise meter (bouncy balls, level bar or emoji face) | ✏️ Whiteboard (pens, eraser, undo, grid/lined/chalkboard; several fingers draw at once; ⏺ record sessions with optional voice, play back at ½–4×, save as video) |
+| ⏳ Timer (ring, white→red circle, white→red rectangle, hourglass, bar or numbers) | 🔊 Noise meter (bouncy balls, level bar or emoji face) | ✏️ Whiteboard (pens, eraser, undo, grid/lined/chalkboard; several fingers draw at once; ⏺ record sessions with optional voice, play back at ½–4× with loop, save as an MP4 quickly even in a background tab) |
 | ⏱️ Stopwatch with laps | 🚦 Traffic light with your own labels | 🧮 Calculator (works safely without `eval`) |
 | 🕒 Clock — 8 styles: analogue/digital, teaching clock (past/to, time in words, set-a-time & quiz), Roman numerals, word clock, sundial with draggable sun, candle, water and incense clocks |
 | 🗓️ School day timeline (coloured sessions with icons, now/next countdown, per-weekday plans, type-in quick entry) |
@@ -23,11 +23,14 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 | 📷 Webcam / document camera (flip, rotate, zoom, freeze, full-resolution photos and ⏺ recorded clips — each opens in its own widget with a ⬇ download button) | | |
 | 🔁 Video loop (each webcam recording loops in its own widget — Step 1, Step 2… — with half/quarter speed and download; or loop any video file) | | |
 | 🎴 Random picture (choose a folder of pictures from the computer; no repeats, auto-change, captions, blurry “mystery” reveal — pictures stay in this browser) | | |
+| ☀️ Weather today (one big picture of the day: high/low, school-hours forecast, what to bring — hat, umbrella, jumper, water) | | |
 | 🌦️ Weather (now, next 6 hours, 5 days, UV sun-safety tips, rain alerts, °C/°F; free data from [Open-Meteo](https://open-meteo.com/), only the rough place is sent) | | |
 | 🎬 Video / Web (YouTube, Google Drive files & folders, Slides, Docs, Vimeo, Canva, Spotify, websites; pop-up window for sites that block embedding) | | |
 | 🎵 Audio (upload, MP3 link, Drive, YouTube, Spotify) | | |
 
 ## Saving and sharing
+
+- Photos, clips, pictures and voice recordings are stored in this browser and **embedded in downloaded screen files** (so those files can be large). Files no screen uses any more (e.g. from a deleted widget) are tidied away automatically.
 
 - **Pause screen** (menu → This screen) stops everything — timers and stopwatches keep their time, alarms, cameras, microphones and videos switch off — so you can carry on tomorrow.
 - Share links can’t carry pictures, clips or sounds from your computer; the share window warns you and offers the screen file instead.
@@ -97,3 +100,9 @@ To add a widget, copy an existing widget file. Export an object with `type`, `ti
 - Maths tools: number line, ten-frame, 120 chart
 - Timetable that highlights the current lesson, and an event countdown
 - Polls and exit tickets, brain-break spinner
+
+## Credits
+
+- [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) by Vanilagy (MIT) — used to save whiteboard recordings as MP4.
+- [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) by Kazuhiko Arase (MIT).
+- Weather data by [Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0).

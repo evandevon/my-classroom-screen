@@ -27,14 +27,14 @@ import qrcode from './qrcode.js';
 import nownext from './nownext.js';
 import webcam from './webcam.js';
 import countdown from './countdown.js';
-import weather from './weather.js';
+import weather, { weatherToday } from './weather.js';
 import randompics from './randompics.js';
 import videoloop from './videoloop.js';
 
 const ALL = [
   timer, stopwatch, clock, alarm, schoolday, calendar, text, list, image, embed, audio,
   noise, traffic, worksymbols, namepicker, groupmaker, tally,
-  whiteboard, calculator, dice, spinner, coin, storydice, scoreboard, qrcode, nownext, webcam, countdown, weather, randompics, videoloop,
+  whiteboard, calculator, dice, spinner, coin, storydice, scoreboard, qrcode, nownext, webcam, countdown, weather, weatherToday, randompics, videoloop,
 ];
 
 export const WIDGETS = Object.fromEntries(ALL.map((w) => [w.type, w]));
@@ -49,7 +49,7 @@ export const byGroup = (g) => ALL.filter((w) => w.group === g);
 
 // The widget bar shows these categories; each opens a pop-up of its widgets.
 export const CATEGORIES = [
-  { id: 'time', label: 'Time & weather', icon: '⏰', types: ['timer', 'stopwatch', 'clock', 'alarm', 'schoolday', 'calendar', 'countdown', 'weather'] },
+  { id: 'time', label: 'Time & weather', icon: '⏰', types: ['timer', 'stopwatch', 'clock', 'alarm', 'schoolday', 'calendar', 'countdown', 'weather', 'weathertoday'] },
   { id: 'class', label: 'Class', icon: '🧑‍🏫', types: ['noise', 'traffic', 'worksymbols', 'nownext', 'namepicker', 'groupmaker', 'tally', 'scoreboard'] },
   { id: 'media', label: 'Words & media', icon: '🖼️', types: ['text', 'list', 'whiteboard', 'image', 'randompics', 'embed', 'audio', 'webcam', 'videoloop', 'qrcode'] },
   { id: 'play', label: 'Maths & chance', icon: '🎲', types: ['calculator', 'dice', 'spinner', 'coin', 'storydice'] },
