@@ -1,5 +1,5 @@
 import { h } from '../util.js';
-import { play, soundSelect } from '../sound.js';
+import { play, soundSelect, unlockAudio, SOUND_LENGTH } from '../sound.js';
 import { panel, select, field } from './_common.js';
 
 const FACES = ['😌', '🙂', '😐', '😬', '😱'];
@@ -29,13 +29,15 @@ export default {
       h('span', {}, 'Too loud at'), thresholdIn,
       h('button', { class: 'btn small', onclick: () => (stop(), (overlay.hidden = false)), 'aria-label': 'Stop listening' }, '⏹'),
     );
-    ctx.view.append(h('div', { class: 'noise' }, canvas, status, footer, overlay));
+    const banner = h('div', { class: 'noise-banner', hidden: true }, 'Too loud!');
+    ctx.view.append(h('div', { class: 'noise' }, canvas, status, banner, footer, overlay));
 
     let stream, actx, analyser, data, raf;
     let level = 0; // smoothed 0..100
     let warnings = 0;
     let overSince = 0;
     let lastAlarm = 0;
+    let mutedUntil = 0;
     const balls = Array.from({ length: 24 }, (_, i) => ({
       x: Math.random(), y: Math.random(), vx: 0, vy: 0, r: 0.035 + Math.random() * 0.03, hue: (i * 47) % 360,
     }));
@@ -43,6 +45,7 @@ export default {
     startBtn.addEventListener('click', start);
 
     async function start() {
+      unlockAudio(); // this click is a user gesture, so sound is allowed from now on
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
       } catch (e) {
@@ -83,16 +86,21 @@ export default {
       measure();
       const now = performance.now();
       const loud = level > s.threshold;
-      if (loud) {
+      // Ignore the room while our own warning sound is playing (the mic would hear it).
+      const listening = now > mutedUntil;
+      if (loud && listening) {
         if (!overSince) overSince = now;
         if (now - overSince > 600 && now - lastAlarm > 4000) {
           lastAlarm = now;
+          overSince = 0;
           warnings++;
           play(s.alarm);
+          mutedUntil = now + ((SOUND_LENGTH[s.alarm] || 1) + 0.6) * 1000;
           ctx.el.classList.add('flash');
-          setTimeout(() => ctx.el.classList.remove('flash'), 900);
+          banner.hidden = false;
+          setTimeout(() => { ctx.el.classList.remove('flash'); banner.hidden = true; }, 2200);
         }
-      } else overSince = 0;
+      } else if (!loud) overSince = 0;
       status.textContent = warnings ? `Too-loud warnings: ${warnings}` : '';
       draw(loud);
       raf = requestAnimationFrame(loop);

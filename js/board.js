@@ -6,6 +6,10 @@ import { h, uid, clamp, toast } from './util.js';
 
 const MIN_W = 150;
 const MIN_H = 110;
+const HEAD_H = 44; // title bar height (keep in sync with CSS)
+const TOP_SAFE = 64; // space for the menu / full-screen buttons
+const GRAB_MIN = 120; // px of title bar that must stay on screen
+const DRAG_SLOP = 6; // px the pointer must move before a drag starts
 
 export class Board {
   constructor(el, { onChange }) {
@@ -29,6 +33,8 @@ export class Board {
   load(screen) {
     for (const id of [...this.mounted.keys()]) this.unmount(id);
     this.screen = screen;
+    // Keep z-index small and tidy (it only ever counts up while you tap widgets).
+    [...screen.widgets].sort((a, b) => (a.z || 0) - (b.z || 0)).forEach((w, i) => (w.z = i + 1));
     for (const rec of screen.widgets) this.mount(rec);
   }
 
@@ -157,15 +163,30 @@ export class Board {
     this.changed();
   }
 
-  layout(m) {
+  /** Area where a title bar may sit: below the top buttons and above the widget dock. */
+  safeArea() {
     const r = this.rect;
+    const dock = document.querySelector('.dock');
+    const dockHidden = document.body.classList.contains('dock-hidden');
+    const dockH = dock && !dockHidden ? dock.getBoundingClientRect().height : 30;
+    return { top: TOP_SAFE, bottom: r.height - dockH - HEAD_H - 16, width: r.width, height: r.height };
+  }
+
+  layout(m) {
+    const a = this.safeArea();
     const { rec, el } = m;
-    el.style.left = `${rec.x * r.width}px`;
-    el.style.top = `${rec.y * r.height}px`;
-    el.style.width = `${Math.max(MIN_W, rec.w * r.width)}px`;
-    el.style.height = `${Math.max(MIN_H, rec.h * r.height)}px`;
+    const w = Math.max(MIN_W, rec.w * a.width);
+    const hh = Math.max(MIN_H, rec.h * a.height);
+    // Whatever is stored, draw the widget so that its title bar can be reached.
+    const left = clamp(rec.x * a.width, -(w - GRAB_MIN), a.width - GRAB_MIN);
+    const top = clamp(rec.y * a.height, a.top, Math.max(a.top, a.bottom));
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+    el.style.width = `${w}px`;
+    el.style.height = `${hh}px`;
     el.style.zIndex = rec.z || 1;
     el.classList.toggle('locked', !!rec.locked);
+    el.classList.toggle('narrow', w < 300);
   }
 
   layoutAll() {
@@ -182,7 +203,7 @@ export class Board {
 
     const view = h('div', { class: 'w-view' });
     const settings = h('div', { class: 'w-settings', hidden: true });
-    const title = h('span', { class: 'w-title' }, h('span', { class: 'w-icon', 'aria-hidden': 'true' }, def.icon), def.title);
+    const title = h('span', { class: 'w-title' }, h('span', { class: 'w-icon', 'aria-hidden': 'true' }, def.icon), h('span', { class: 'w-name' }, def.title));
 
     const btn = (label, icon, onclick, cls = '') =>
       h('button', { class: `w-btn ${cls}`, title: label, 'aria-label': label, onclick }, icon);
@@ -201,7 +222,7 @@ export class Board {
       title,
       h('div', { class: 'w-actions' },
         settingsBtn,
-        btn('Duplicate', '⧉', () => this.duplicate(rec.id), 'hide-locked'),
+        btn('Duplicate', '⧉', () => this.duplicate(rec.id), 'dup hide-locked'),
         lockBtn,
         btn('Remove', '✕', () => this.remove(rec.id), 'close hide-locked'),
       ),
@@ -258,71 +279,136 @@ export class Board {
     this.enableResize(m, resize);
   }
 
+  /**
+   * Track one pointer from pointerdown to pointerup with pointer capture.
+   * Only one gesture per widget at a time; extra fingers are ignored.
+   */
+  track(m, e, handle, { onStart, onMove, onEnd, slop = 0 }) {
+    if (m.gesture) return;
+    const start = { x: e.clientX, y: e.clientY };
+    let started = false;
+    const id = e.pointerId;
+    m.gesture = id;
+
+    // Capture the pointer only once the gesture really starts, so a plain tap on a
+    // title-bar button still produces a normal click on that button.
+    const begin = () => {
+      started = true;
+      try { handle.setPointerCapture(id); } catch { /* pointer already gone */ }
+      document.body.classList.add('moving');
+      onStart?.();
+    };
+    const move = (ev) => {
+      if (ev.pointerId !== id) return;
+      const dx = ev.clientX - start.x;
+      const dy = ev.clientY - start.y;
+      if (!started) {
+        if (Math.hypot(dx, dy) < slop) return;
+        begin();
+      }
+      ev.preventDefault();
+      onMove(dx, dy, ev);
+    };
+    const finish = (ev) => {
+      if (ev.pointerId !== id) return;
+      // Touch pointers are implicitly captured by the element first touched (e.g. the title
+      // text). Moving the capture to the handle fires a bubbling lostpointercapture from that
+      // child — that is not the end of the gesture.
+      if (ev.type === 'lostpointercapture' && ev.target !== handle) return;
+      window.removeEventListener('pointermove', move, true);
+      window.removeEventListener('pointerup', finish, true);
+      window.removeEventListener('pointercancel', finish, true);
+      handle.removeEventListener('lostpointercapture', finish);
+      try { handle.releasePointerCapture(id); } catch { /* fine */ }
+      m.gesture = null;
+      document.body.classList.remove('moving');
+      if (started) onEnd?.();
+    };
+    window.addEventListener('pointermove', move, true);
+    window.addEventListener('pointerup', finish, true);
+    window.addEventListener('pointercancel', finish, true);
+    handle.addEventListener('lostpointercapture', finish);
+    if (slop === 0) begin();
+  }
+
   enableDrag(m, handle) {
+    // The whole title bar is a drag handle — including its buttons. A tap on a button still
+    // works as a button; if the finger moves more than a few pixels it becomes a drag instead.
+    let suppressClick = false;
+    handle.addEventListener('click', (e) => {
+      if (suppressClick) {
+        e.stopPropagation();
+        e.preventDefault();
+        suppressClick = false;
+      }
+    }, true);
+
     handle.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('button') || m.rec.locked || e.button > 0) return;
-      e.preventDefault();
-      handle.setPointerCapture(e.pointerId);
-      const r = this.rect;
-      const start = { px: e.clientX, py: e.clientY, x: m.rec.x, y: m.rec.y };
-      m.el.classList.add('dragging');
-      const move = (ev) => {
-        let nx = start.x + (ev.clientX - start.px) / r.width;
-        let ny = start.y + (ev.clientY - start.py) / r.height;
-        const ww = m.el.offsetWidth / r.width;
-        nx = clamp(nx, -ww + 0.05, 0.95); // allow partly off-screen, never lost
-        ny = clamp(ny, 0, 1 - 0.05);
-        if (this.snap) {
-          nx = Math.round((nx * r.width) / 20) * 20 / r.width;
-          ny = Math.round((ny * r.height) / 20) * 20 / r.height;
-        }
-        m.rec.x = nx;
-        m.rec.y = ny;
-        this.layout(m);
-      };
-      const up = () => {
-        handle.removeEventListener('pointermove', move);
-        handle.removeEventListener('pointerup', up);
-        handle.removeEventListener('pointercancel', up);
-        m.el.classList.remove('dragging');
-        this.changed();
-      };
-      handle.addEventListener('pointermove', move);
-      handle.addEventListener('pointerup', up);
-      handle.addEventListener('pointercancel', up);
+      if (m.rec.locked || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      const onButton = !!e.target.closest('button');
+      if (!onButton) e.preventDefault(); // stop text selection / focus changes
+      const a = this.safeArea();
+      const startX = m.el.offsetLeft;
+      const startY = m.el.offsetTop;
+      this.track(m, e, handle, {
+        slop: onButton || e.pointerType !== 'mouse' ? DRAG_SLOP : 0,
+        onStart: () => {
+          if (onButton) suppressClick = true;
+          m.el.classList.add('dragging');
+        },
+        onMove: (dx, dy) => {
+          let nx = startX + dx;
+          let ny = startY + dy;
+          if (this.snap) {
+            nx = Math.round(nx / 20) * 20;
+            ny = Math.round(ny / 20) * 20;
+          }
+          const w = m.el.offsetWidth;
+          nx = clamp(nx, -(w - GRAB_MIN), a.width - GRAB_MIN);
+          ny = clamp(ny, a.top, Math.max(a.top, a.bottom));
+          m.rec.x = nx / a.width;
+          m.rec.y = ny / a.height;
+          m.el.style.left = `${nx}px`;
+          m.el.style.top = `${ny}px`;
+        },
+        onEnd: () => {
+          m.el.classList.remove('dragging');
+          // A click event may or may not follow; clear the flag shortly after either way.
+          setTimeout(() => (suppressClick = false), 50);
+          this.changed();
+        },
+      });
     });
   }
 
   enableResize(m, handle) {
     handle.addEventListener('pointerdown', (e) => {
-      if (m.rec.locked) return;
+      if (m.rec.locked || (e.pointerType === 'mouse' && e.button !== 0)) return;
       e.preventDefault();
       e.stopPropagation();
-      handle.setPointerCapture(e.pointerId);
-      const r = this.rect;
-      const start = { px: e.clientX, py: e.clientY, w: m.el.offsetWidth, h: m.el.offsetHeight };
-      m.el.classList.add('resizing');
-      const move = (ev) => {
-        let w = Math.max(MIN_W, start.w + ev.clientX - start.px);
-        let hh = Math.max(MIN_H, start.h + ev.clientY - start.py);
-        if (this.snap) {
-          w = Math.round(w / 20) * 20;
-          hh = Math.round(hh / 20) * 20;
-        }
-        m.rec.w = w / r.width;
-        m.rec.h = hh / r.height;
-        this.layout(m);
-      };
-      const up = () => {
-        handle.removeEventListener('pointermove', move);
-        handle.removeEventListener('pointerup', up);
-        handle.removeEventListener('pointercancel', up);
-        m.el.classList.remove('resizing');
-        this.changed();
-      };
-      handle.addEventListener('pointermove', move);
-      handle.addEventListener('pointerup', up);
-      handle.addEventListener('pointercancel', up);
+      const a = this.safeArea();
+      const w0 = m.el.offsetWidth;
+      const h0 = m.el.offsetHeight;
+      this.track(m, e, handle, {
+        onStart: () => m.el.classList.add('resizing'),
+        onMove: (dx, dy) => {
+          let w = Math.max(MIN_W, w0 + dx);
+          let hh = Math.max(MIN_H, h0 + dy);
+          if (this.snap) {
+            w = Math.round(w / 20) * 20;
+            hh = Math.round(hh / 20) * 20;
+          }
+          m.rec.w = w / a.width;
+          m.rec.h = hh / a.height;
+          m.el.style.width = `${w}px`;
+          m.el.style.height = `${hh}px`;
+          m.el.classList.toggle('narrow', w < 300);
+        },
+        onEnd: () => {
+          m.el.classList.remove('resizing');
+          this.changed();
+        },
+      });
     });
   }
 }

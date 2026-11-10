@@ -10,9 +10,10 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 
 | Basics | Class management | Extras |
 |---|---|---|
-| ⏳ Timer (circle, bar or numbers; end sounds; quick presets) | 🔊 Noise meter (bouncy balls, level bar or emoji face) | ✏️ Whiteboard (pens, eraser, undo, grid/lined/chalkboard) |
+| ⏳ Timer (ring, white→red circle, white→red rectangle, hourglass, bar or numbers) | 🔊 Noise meter (bouncy balls, level bar or emoji face) | ✏️ Whiteboard (pens, eraser, undo, grid/lined/chalkboard) |
 | ⏱️ Stopwatch with laps | 🚦 Traffic light with your own labels | 🧮 Calculator (works safely without `eval`) |
-| 🕒 Clock (analogue and/or digital) | 🤫 Work symbols (voice levels + how to work) | 🎲 Dice (1–6 dice, d4–d100) |
+| 🕒 Clock (analogue and/or digital) |
+| ⏰ Alarms (school bells with a pack-up warning beforehand, choice of days and sounds) | | | 🤫 Work symbols (voice levels + how to work) | 🎲 Dice (1–6 dice, any number of sides from 2) |
 | 📝 Text (bold, lists, sizes, colours) | 🎡 Name picker (spinning wheel or flash card, no repeats) | 🏆 Scoreboard (2–8 teams) |
 | ✅ List / checklist | 👥 Group maker (by number of groups or group size) | 🔳 QR code (works offline) |
 | 🖼️ Image (upload or link) | | ➡️ Now / Next visual schedule |
@@ -33,6 +34,8 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 - ☰ → *Large buttons* makes the controls bigger.
 - 🔒 locks a widget so it can't be moved by accident.
 - ▾ above the widget bar hides the bar.
+- Tap the screen once after opening the page. Browsers only allow sound after a tap, and alarms need it.
+- Alarms only ring while the page is open, so leave the tab open.
 - After the first visit, the site works offline, so it keeps running when the school wifi drops. Videos still need internet.
 
 ## Turning on GitHub Pages
