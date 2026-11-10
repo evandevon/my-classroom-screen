@@ -29,6 +29,9 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 
 ## Saving and sharing
 
+- **Pause screen** (menu → This screen) stops everything — timers and stopwatches keep their time, alarms, cameras, microphones and videos switch off — so you can carry on tomorrow.
+- Share links can’t carry pictures, clips or sounds from your computer; the share window warns you and offers the screen file instead.
+
 - **Auto-save:** every change is saved in the browser (IndexedDB) straight away.
 - **Screens:** tap ☰ to make, switch, rename, duplicate or delete screens. You can start blank or from a template (Morning routine, Group work, Quiet reading, Maths lesson).
 - **Share link:** ☰ → *Share link* puts the whole layout inside a long URL you can copy. Student names are **left out** unless you tick the box. Uploaded pictures and audio can't fit in a link.

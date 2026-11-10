@@ -29,6 +29,7 @@ const persist = debounce(async () => {
 }, 400);
 
 const board = new Board(boardEl, { onChange: () => persist() });
+board.onResume = () => resumeScreen();
 
 // ---------- class (labels recorded data, supplies names to widgets) ----------
 const classPill = $('#class-pill');
@@ -70,11 +71,38 @@ async function openScreen(s) {
   persist.flush();
   screen = s;
   board.load(screen);
+  updatePauseBadge();
   await applyBackground();
   nameBtn.textContent = screen.name;
   document.title = `${screen.name} · My Classroom Screen`;
   db.setMeta('lastScreen', screen.id);
   updateClassPill();
+}
+
+// ---------- pause / carry on ----------
+/** Stop everything on this screen (timers keep their time left) so it can be picked up later. */
+function pauseScreen() {
+  if (screen.paused) return;
+  const held = [];
+  for (const rec of screen.widgets) {
+    const line = WIDGETS[rec.type]?.hold?.(rec.state, rec);
+    if (line) held.push(line);
+  }
+  screen.paused = { at: Date.now(), held };
+  board.load(screen);
+  persist.flush();
+  updatePauseBadge();
+}
+function resumeScreen() {
+  if (!screen.paused) return;
+  for (const rec of screen.widgets) WIDGETS[rec.type]?.unhold?.(rec.state, rec);
+  delete screen.paused;
+  board.load(screen);
+  persist.flush();
+  updatePauseBadge();
+}
+function updatePauseBadge() {
+  document.body.classList.toggle('screen-paused', !!screen.paused);
 }
 
 async function applyBackground() {
@@ -160,9 +188,12 @@ async function renderDrawer() {
     h('h3', {}, 'This screen'),
     h('div', { class: 'menu-grid' },
       menuBtn('🎨', 'Background', backgroundDialog),
+      screen.paused
+        ? menuBtn('▶', 'Carry on', () => { resumeScreen(); closeDrawer(); })
+        : menuBtn('⏸', 'Pause screen', () => { pauseScreen(); closeDrawer(); }),
       menuBtn('🔗', 'Share link', shareDialog),
       menuBtn('⬇', 'Download screen', () => exportScreens([screen], screen.name)),
-      menuBtn('🧹', 'Clear widgets', () => { if (confirm('Remove all widgets from this screen?')) board.clearAll(); }),
+      menuBtn('🧹', 'Clear widgets', () => { if (screen.paused) { toast('Carry on with the paused screen first.'); return; } if (confirm('Remove all widgets from this screen?')) board.clearAll(); }),
     ),
     h('h3', {}, 'All screens'),
     h('div', { class: 'menu-grid' },
@@ -295,37 +326,57 @@ function shareDialog() {
     const v = w.state[k];
     return v && (Array.isArray(v) ? v.length : String(v).trim().length);
   }));
-  const out = h('textarea', { class: 'share-url', readonly: true, rows: 4 });
+  const out = h('textarea', { class: 'share-url', readonly: true, rows: 3 });
   const notes = h('p', { class: 'hint' });
+  const warn = h('div', { class: 'share-warn', hidden: true, role: 'alert' });
   const includeNames = h('input', { type: 'checkbox' });
   const copyBtn = h('button', { class: 'btn primary' }, '📋 Copy link');
+  const fileBtn = h('button', { class: 'btn', onclick: () => exportScreens([screen], screen.name) }, '⬇ Download screen file');
+  let missing = [];
   const make = async () => {
     const { url, dropped, long } = await makeShareLink(screen, { includeNames: includeNames.checked });
     out.value = url;
+    missing = dropped;
+    const files = dropped.filter((d) => d.startsWith('uploaded'));
+    const other = dropped.filter((d) => !d.startsWith('uploaded'));
+    const lines = [];
+    if (files.length) {
+      const which = [...new Set(screen.widgets.filter((w) => Object.entries(w.state || {}).some(([k, v]) => (k.endsWith('AssetId') && v) || (k.endsWith('AssetIds') && v?.length))).map((w) => WIDGETS[w.type]?.title || w.type))];
+      if (screen.background?.assetId) which.unshift('Background picture');
+      lines.push(h('p', {}, h('b', {}, '⚠️ Your files won’t be in this link. '), `Pictures, video clips and sounds you added from this computer stay on this computer, so people opening the link will see empty widgets: ${which.join(', ')}.`));
+    }
+    if (other.length) lines.push(h('p', {}, h('b', {}, files.length ? 'Also missing: ' : '⚠️ Not in this link: '), `${other.join(', ')}.`));
+    if (lines.length) lines.push(h('p', {}, 'To share everything, download the screen file and send that instead (they open it with “Open project file”).'));
+    warn.replaceChildren(...lines);
+    warn.hidden = !lines.length;
+    fileBtn.className = lines.length ? 'btn primary' : 'btn';
+    copyBtn.className = lines.length ? 'btn' : 'btn primary';
+    copyBtn.textContent = lines.length ? '📋 Copy link anyway' : '📋 Copy link';
     const bits = [];
-    if (dropped.length) bits.push(`Not included in the link: ${dropped.join(', ')}. Use “Download screen” to share everything.`);
-    if (long) bits.push('This link is very long and may not work in every app — a project file is safer.');
+    if (long) bits.push('This link is very long and may not work in every app — a screen file is safer.');
     bits.push(`${url.length.toLocaleString()} characters.`);
     notes.textContent = bits.join(' ');
   };
   includeNames.addEventListener('change', make);
   copyBtn.addEventListener('click', async () => {
+    const label = copyBtn.textContent;
     try {
       await navigator.clipboard.writeText(out.value);
-      copyBtn.textContent = '✔ Copied';
     } catch {
       out.select();
       document.execCommand('copy');
-      copyBtn.textContent = '✔ Copied';
     }
-    setTimeout(() => (copyBtn.textContent = '📋 Copy link'), 2000);
+    copyBtn.textContent = '✔ Copied';
+    if (missing.some((d) => d.startsWith('uploaded'))) toast('Link copied — remember it doesn’t include your pictures, clips or sounds.', { action: '⬇ Download file', onAction: () => exportScreens([screen], screen.name), ms: 8000 });
+    setTimeout(() => (copyBtn.textContent = label), 2000);
   });
   modal('Share this screen',
     h('p', {}, 'Anyone who opens this link gets their own copy of this screen layout.'),
+    warn,
     hasNames ? h('label', { class: 'check' }, includeNames, h('span', {}, 'Include student names and calendar events (only share with colleagues at your school)')) : null,
     out,
     notes,
-    h('div', { class: 'row end' }, h('button', { class: 'btn', onclick: () => exportScreens([screen], screen.name) }, '⬇ Download as file instead'), copyBtn),
+    h('div', { class: 'row end' }, fileBtn, copyBtn),
   );
   make();
 }
