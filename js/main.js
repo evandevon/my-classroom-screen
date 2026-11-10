@@ -301,7 +301,7 @@ function shareDialog() {
   });
   modal('Share this screen',
     h('p', {}, 'Anyone who opens this link gets their own copy of this screen layout.'),
-    hasNames ? h('label', { class: 'check' }, includeNames, h('span', {}, 'Include student names (only share with colleagues at your school)')) : null,
+    hasNames ? h('label', { class: 'check' }, includeNames, h('span', {}, 'Include student names and calendar events (only share with colleagues at your school)')) : null,
     out,
     notes,
     h('div', { class: 'row end' }, h('button', { class: 'btn', onclick: () => exportScreens([screen], screen.name) }, '⬇ Download as file instead'), copyBtn),

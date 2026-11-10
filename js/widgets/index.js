@@ -3,6 +3,8 @@ import timer from './timer.js';
 import stopwatch from './stopwatch.js';
 import clock from './clock.js';
 import alarm from './alarm.js';
+import schoolday from './schoolday.js';
+import calendar from './calendar.js';
 import text from './text.js';
 import list from './list.js';
 import image from './image.js';
@@ -21,7 +23,7 @@ import qrcode from './qrcode.js';
 import nownext from './nownext.js';
 
 const ALL = [
-  timer, stopwatch, clock, alarm, text, list, image, embed, audio,
+  timer, stopwatch, clock, alarm, schoolday, calendar, text, list, image, embed, audio,
   noise, traffic, worksymbols, namepicker, groupmaker,
   whiteboard, calculator, dice, scoreboard, qrcode, nownext,
 ];
