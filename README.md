@@ -10,7 +10,7 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 
 | Basics | Class management | Extras |
 |---|---|---|
-| ⏳ Timer (ring, white→red circle, white→red rectangle, hourglass, bar or numbers) | 🔊 Noise meter (bouncy balls, level bar or emoji face) | ✏️ Whiteboard (pens, eraser, undo, grid/lined/chalkboard) |
+| ⏳ Timer (ring, white→red circle, white→red rectangle, hourglass, bar or numbers) | 🔊 Noise meter (bouncy balls, level bar or emoji face) | ✏️ Whiteboard (pens, eraser, undo, grid/lined/chalkboard; several fingers draw at once; ⏺ record sessions with optional voice, play back at ½–4×, save as video) |
 | ⏱️ Stopwatch with laps | 🚦 Traffic light with your own labels | 🧮 Calculator (works safely without `eval`) |
 | 🕒 Clock — 8 styles: analogue/digital, teaching clock (past/to, time in words, set-a-time & quiz), Roman numerals, word clock, sundial with draggable sun, candle, water and incense clocks |
 | 🗓️ School day timeline (coloured sessions with icons, now/next countdown, per-weekday plans, type-in quick entry) |
