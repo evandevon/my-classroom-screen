@@ -38,7 +38,7 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 - **Auto-save:** every change is saved in the browser (IndexedDB) straight away.
 - **Screens:** tap ☰ to make, switch, rename, duplicate or delete screens. You can start blank or from a template (Morning routine, Group work, Quiet reading, Maths lesson).
 - **Share link:** ☰ → *Share link* puts the whole layout inside a long URL you can copy. Student names are **left out** unless you tick the box. Uploaded pictures and audio can't fit in a link.
-- **Project file:** ☰ → *Download screen* or *Download all* saves a `.classroom.json` file that includes uploaded pictures and audio. *Open project file* loads it on any computer. Download a backup now and then.
+- **Project file:** ☰ → *Download screen* or *Download all* saves a `.classroom` file — a zip containing `classroom.json` (the screens) and a `files/` folder with every photo, clip, picture and sound at its real size (rename to `.zip` to look inside). *Open project file* loads it on any computer, and still opens older `.classroom.json` files. Download a backup now and then.
 
 ## Classes and student lists (stay on this device)
 
@@ -83,6 +83,7 @@ js/main.js            app: screens, menu, dock, sharing dialogs
 js/board.js           drag / resize / z-order (Pointer Events: mouse, pen and touch)
 js/storage.js         IndexedDB (screens, uploaded assets, settings)
 js/share.js           share links (deflate + base64url in the #hash) and project files
+js/zip.js             tiny zip reader/writer for .classroom files
 js/templates.js       starter screens and backgrounds
 js/sound.js           sound effects made with Web Audio (no audio files)
 js/widgets/*.js       one file per widget; register new ones in js/widgets/index.js

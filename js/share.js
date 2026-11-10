@@ -1,7 +1,8 @@
+import { makeZip, readZip, isZip } from './zip.js';
 // Share links (compressed screen in the URL hash) and project files (JSON with embedded assets).
 
 import { db } from './storage.js';
-import { blobToDataURL, dataURLToBlob, uid } from './util.js';
+import { dataURLToBlob, uid } from './util.js';
 import { WIDGETS } from './widgets/index.js';
 import { classLists } from './classes.js';
 
@@ -128,28 +129,62 @@ function assetIdsIn(screen) {
   return ids;
 }
 
+const EXT_BY_TYPE = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/webm': 'webm', 'audio/mp4': 'm4a', 'audio/webm': 'webm', 'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/ogg': 'ogg' };
+const README = `My Classroom Screen — saved screens
+https://evandevon.github.io/my-classroom-screen/
+
+To open: in My Classroom Screen, menu → Open project file, and choose this file.
+
+This file is a normal zip. Rename it to .zip to look inside:
+  classroom.json   the screens and their settings
+  files/           photos, video clips, pictures and sounds used by the screens
+`;
+
+/**
+ * A ".classroom" file: a zip holding classroom.json (screens) plus each stored file as itself
+ * (no base64 bloat, so clips and photos stay their real size).
+ */
 export async function buildProjectFile(screens) {
   const assets = {};
+  const files = [];
   for (const s of screens) {
     for (const id of assetIdsIn(s)) {
       if (assets[id]) continue;
       const a = await db.getAsset(id);
-      if (a) assets[id] = { name: a.name, type: a.type, data: await blobToDataURL(a.blob) };
+      if (!a) continue;
+      const type = a.type || a.blob.type || '';
+      const ext = (a.name?.match(/\.([a-z0-9]{1,5})$/i)?.[1] || EXT_BY_TYPE[type.split(';')[0]] || 'bin').toLowerCase();
+      const file = `files/${id}.${ext}`;
+      assets[id] = { name: a.name, type, file };
+      files.push({ name: file, data: a.blob, compress: !/^(image\/(jpeg|png|gif|webp)|video|audio)/.test(type) });
     }
   }
   const json = JSON.stringify({ format: FORMAT, version: VERSION, exported: new Date().toISOString(), screens, assets }, null, 1);
-  return new Blob([json], { type: 'application/json' });
+  return makeZip([{ name: 'classroom.json', data: json, compress: true }, { name: 'README.txt', data: README }, ...files], 'application/x-classroom+zip');
 }
 
-/** Returns new screens (with fresh ids) and stores their assets. */
-export async function importProjectFile(text) {
-  const data = JSON.parse(text);
+/** Opens a .classroom (zip) file, or an older .json project file. */
+export async function importProjectFile(file) {
+  let data;
+  let zip = null;
+  if (typeof file !== 'string' && (await isZip(file))) {
+    zip = await readZip(file);
+    const entry = zip.get('classroom.json');
+    if (!entry) throw new Error('This is not a My Classroom Screen file.');
+    data = JSON.parse(new TextDecoder().decode(await entry.read()));
+  } else {
+    data = JSON.parse(typeof file === 'string' ? file : await file.text());
+  }
   if (data.format !== FORMAT || !Array.isArray(data.screens)) throw new Error('This is not a My Classroom Screen project file.');
   const idMap = {};
   for (const [oldId, a] of Object.entries(data.assets || {})) {
+    let blob = null;
+    if (a.file && zip?.get(a.file)) blob = await zip.get(a.file).blob(a.type);
+    else if (a.data) blob = await dataURLToBlob(a.data); // older .json files
+    if (!blob) continue;
     const id = uid('asset');
     idMap[oldId] = id;
-    await db.putAsset({ id, name: a.name, type: a.type, blob: await dataURLToBlob(a.data) });
+    await db.putAsset({ id, name: a.name, type: a.type, blob });
   }
   return data.screens.map((s) => prepareImportedScreen(s, idMap));
 }

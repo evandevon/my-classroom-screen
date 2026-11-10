@@ -387,14 +387,14 @@ async function exportScreens(screens, name) {
   const fresh = await Promise.all(screens.map(async (s) => (s.id === screen.id ? screen : (await db.getScreen(s.id)) || s)));
   const blob = await buildProjectFile(fresh);
   const safe = name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'screen';
-  downloadBlob(blob, `${safe}.classroom.json`);
+  downloadBlob(blob, `${safe}.classroom`);
 }
 
 async function importDialog() {
-  const f = await pickFile('.json,application/json');
+  const f = await pickFile('.classroom,.zip,.json,application/json,application/zip');
   if (!f) return;
   try {
-    const screens = await importProjectFile(await f.text());
+    const screens = await importProjectFile(f);
     for (const s of screens) await db.putScreen(s);
     await openScreen(screens[0]);
     toast(`Opened ${screens.length} screen${screens.length === 1 ? '' : 's'} from the file.`);
