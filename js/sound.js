@@ -67,12 +67,18 @@ export function setVolume(v) {
 }
 export const getVolume = () => volume;
 
+// While a sound is being "booked" for later, every note is shifted by this many seconds
+// and collected so the booking can be cancelled.
+let offset = 0;
+let collecting = null;
+
 /** One note. opts: type, gain, to (glide to frequency), attack */
 function tone(freq, start, dur, { type = 'sine', gain = 0.3, to, attack = 0.01 } = {}) {
   const a = ac();
   if (!a) return;
-  const t = a.currentTime + 0.03 + start;
+  const t = a.currentTime + 0.03 + offset + start;
   const o = a.createOscillator();
+  collecting?.push(o);
   const g = a.createGain();
   o.type = type;
   o.frequency.setValueAtTime(freq, t);
@@ -170,6 +176,46 @@ export function playRepeated(name, times = 3) {
   };
   step();
   return () => clearTimeout(timer);
+}
+
+/**
+ * Book a sound to play at a clock time (ms since epoch), on the audio hardware clock.
+ * Booked sounds play exactly on time even when the tab is in the background and the page's
+ * own timers are paused or slowed. Returns { at, cancel(), playing() }.
+ */
+export function scheduleSound(name, atMs, times = 1) {
+  const a = ac();
+  const nodes = [];
+  const gap = (SOUND_LENGTH[name] || 1.2) + 0.5;
+  // Only book when sound is unlocked; a suspended audio clock is frozen, so times would drift.
+  if (a && a.state === 'running' && SOUNDS[name]) {
+    const base = Math.max(0, (atMs - Date.now()) / 1000);
+    collecting = nodes;
+    try {
+      for (let i = 0; i < times; i++) {
+        offset = base + i * gap;
+        SOUNDS[name].play();
+      }
+    } catch (e) {
+      console.warn('could not book sound', e);
+    } finally {
+      offset = 0;
+      collecting = null;
+    }
+  }
+  return {
+    at: atMs,
+    sound: name,
+    times,
+    // Whether the audio system can actually play it (it has been unlocked by a tap).
+    live: !!a && a.state === 'running',
+    cancel() {
+      for (const o of nodes) {
+        try { o.stop(0); o.disconnect(); } catch { /* already finished */ }
+      }
+      nodes.length = 0;
+    },
+  };
 }
 
 /** A <select> of alarm sounds with a ▶ test button. */

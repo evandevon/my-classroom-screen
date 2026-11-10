@@ -35,7 +35,7 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 - 🔒 locks a widget so it can't be moved by accident.
 - ▾ above the widget bar hides the bar.
 - Tap the screen once after opening the page. Browsers only allow sound after a tap, and alarms need it.
-- Alarms only ring while the page is open, so leave the tab open.
+- Alarms and timers keep ringing when another tab is in front. Their sounds are booked ahead on the audio clock, and a background worker keeps the countdown running. See ☰ → *Keep alarms ringing* to stop the browser putting the tab to sleep.
 - After the first visit, the site works offline, so it keeps running when the school wifi drops. Videos still need internet.
 
 ## Turning on GitHub Pages
@@ -65,6 +65,8 @@ sw.js                 offline cache. Bump VERSION when files change
 To add a widget, copy an existing widget file. Export an object with `type`, `title`, `icon`, `group`, `size`, `defaultState()` and `mount(ctx)`, then add it to `js/widgets/index.js` and to the file list in `sw.js`. Put anything that holds student names in `privateKeys` so share links leave it out.
 
 ## Ideas for later
+
+- **If background alarms still prove unreliable:** add an optional "keep tab awake" switch that plays an inaudible tone while a timer runs or an alarm is due. Browsers don't slow down or put to sleep a tab that is playing sound, but a speaker icon shows on the tab.
 
 - Web Serial widget: let an Arduino button or sensor start a timer, pick a name or drive a meter
 - Maths tools: number line, ten-frame, 120 chart
