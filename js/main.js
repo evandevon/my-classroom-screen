@@ -1,7 +1,7 @@
 // App shell: screens, menu, dock, backgrounds, sharing.
 
 import { Board } from './board.js';
-import { db, assetURL } from './storage.js';
+import { db, assetURL, sweepAssets, assetIdsOfScreen } from './storage.js';
 import { WIDGETS, CATEGORIES } from './widgets/index.js';
 import { TEMPLATES, GRADIENTS, SOLIDS } from './templates.js';
 import { makeShareLink, readShareHash, buildProjectFile, importProjectFile, prepareImportedScreen } from './share.js';
@@ -531,6 +531,14 @@ async function init() {
     target = screens.find((s) => s.id === lastId) || screens[0];
   }
   await openScreen(target);
+  // Tidy up files nothing uses any more (deleted widgets / screens), now and every half hour.
+  const sweep = () => {
+    persist.flush();
+    const keep = board.lastRemoved ? [...assetIdsOfScreen({ widgets: [board.lastRemoved] })] : [];
+    setTimeout(() => sweepAssets(keep).catch((e) => console.warn('tidy-up', e)), 1500); // after the save lands
+  };
+  setTimeout(sweep, 15000);
+  setInterval(sweep, 30 * 60 * 1000);
 }
 
 init();

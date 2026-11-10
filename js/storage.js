@@ -54,7 +54,8 @@ export const db = {
 
   // Assets: { id, blob, name, type }
   getAsset: (id) => tx('assets', 'readonly', (s) => s.get(id)),
-  putAsset: (asset) => tx('assets', 'readwrite', (s) => s.put(asset)),
+  putAsset: (asset) => tx('assets', 'readwrite', (s) => s.put({ created: Date.now(), ...asset })),
+  listAssetKeys: () => tx('assets', 'readonly', (s) => s.getAllKeys()),
   deleteAsset: (id) => tx('assets', 'readwrite', (s) => s.delete(id)),
 
   // Meta key/value
@@ -93,3 +94,35 @@ export async function assetURL(id) {
 
 // Ask the browser not to evict our data under storage pressure.
 navigator.storage?.persist?.().catch(() => {});
+
+/** Every uploaded file a screen points to (background, widget files, picture lists). */
+export function assetIdsOfScreen(screen) {
+  const ids = new Set();
+  if (screen?.background?.assetId) ids.add(screen.background.assetId);
+  for (const w of screen?.widgets || []) {
+    for (const [k, v] of Object.entries(w.state || {})) {
+      if (k.endsWith('AssetId') && v) ids.add(v);
+      if (k.endsWith('AssetIds') && Array.isArray(v)) v.forEach((x) => x && ids.add(x));
+    }
+  }
+  return ids;
+}
+
+/**
+ * Delete stored files (photos, clips, voice recordings…) that no screen uses any more,
+ * e.g. after a widget or screen is deleted. Files added in the last 10 minutes are left
+ * alone (they may belong to something not saved yet, or to an undo).
+ */
+export async function sweepAssets(keep = []) {
+  const used = new Set(keep);
+  for (const sc of await db.listScreens()) for (const id of assetIdsOfScreen(sc)) used.add(id);
+  let freed = 0;
+  for (const id of await db.listAssetKeys()) {
+    if (used.has(id)) continue;
+    const a = await db.getAsset(id);
+    if (a?.created && Date.now() - a.created < 10 * 60 * 1000) continue;
+    freed += a?.blob?.size || 0;
+    await db.deleteAsset(id);
+  }
+  return freed;
+}
