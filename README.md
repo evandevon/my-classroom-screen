@@ -30,9 +30,15 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 - **Share link:** ☰ → *Share link* puts the whole layout inside a long URL you can copy. Student names are **left out** unless you tick the box. Uploaded pictures and audio can't fit in a link.
 - **Project file:** ☰ → *Download screen* or *Download all* saves a `.classroom.json` file that includes uploaded pictures and audio. *Open project file* loads it on any computer. Download a backup now and then.
 
+## Classes and student lists (stay on this device)
+
+- **☰ → Classes & student lists:** make a class, then type names or paste a column from a spreadsheet. You can also import or export CSV to move lists to another computer.
+- **👥 button in the top bar:** choose the current class. It can also switch automatically when the School day timeline's session name contains a class name.
+- The Name picker, Group maker, Tally (per student), Scoreboard ("a row for each student") and Stopwatch use the current class's names, or their own typed list.
+- Class lists are never put into share links or screen files. Student names in widgets are taken out of share links unless you choose to include them.
+
 ## Recording data (stays on this device)
 
-- Tap **👥 Class** at the top to label what you record with a class (or let the School day timeline fill it in).
 - Use the **Tally** widget, or turn on **📊 Record** in the settings of the Scoreboard, Stopwatch (e.g. time off-task), Noise meter, Traffic light or Name picker. A red **● REC** shows while recording.
 - **☰ → 📊 Data** lets you filter by date, class, widget or student, see totals, **download a CSV** for Excel or Sheets, copy rows, and delete records. You can also have old records deleted automatically.
 - Records stay only in this browser on this device. They are never put into share links or screen files. They're for your own teaching notes; official records still belong in your school's system.

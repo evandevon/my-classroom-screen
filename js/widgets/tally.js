@@ -2,6 +2,7 @@ import { h, parseLines, setKids } from '../util.js';
 import { play } from '../sound.js';
 import { logEvent, undoEvent, recBadge, RECORD_HINT } from '../datalog.js';
 import { panel, checkbox, field, textarea, select } from './_common.js';
+import { namesFor, sourceSelect, sourceName, onClassChange } from '../classes.js';
 
 // Tally counter: tap to count things that happen (interruptions, great answers, kindness…),
 // for the whole class or per student. Each tap is recorded in the Data log (on this device only).
@@ -27,6 +28,7 @@ export default {
     cats: DEFAULT_CATS,
     students: '',
     mode: 'class', // class | students
+    source: 'current',
     current: 0, // selected category in student mode
     counts: {}, // "cat|who" -> number, for this lesson's display
     record: true,
@@ -64,7 +66,7 @@ export default {
 
     function render() {
       const cats = parseCats(s.cats);
-      const students = parseLines(s.students);
+      const students = namesFor(s.source) || parseLines(s.students);
       const perStudent = s.mode === 'students' && students.length;
       if (s.current >= cats.length) s.current = 0;
       const foot = h('div', { class: 'tally-foot' },
@@ -85,7 +87,7 @@ export default {
               h('span', { class: 'tb-count' }, String(s.counts[key(c.name)] || 0)),
             )),
           ),
-          s.mode === 'students' ? h('p', { class: 'hint' }, 'Add student names in ⚙ to count for each student.') : null,
+          s.mode === 'students' ? h('p', { class: 'hint' }, 'Choose a class (👥 at the top) or add student names in ⚙ to count for each student.') : null,
           foot,
         );
         return;
@@ -109,14 +111,17 @@ export default {
       );
     }
     render();
+    const offClass = onClassChange(render);
 
     return {
+      destroy: () => offClass(),
       resize: render,
       openSettings() {
         panel(ctx, 'Tally',
           field('Things to count (one per line, start with an emoji if you like)', textarea(s.cats, (v) => { s.cats = v; ctx.save(); }, { rows: 5 })),
           field('Count for', select([['class', 'The whole class'], ['students', 'Each student']], s.mode, (v) => { s.mode = v; ctx.save(); ctx.openSettings(); })),
-          s.mode === 'students' ? field('Student names (one per line)', textarea(s.students, (v) => { s.students = v; ctx.save(); }, { rows: 7, placeholder: 'Ava\nBen\nCharlie' })) : null,
+          s.mode === 'students' ? field('Names from', sourceSelect(s.source, (v) => { s.source = v; ctx.save(); ctx.openSettings(); })) : null,
+          s.mode === 'students' && (s.source === 'own' || !namesFor(s.source)) ? field('Student names (one per line)', textarea(s.students, (v) => { s.students = v; ctx.save(); }, { rows: 7, placeholder: 'Ava\nBen\nCharlie' })) : null,
           checkbox('📊 Record each tap in the Data log', s.record, (v) => { s.record = v; ctx.save(); }),
           checkbox('Pop sound on each tap', s.sound, (v) => { s.sound = v; ctx.save(); }),
           h('p', { class: 'hint' }, RECORD_HINT),

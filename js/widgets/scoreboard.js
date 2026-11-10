@@ -1,6 +1,7 @@
 import { h } from '../util.js';
 import { play } from '../sound.js';
 import { logEvent, recBadge, RECORD_HINT } from '../datalog.js';
+import { namesFor, sourceName } from '../classes.js';
 import { panel, numberInput, textInput, field, swatches, checkbox, PALETTE } from './_common.js';
 
 export default {
@@ -10,6 +11,14 @@ export default {
   group: 'extras',
   size: [520, 300],
   hasSettings: true,
+  /** For share links: rows named after students in a class list become "Player 1", "Player 2"… */
+  scrubNames(state, known) {
+    let changed = false;
+    state.teams.forEach((t, i) => {
+      if (known.has(String(t.name).toLowerCase())) { t.name = `Player ${i + 1}`; changed = true; }
+    });
+    return changed;
+  },
   defaultState: () => ({
     record: false,
     step: 1,
@@ -69,7 +78,14 @@ export default {
         drawTeams();
         panel(ctx, 'Scoreboard',
           teamsBox,
-          h('p', { class: 'hint' }, 'Tip: add a row for each student to track individual points.'),
+          namesFor('current')
+            ? h('button', { class: 'btn', onclick: () => {
+                const names = namesFor('current');
+                if (!confirm(`Replace the teams with a row for each of the ${names.length} students in ${sourceName('current')}? (Scores start at 0.)`)) return;
+                s.teams = names.map((n, i) => ({ name: n, score: 0, color: PALETTE[i % PALETTE.length] }));
+                ctx.save(); render(); ctx.openSettings();
+              } }, `👥 Make a row for each student in ${sourceName('current')}`)
+            : h('p', { class: 'hint' }, 'Tip: choose a class (👥 at the top) to make a row for each student, or add rows yourself.'),
           h('div', { class: 'row' },
             h('button', { class: 'btn', onclick: () => { if (s.teams.length < 30) { s.teams.push({ name: `Team ${s.teams.length + 1}`, score: 0, color: PALETTE[s.teams.length % PALETTE.length] }); drawTeams(); render(); ctx.save(); } } }, '+ Add team'),
             h('button', { class: 'btn', onclick: () => { s.teams.forEach((t) => (t.score = 0)); render(); ctx.save(); } }, 'Reset scores'),

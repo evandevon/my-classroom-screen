@@ -1,6 +1,7 @@
 import { h, parseLines, shuffle } from '../util.js';
 import { play } from '../sound.js';
 import { panel, select, numberInput, textarea, field, PALETTE } from './_common.js';
+import { namesFor, sourceSelect, sourceName, onClassChange } from '../classes.js';
 
 export default {
   type: 'groupmaker',
@@ -10,13 +11,14 @@ export default {
   size: [560, 400],
   hasSettings: true,
   privateKeys: ['names', 'groups'],
-  defaultState: () => ({ names: '', by: 'count', n: 4, groups: [] }),
+  defaultState: () => ({ source: 'current', names: '', by: 'count', n: 4, groups: [] }),
 
   mount(ctx) {
     const s = ctx.state;
+    const allNames = () => namesFor(s.source) || parseLines(s.names);
     const grid = h('div', { class: 'groups' });
     const empty = h('div', { class: 'empty' },
-      h('p', {}, 'Add names, then make random groups'),
+      h('p', {}, 'Choose a class (👥 at the top) or add names, then make random groups'),
       h('button', { class: 'btn primary', onclick: () => ctx.openSettings() }, 'Add names'),
     );
     const byLabel = h('span', {});
@@ -29,7 +31,7 @@ export default {
     ctx.view.append(h('div', { class: 'groupmaker' }, empty, grid, foot));
 
     function make() {
-      const names = shuffle(parseLines(s.names));
+      const names = shuffle(allNames());
       if (!names.length) return;
       const count = s.by === 'count' ? Math.min(s.n, names.length) : Math.max(1, Math.ceil(names.length / s.n));
       const groups = Array.from({ length: count }, () => []);
@@ -41,7 +43,7 @@ export default {
     }
 
     function render(animate = false) {
-      const has = parseLines(s.names).length > 0;
+      const has = allNames().length > 0;
       empty.hidden = has;
       foot.hidden = !has;
       byLabel.textContent = s.by === 'count' ? 'groups' : 'per group';
@@ -56,11 +58,16 @@ export default {
       );
     }
     render();
+    const offClass = onClassChange(() => render());
 
     return {
+      destroy: () => offClass(),
       openSettings() {
         panel(ctx, 'Group maker',
-          field('Names (one per line)', textarea(s.names, (v) => { s.names = v; ctx.save(); }, { rows: 8, placeholder: 'Ava\nBen\nCharlie' })),
+          field('Names from', sourceSelect(s.source, (v) => { s.source = v; ctx.save(); ctx.openSettings(); })),
+          s.source === 'own' || !namesFor(s.source)
+            ? field('Names (one per line)', textarea(s.names, (v) => { s.names = v; ctx.save(); }, { rows: 8, placeholder: 'Ava\nBen\nCharlie' }))
+            : h('p', { class: 'hint' }, `Using ${allNames().length} names from ${sourceName(s.source)}. Edit them in ☰ → Classes & student lists.`),
           h('div', { class: 'row' },
             field('Make', select([['count', 'this many groups'], ['size', 'groups of this size']], s.by, (v) => { s.by = v; ctx.save(); })),
             field('Number', numberInput(s.n, (v) => { if (v >= 1) { s.n = v; ctx.save(); } }, { min: 1, max: 30 })),
