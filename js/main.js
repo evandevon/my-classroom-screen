@@ -38,7 +38,7 @@ function updateClassPill() {
   const c = currentClassName();
   classPill.querySelector('span').textContent = c || 'Choose class';
   classPill.classList.toggle('unset', !c);
-  classPill.title = c ? `Class: ${c}${fromTimeline() ? ' (from the School day timeline)' : ''} — tap to change` : 'Choose a class (labels recorded data and gives widgets the class list)';
+  classPill.title = c ? `Class: ${c}${fromTimeline() ? ' (from the Activity timeline)' : ''} — tap to change` : 'Choose a class (labels recorded data and gives widgets the class list)';
 }
 setLogContext({ getClass: currentClassName, getScreen: () => screen });
 onClassChange(updateClassPill);

@@ -72,7 +72,7 @@ export async function showDataScreen() {
         h('ul', {},
           h('li', {}, 'Add a ', h('b', {}, 'Tally'), ' widget to count things like interruptions or great answers — for the whole class or for each student.'),
           h('li', {}, 'Or open ⚙ on a Scoreboard, Stopwatch, Noise meter, Traffic light or Name picker and turn on ', h('b', {}, '📊 Record'), '. A red ● REC shows while it records.'),
-          h('li', {}, 'Tap the ', h('b', {}, '👥 class'), ' button at the top so records are labelled with the right class (or let the School day timeline fill it in).'),
+          h('li', {}, 'Tap the ', h('b', {}, '👥 class'), ' button at the top so records are labelled with the right class (or let the Activity timeline fill it in).'),
           h('li', {}, 'The downloaded spreadsheet opens in Excel or Google Sheets, where you can sort, filter and chart it.'),
         ),
       ),

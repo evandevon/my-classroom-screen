@@ -43,13 +43,13 @@ export async function initClasses(getScreen) {
   }
   await db.setMeta('classLabel', '');
   st.lastName = currentClassName();
-  // The School day timeline can change the class as sessions change.
+  // The Activity timeline can change the class as sessions change.
   setInterval(() => { if (currentClassName() !== st.lastName) emit(); }, 15000);
 }
 
 export const classLists = () => st.lists;
 
-/** If the School day timeline on this screen is in a session, which class is it? */
+/** If the Activity timeline on this screen is in a session, which class is it? */
 function sessionMatch() {
   if (!st.auto) return null;
   const sd = st.getScreen()?.widgets.find((w) => w.type === 'schoolday');
@@ -134,7 +134,7 @@ export function showClassPicker() {
     h('div', { class: 'row' },
       h('button', { class: 'btn', onclick: () => { dlg.close(); showClassManager(); } }, '✎ Add or edit classes…'),
     ),
-    h('label', { class: 'check' }, auto, h('span', {}, 'When this screen has a School day timeline, switch to the class whose name matches the current session')),
+    h('label', { class: 'check' }, auto, h('span', {}, 'When this screen has an Activity timeline, switch to the class whose name matches the current session')),
     note,
     h('p', { class: 'hint' }, '🔒 Class lists stay on this device. They are not put into share links or screen files.'),
   );
