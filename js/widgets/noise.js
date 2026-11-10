@@ -1,6 +1,7 @@
 import { h } from '../util.js';
 import { play, soundSelect, unlockAudio, SOUND_LENGTH } from '../sound.js';
-import { panel, select, field } from './_common.js';
+import { panel, select, field, checkbox } from './_common.js';
+import { logEvent, recBadge, RECORD_HINT } from '../datalog.js';
 
 const FACES = ['😌', '🙂', '😐', '😬', '😱'];
 
@@ -11,7 +12,7 @@ export default {
   group: 'manage',
   size: [400, 320],
   hasSettings: true,
-  defaultState: () => ({ style: 'balls', threshold: 60, sensitivity: 5, alarm: 'beep' }),
+  defaultState: () => ({ record: false, style: 'balls', threshold: 60, sensitivity: 5, alarm: 'beep' }),
 
   mount(ctx) {
     const s = ctx.state;
@@ -30,7 +31,9 @@ export default {
       h('button', { class: 'btn small', onclick: () => (stop(), (overlay.hidden = false)), 'aria-label': 'Stop listening' }, '⏹'),
     );
     const banner = h('div', { class: 'noise-banner', hidden: true }, 'Too loud!');
-    ctx.view.append(h('div', { class: 'noise' }, canvas, status, banner, footer, overlay));
+    const badge = recBadge();
+    ctx.view.append(h('div', { class: 'noise' }, canvas, status, banner, footer, overlay), badge);
+    badge.hidden = !s.record;
 
     let stream, actx, analyser, data, raf;
     let level = 0; // smoothed 0..100
@@ -38,6 +41,9 @@ export default {
     let overSince = 0;
     let lastAlarm = 0;
     let mutedUntil = 0;
+    let levelSum = 0;
+    let levelN = 0;
+    let startedAt = 0;
     const balls = Array.from({ length: 24 }, (_, i) => ({
       x: Math.random(), y: Math.random(), vx: 0, vy: 0, r: 0.035 + Math.random() * 0.03, hue: (i * 47) % 360,
     }));
@@ -60,10 +66,20 @@ export default {
       src.connect(analyser);
       overlay.hidden = true;
       warnings = 0;
+      levelSum = 0;
+      levelN = 0;
+      startedAt = Date.now();
       loop();
     }
 
     function stop() {
+      // Record a summary of the listening session.
+      if (s.record && startedAt && levelN > 30) {
+        const mins = (Date.now() - startedAt) / 60000;
+        logEvent({ widget: 'noise', widgetId: ctx.rec.id, kind: 'noise-session', label: 'Average noise level', value: levelSum / levelN, unit: 'level',
+          note: `${warnings} too-loud warning${warnings === 1 ? '' : 's'} in ${Math.max(1, Math.round(mins))} min (too loud at ${s.threshold})` });
+      }
+      startedAt = 0;
       cancelAnimationFrame(raf);
       stream?.getTracks().forEach((t) => t.stop());
       actx?.close().catch(() => {});
@@ -84,6 +100,8 @@ export default {
 
     function loop() {
       measure();
+      levelSum += level;
+      levelN += 1;
       const now = performance.now();
       const loud = level > s.threshold;
       // Ignore the room while our own warning sound is playing (the mic would hear it).
@@ -94,6 +112,7 @@ export default {
           lastAlarm = now;
           overSince = 0;
           warnings++;
+          if (s.record) logEvent({ widget: 'noise', widgetId: ctx.rec.id, kind: 'noise-warning', label: 'Too loud', value: level, unit: 'level' });
           play(s.alarm);
           mutedUntil = now + ((SOUND_LENGTH[s.alarm] || 1) + 0.6) * 1000;
           ctx.el.classList.add('flash');
@@ -205,6 +224,7 @@ export default {
             return r;
           })()),
           field('Too-loud sound', soundSelect(s.alarm, (v) => { s.alarm = v; ctx.save(); })),
+          checkbox('📊 Record too-loud warnings and the average level', s.record, (v) => { s.record = v; badge.hidden = !v; ctx.save(); }),
           h('p', { class: 'hint' }, 'Tip: start listening, then drag the “Too loud at” slider to just above your normal working noise.'),
         );
       },

@@ -1,7 +1,8 @@
-// IndexedDB persistence: screens (layouts), assets (uploaded images/audio), meta (settings).
+// IndexedDB persistence: screens (layouts), assets (uploaded images/audio), meta (settings),
+// events (the activity log used for data collection — never leaves this device).
 
 const DB_NAME = 'my-classroom-screen';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 let dbPromise;
 
 function open() {
@@ -13,8 +14,18 @@ function open() {
       if (!db.objectStoreNames.contains('screens')) db.createObjectStore('screens', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('assets')) db.createObjectStore('assets', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+      if (!db.objectStoreNames.contains('events')) {
+        const ev = db.createObjectStore('events', { keyPath: 'id' });
+        ev.createIndex('t', 't');
+      }
     };
-    req.onsuccess = () => resolve(req.result);
+    // Another tab has the old version open: let the upgrade go ahead.
+    req.onblocked = () => console.warn('Close other My Classroom Screen tabs to finish updating.');
+    req.onsuccess = () => {
+      // If a newer version of the app opens in another tab, let it upgrade the database.
+      req.result.onversionchange = () => req.result.close();
+      resolve(req.result);
+    };
     req.onerror = () => reject(req.error);
   });
   return dbPromise;
@@ -52,6 +63,20 @@ export const db = {
     return r ? r.value : fallback;
   },
   setMeta: (key, value) => tx('meta', 'readwrite', (s) => s.put({ key, value })),
+
+  // Activity log
+  addEvent: (ev) => tx('events', 'readwrite', (s) => s.put(ev)),
+  allEvents: () => tx('events', 'readonly', (s) => s.getAll()),
+  deleteEvents: async (ids) => {
+    const dbh = await open();
+    return new Promise((resolve, reject) => {
+      const t = dbh.transaction('events', 'readwrite');
+      const st = t.objectStore('events');
+      for (const id of ids) st.delete(id);
+      t.oncomplete = () => resolve();
+      t.onerror = () => reject(t.error);
+    });
+  },
 };
 
 // Object URLs for assets, cached so widgets can share them.

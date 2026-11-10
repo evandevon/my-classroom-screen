@@ -15,6 +15,7 @@ import traffic from './traffic.js';
 import worksymbols from './worksymbols.js';
 import namepicker from './namepicker.js';
 import groupmaker from './groupmaker.js';
+import tally from './tally.js';
 import whiteboard from './whiteboard.js';
 import calculator from './calculator.js';
 import dice from './dice.js';
@@ -24,7 +25,7 @@ import nownext from './nownext.js';
 
 const ALL = [
   timer, stopwatch, clock, alarm, schoolday, calendar, text, list, image, embed, audio,
-  noise, traffic, worksymbols, namepicker, groupmaker,
+  noise, traffic, worksymbols, namepicker, groupmaker, tally,
   whiteboard, calculator, dice, scoreboard, qrcode, nownext,
 ];
 

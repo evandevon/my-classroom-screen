@@ -7,6 +7,9 @@ import { TEMPLATES, GRADIENTS, SOLIDS } from './templates.js';
 import { makeShareLink, readShareHash, buildProjectFile, importProjectFile, prepareImportedScreen } from './share.js';
 import { h, uid, debounce, toast, pickFile, downloadBlob } from './util.js';
 import { showSoundHelp } from './help.js';
+import { setLogContext } from './datalog.js';
+import { showDataScreen } from './datascreen.js';
+import { currentSession } from './widgets/schoolday.js';
 
 const $ = (sel) => document.querySelector(sel);
 const boardEl = $('#board');
@@ -26,6 +29,51 @@ const persist = debounce(async () => {
 }, 400);
 
 const board = new Board(boardEl, { onChange: () => persist() });
+
+// ---------- class label (tags recorded data) ----------
+const classPill = $('#class-pill');
+const cls = { label: '', auto: true, history: [] };
+function sessionClass() {
+  if (!cls.auto || !screen) return '';
+  const sd = screen.widgets.find((w) => w.type === 'schoolday');
+  return sd ? currentSession(sd.state)?.name || '' : '';
+}
+const currentClass = () => sessionClass() || cls.label;
+function updateClassPill() {
+  const c = currentClass();
+  classPill.querySelector('span').textContent = c || 'Set class';
+  classPill.classList.toggle('unset', !c);
+  classPill.title = c ? `Class: ${c}${sessionClass() ? ' (from the School day timeline)' : ''} — tap to change` : 'Which class is this? (labels recorded data)';
+}
+setLogContext({ getClass: currentClass, getScreen: () => screen });
+setInterval(updateClassPill, 20000);
+classPill.addEventListener('click', classDialog);
+function classDialog() {
+  const input = h('input', { type: 'text', value: cls.label, placeholder: 'e.g. 4B, 3/4 Science, Kindy Blue', 'aria-label': 'Class name' });
+  const save = async () => {
+    cls.label = input.value.trim();
+    if (cls.label) cls.history = [cls.label, ...cls.history.filter((x) => x !== cls.label)].slice(0, 12);
+    await db.setMeta('classLabel', cls.label);
+    await db.setMeta('classHistory', cls.history);
+    updateClassPill();
+    dlg.close();
+  };
+  input.addEventListener('keydown', (e) => e.key === 'Enter' && save());
+  const auto = h('input', { type: 'checkbox' });
+  auto.checked = cls.auto;
+  auto.addEventListener('change', async () => { cls.auto = auto.checked; await db.setMeta('classAuto', cls.auto); updateClassPill(); });
+  const fromDay = sessionClass();
+  const dlg = modal('Which class is this?',
+    h('p', {}, 'Anything you record (points, tallies, timings…) is labelled with this class, so you can sort it out later in ☰ → 📊 Data.'),
+    h('div', { class: 'row stretch' }, input, h('button', { class: 'btn primary', onclick: save }, 'Use this class')),
+    cls.history.length ? h('div', { class: 'chips', style: { marginTop: '10px' } },
+      ...cls.history.map((c) => h('button', { class: 'chip', onclick: () => { input.value = c; save(); } }, c))) : null,
+    h('label', { class: 'check', style: { marginTop: '10px' } }, auto, h('span', {}, 'When this screen has a School day timeline, use the current session’s name instead')),
+    fromDay ? h('p', { class: 'hint' }, `Right now the timeline says: “${fromDay}”.`) : null,
+    cls.label ? h('button', { class: 'btn small', onclick: async () => { input.value = ''; await save(); } }, 'Clear the class') : null,
+  );
+  setTimeout(() => input.select(), 50);
+}
 
 // ---------- screens ----------
 function newScreenFrom(tpl, name) {
@@ -59,6 +107,7 @@ async function openScreen(s) {
   nameBtn.textContent = screen.name;
   document.title = `${screen.name} · My Classroom Screen`;
   db.setMeta('lastScreen', screen.id);
+  updateClassPill();
 }
 
 async function applyBackground() {
@@ -158,6 +207,11 @@ async function renderDrawer() {
       toggle('Snap widgets to a grid', board.snap, (v) => { board.snap = v; db.setMeta('snap', v); }),
       toggle('Hide widget title bars (tap a widget to show)', document.body.classList.contains('clean'), (v) => { document.body.classList.toggle('clean', v); db.setMeta('clean', v); }),
       toggle('Large buttons', document.body.classList.contains('large'), (v) => { document.body.classList.toggle('large', v); db.setMeta('large', v); }),
+    ),
+    h('h3', {}, 'Data'),
+    h('div', { class: 'menu-grid' },
+      menuBtn('📊', 'Data you’ve recorded', () => { closeDrawer(); showDataScreen(); }),
+      menuBtn('👥', 'Set the class', () => { closeDrawer(); classDialog(); }),
     ),
     h('h3', {}, 'Help'),
     h('div', { class: 'menu-grid' },
@@ -370,6 +424,9 @@ document.addEventListener('visibilitychange', () => document.visibilityState ===
 // ---------- start ----------
 async function init() {
   buildDock();
+  cls.label = await db.getMeta('classLabel', '');
+  cls.auto = await db.getMeta('classAuto', true);
+  cls.history = await db.getMeta('classHistory', []);
   board.snap = await db.getMeta('snap', false);
   document.body.classList.toggle('clean', await db.getMeta('clean', false));
   document.body.classList.toggle('large', await db.getMeta('large', false));

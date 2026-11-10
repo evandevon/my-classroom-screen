@@ -905,3 +905,55 @@ input.bg-swatch { min-height: 56px; }
 .ex-small { font-size: .9em; color: var(--muted); margin: 2px 0 6px; }
 .ex-min { font-size: .92em; text-align: right; max-width: 7.5em; white-space: normal !important; }
 .clock-host.face-sundial.explaining > svg { min-height: 34cqh; flex: 0 0 34cqh; }
+
+/* ---------- data collection ---------- */
+.class-pill { font-size: 15px; max-width: 26vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.class-pill.unset { color: var(--muted); font-weight: 600; }
+.rec-badge { position: absolute; top: 6px; left: 8px; z-index: 4; background: var(--red); color: #fff; font-size: 11px; font-weight: 900; letter-spacing: .05em; border-radius: 99px; padding: 2px 8px; pointer-events: none; animation: recblink 2s ease-in-out infinite; }
+.rec-badge[hidden] { display: none; }
+@keyframes recblink { 50% { opacity: .55; } }
+.tally-foot .rec-badge, .stopwatch .rec-badge { position: static; }
+.stopwatch { position: relative; }
+.stopwatch > .rec-badge { position: absolute; top: auto; bottom: 8px; left: 8px; }
+.sw-rec { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; align-items: center; }
+.sw-who { width: 160px !important; min-height: 34px !important; }
+
+/* tally */
+.tally { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 8px; padding: 8px; }
+.tally-cats { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.tally-btn { border: 0; border-radius: 16px; background: color-mix(in srgb, var(--c) 14%, white); border: 3px solid var(--c); display: grid; grid-template-rows: auto auto 1fr; place-items: center; padding: 6px; color: var(--ink); min-height: 0; }
+.tally-btn:active { transform: scale(.97); }
+.tb-ic { font-size: max(24px, 8cqmin); line-height: 1; }
+.tb-name { font-weight: 800; font-size: max(14px, 3.6cqmin); text-align: center; }
+.tb-count { font-weight: 900; font-size: max(30px, 12cqmin); color: var(--c); font-variant-numeric: tabular-nums; line-height: 1; filter: brightness(.85); }
+.bump { animation: pop .35s cubic-bezier(.2, 1.6, .4, 1); }
+.tally-pick .chip.on { background: var(--c); border-color: var(--c); color: #fff; }
+.tally-students { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; align-content: start; touch-action: pan-y; }
+.tally-kid { border: 2px solid var(--line); border-radius: 12px; background: #fff; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-weight: 800; color: var(--ink); padding: 4px; }
+.tally-kid.has { border-color: var(--c); background: color-mix(in srgb, var(--c) 12%, white); }
+.tk-name { font-size: max(14px, 3cqmin); text-align: center; line-height: 1.1; }
+.tk-count { font-size: 14px; color: var(--c); filter: brightness(.8); min-height: 1em; }
+.tally-foot { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.tally-foot .rec-badge { margin-right: auto; }
+
+/* data screen */
+.modal.data-modal { width: min(1100px, 96vw); }
+.data-privacy { background: #eef7f1; border: 1px solid #b7e0c4; border-radius: 12px; padding: 8px 12px; font-weight: 600; }
+.data-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.data-filters .field { min-width: 150px; flex: 1; }
+.data-filters input[type="date"] { min-height: 42px; border: 1px solid #cfd4dc; border-radius: 10px; padding: 4px 8px; font-weight: 700; }
+.data-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin: 6px 0 10px; }
+.data-card { background: #f4f6fa; border-radius: 14px; padding: 10px 12px; }
+.dc-what { display: flex; gap: 6px; font-weight: 800; }
+.dc-big { font-size: 28px; font-weight: 900; color: var(--accent); font-variant-numeric: tabular-nums; }
+.dc-sub { font-size: 13px; color: var(--muted); font-weight: 600; }
+.data-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.data-count { font-weight: 800; margin-right: auto; }
+.data-table-wrap { max-height: 46vh; overflow: auto; border: 1px solid var(--line); border-radius: 12px; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.data-table th { position: sticky; top: 0; background: #f4f6fa; text-align: left; padding: 6px 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.data-table td { padding: 5px 8px; border-top: 1px solid var(--line); }
+.data-table td.num { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.data-table small { color: var(--muted); }
+.data-foot { display: flex; align-items: center; gap: 8px; margin: 10px 0; font-weight: 700; }
+.data-foot select { width: auto; }
