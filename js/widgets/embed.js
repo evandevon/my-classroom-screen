@@ -34,8 +34,25 @@ export function blockedSite(raw) {
   return null;
 }
 
-/** Turn a normal share/watch link into an embeddable URL. Returns null for unsafe links. */
-export function toEmbedURL(raw, { privacy = false } = {}) {
+/** "1:30", "01:02:03", "90" or "90s" → seconds (null if blank/invalid). */
+export function parseClock(v) {
+  const t = String(v ?? '').trim().replace(/s$/i, '');
+  if (!t) return null;
+  if (/^\d+$/.test(t)) return Number(t);
+  const m = t.match(/^(?:(\d+):)?(\d{1,2}):(\d{1,2})$/);
+  return m ? Number(m[1] || 0) * 3600 + Number(m[2]) * 60 + Number(m[3]) : null;
+}
+export const fmtClock = (sec) => {
+  if (sec == null) return '';
+  const hh = Math.floor(sec / 3600);
+  const mm = Math.floor((sec % 3600) / 60);
+  const ss = sec % 60;
+  return hh ? `${hh}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}` : `${mm}:${String(ss).padStart(2, '0')}`;
+};
+
+/** Turn a normal share/watch link into an embeddable URL. Returns null for unsafe links.
+ *  clipStart / clipEnd (seconds) play just part of a YouTube video (Vimeo: start only). */
+export function toEmbedURL(raw, { privacy = false, clipStart = null, clipEnd = null } = {}) {
   const u = normaliseURL(raw);
   if (!u) return null;
   const host = u.hostname.replace(/^www\.|^m\./, '');
@@ -60,7 +77,9 @@ export function toEmbedURL(raw, { privacy = false } = {}) {
       start = parts ? (Number(parts[1] || 0) * 3600 + Number(parts[2] || 0) * 60 + Number(parts[3] || 0)) : parseInt(t, 10) || 0;
     }
     const params = new URLSearchParams({ rel: '0', playsinline: '1' });
-    if (start) params.set('start', start);
+    const from = clipStart ?? start;
+    if (from) params.set('start', from);
+    if (clipEnd && clipEnd > (from || 0)) params.set('end', clipEnd);
     if (location.origin.startsWith('http')) params.set('origin', location.origin);
     if (id) {
       if (list) params.set('list', list);
@@ -91,7 +110,7 @@ export function toEmbedURL(raw, { privacy = false } = {}) {
   // Vimeo
   if (host === 'vimeo.com') {
     const m = u.pathname.match(/^\/(\d+)/);
-    if (m) return `https://player.vimeo.com/video/${m[1]}`;
+    if (m) return `https://player.vimeo.com/video/${m[1]}${clipStart ? `#t=${clipStart}s` : ''}`;
   }
 
   // Canva designs
@@ -115,7 +134,7 @@ export default {
   group: 'core',
   size: [560, 360],
   hasSettings: true,
-  defaultState: () => ({ url: '', privacy: false }),
+  defaultState: () => ({ url: '', privacy: false, clipStart: null, clipEnd: null }),
 
   mount(ctx) {
     const s = ctx.state;
@@ -162,7 +181,7 @@ export default {
     }
     function render() {
       const blocked = s.url ? blockedSite(s.url) : null;
-      const src = s.url && !blocked ? toEmbedURL(s.url, { privacy: s.privacy }) : null;
+      const src = s.url && !blocked ? toEmbedURL(s.url, { privacy: s.privacy, clipStart: s.clipStart, clipEnd: s.clipEnd }) : null;
       empty.hidden = !!(src || blocked);
       blockedCard.hidden = !blocked;
       frameHost.hidden = !src;
@@ -203,6 +222,11 @@ export default {
       openSettings() {
         panel(ctx, 'Video / web settings',
           field('Link', textInput(s.url, (v) => { s.url = v.trim(); ctx.save(); }, { placeholder: 'https://…' })),
+          h('div', { class: 'row' },
+            field('Start at (m:ss)', textInput(fmtClock(s.clipStart), (v) => { s.clipStart = parseClock(v); ctx.save(); }, { placeholder: '0:00', inputmode: 'numeric' })),
+            field('Stop at (m:ss)', textInput(fmtClock(s.clipEnd), (v) => { s.clipEnd = parseClock(v); ctx.save(); }, { placeholder: 'the end', inputmode: 'numeric' })),
+          ),
+          h('p', { class: 'hint' }, 'Play just part of a video, e.g. start 1:30, stop 2:45. Works for YouTube; Vimeo can use a start time only. Leave blank for the whole video.'),
           checkbox('YouTube privacy mode (youtube-nocookie.com — some school filters block it)', !!s.privacy, (v) => { s.privacy = v; ctx.save(); }),
           h('p', { class: 'hint' }, 'Google Drive, Docs and Slides files must be shared as “Anyone with the link”. Some websites (Google Search, Gmail, Kahoot, social media…) refuse to be shown inside other pages — use the pop-up window for those.'),
           h('div', { class: 'row' },

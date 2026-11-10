@@ -2,7 +2,7 @@
 
 import { Board } from './board.js';
 import { db, assetURL } from './storage.js';
-import { WIDGETS, GROUPS, byGroup } from './widgets/index.js';
+import { WIDGETS, CATEGORIES } from './widgets/index.js';
 import { TEMPLATES, GRADIENTS, SOLIDS } from './templates.js';
 import { makeShareLink, readShareHash, buildProjectFile, importProjectFile, prepareImportedScreen } from './share.js';
 import { h, uid, debounce, toast, pickFile, downloadBlob } from './util.js';
@@ -386,18 +386,70 @@ async function importDialog() {
 }
 
 // ---------- dock ----------
+let recent = [];
+const pop = h('div', { class: 'dock-pop', hidden: true, role: 'dialog' });
+document.body.append(pop);
+function closePop() {
+  pop.hidden = true;
+  document.querySelectorAll('.dock-cat.open').forEach((b) => b.classList.remove('open'));
+}
+document.addEventListener('pointerdown', (e) => {
+  if (!pop.hidden && !e.target.closest('.dock-pop, .dock-cat')) closePop();
+}, true);
+document.addEventListener('keydown', (e) => e.key === 'Escape' && closePop());
+
+function addFromDock(type) {
+  closePop();
+  board.addWidget(type);
+  recent = [type, ...recent.filter((t) => t !== type)].slice(0, 4);
+  db.setMeta('recentWidgets', recent);
+  drawRecent();
+}
+const tile = (w, cls = 'dock-btn') =>
+  h('button', { class: cls, title: `Add ${w.title}`, onclick: () => addFromDock(w.type) },
+    h('span', { class: 'di', 'aria-hidden': 'true' }, w.icon),
+    h('span', { class: 'dl' }, w.title));
+
+function openCategory(cat, btn) {
+  const wasOpen = !pop.hidden && pop.dataset.cat === cat.id;
+  closePop();
+  if (wasOpen) return;
+  pop.dataset.cat = cat.id;
+  pop.setAttribute('aria-label', cat.label);
+  pop.replaceChildren(
+    h('div', { class: 'dock-pop-head' }, h('span', {}, `${cat.icon} ${cat.label}`), h('button', { class: 'w-btn', 'aria-label': 'Close', onclick: closePop }, '✕')),
+    h('div', { class: 'dock-pop-grid' }, ...cat.types.filter((t) => WIDGETS[t]).map((t) => tile(WIDGETS[t], 'pop-tile'))),
+  );
+  pop.hidden = false;
+  btn.classList.add('open');
+  // Sit just above the button, kept on screen.
+  const r = btn.getBoundingClientRect();
+  const pw = pop.offsetWidth;
+  pop.style.left = `${Math.max(8, Math.min(window.innerWidth - pw - 8, r.left + r.width / 2 - pw / 2))}px`;
+  pop.style.bottom = `${window.innerHeight - r.top + 10}px`;
+}
+
+const recentBox = h('div', { class: 'dock-group dock-recent', role: 'group', 'aria-label': 'Recently used' });
+function drawRecent() {
+  recentBox.replaceChildren(...recent.filter((t) => WIDGETS[t]).map((t) => tile(WIDGETS[t])));
+  recentBox.hidden = !recent.length;
+}
+
 function buildDock() {
   const dock = $('#dock-items');
-  for (const g of GROUPS) {
-    dock.append(h('div', { class: 'dock-group', role: 'group', 'aria-label': g.label },
-      ...byGroup(g.id).map((w) =>
-        h('button', { class: 'dock-btn', title: `Add ${w.title}`, onclick: () => board.addWidget(w.type) },
-          h('span', { class: 'di', 'aria-hidden': 'true' }, w.icon),
-          h('span', { class: 'dl' }, w.title),
-        ),
-      ),
-    ));
-  }
+  dock.append(
+    h('div', { class: 'dock-group dock-cats', role: 'group', 'aria-label': 'Add a widget' },
+      ...CATEGORIES.map((cat) => {
+        const b = h('button', { class: 'dock-btn dock-cat', 'aria-haspopup': 'dialog', title: `${cat.label} widgets` },
+          h('span', { class: 'di', 'aria-hidden': 'true' }, cat.icon),
+          h('span', { class: 'dl' }, cat.label, h('i', { class: 'caret' }, '▴')));
+        b.addEventListener('click', () => openCategory(cat, b));
+        return b;
+      }),
+    ),
+    recentBox,
+  );
+  db.getMeta('recentWidgets', ['timer', 'noise', 'namepicker']).then((r) => { recent = r; drawRecent(); });
   $('#dock-toggle').addEventListener('click', () => {
     const hidden = document.body.classList.toggle('dock-hidden');
     setTimeout(() => board.layoutAll(), 300); // the safe area for title bars changed
