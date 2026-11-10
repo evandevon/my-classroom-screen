@@ -20,6 +20,18 @@ export class Board {
     this.snap = false;
     this.lastRemoved = null;
     window.addEventListener('resize', () => this.layoutAll());
+    // Phones (and short landscape screens): widgets stack in a scrolling column instead of
+    // floating freely. The stored layout isn't changed, so the big screen still looks the same.
+    this.mq = matchMedia('(max-width: 640px), (max-height: 520px)');
+    this.compact = this.mq.matches;
+    const applyCompact = () => {
+      this.compact = this.mq.matches;
+      this.el.classList.toggle('compact', this.compact);
+      document.body.classList.toggle('compact', this.compact);
+      this.layoutAll();
+    };
+    this.mq.addEventListener?.('change', applyCompact);
+    applyCompact();
     // Tap on empty board clears the active widget (used in clean mode).
     el.addEventListener('pointerdown', (e) => {
       if (e.target === el) this.setActive(null);
@@ -94,6 +106,10 @@ export class Board {
     this.mount(rec);
     this.setActive(rec.id);
     this.changed();
+    if (this.compact) {
+      const el = this.mounted.get(rec.id)?.el;
+      requestAnimationFrame(() => el?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    }
     return rec;
   }
 
@@ -198,7 +214,33 @@ export class Board {
     return { top: TOP_SAFE, bottom: r.height - dockH - HEAD_H - 16, width: r.width, height: r.height };
   }
 
+  /** Phone layout: one column (two on a landscape phone), in reading order of the big layout. */
+  layoutCompact(m) {
+    const { rec, el } = m;
+    const W = this.el.clientWidth || innerWidth;
+    const cols = W >= 700 ? 2 : 1;
+    this.el.style.setProperty('--cols', cols);
+    const colW = (W - 20 - 12 * (cols - 1)) / cols;
+    const def = WIDGETS[rec.type];
+    // Keep roughly the shape it has on a 16:9 screen.
+    let aspect = (rec.w * 16) / (rec.h * 9);
+    if (!Number.isFinite(aspect) || aspect <= 0) aspect = def?.size ? def.size[0] / def.size[1] : 4 / 3;
+    const maxH = Math.max(260, innerHeight - 140);
+    const hh = Math.round(clamp(colW / aspect, 230, maxH));
+    el.style.left = '';
+    el.style.top = '';
+    el.style.width = '';
+    el.style.height = `${hh}px`;
+    el.style.zIndex = '';
+    const order = [...this.screen.widgets].sort((a, b) => (Math.abs(a.y - b.y) > 0.08 ? a.y - b.y : a.x - b.x));
+    for (const [id, mm] of this.mounted) mm.el.style.order = String(order.findIndex((w) => w.id === id));
+    el.classList.toggle('narrow', colW < 300);
+    el.classList.toggle('locked', !!rec.locked);
+  }
+
   layout(m) {
+    if (this.compact) { this.layoutCompact(m); return; }
+    m.el.style.order = '';
     const a = this.safeArea();
     const { rec, el } = m;
     const w = Math.max(MIN_W, rec.w * a.width);
@@ -371,7 +413,7 @@ export class Board {
     }, true);
 
     handle.addEventListener('pointerdown', (e) => {
-      if (m.rec.locked || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      if (this.compact || m.rec.locked || (e.pointerType === 'mouse' && e.button !== 0)) return;
       const onButton = !!e.target.closest('button');
       if (!onButton) e.preventDefault(); // stop text selection / focus changes
       const a = this.safeArea();
@@ -410,7 +452,7 @@ export class Board {
 
   enableResize(m, handle) {
     handle.addEventListener('pointerdown', (e) => {
-      if (m.rec.locked || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      if (this.compact || m.rec.locked || (e.pointerType === 'mouse' && e.button !== 0)) return;
       e.preventDefault();
       e.stopPropagation();
       const a = this.safeArea();

@@ -1218,3 +1218,41 @@ body.screen-paused .dock-cats, body.screen-paused .dock-recent { opacity: .4; }
 .wxt-ti { font-size: max(18px, 6.5cqmin); line-height: 1; }
 @container (max-height: 300px) { .wxt-slots { display: none; } }
 @container (max-height: 220px) { .wxt-tips, .wxt-head { display: none; } }
+
+/* ---------- phones: stacked layout ---------- */
+#board.compact {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr));
+  gap: 12px;
+  align-content: start;
+  padding: 66px 10px 130px;
+  background-attachment: fixed;
+}
+#board.compact .widget { position: relative; left: auto !important; top: auto !important; width: auto !important; z-index: auto !important; }
+#board.compact .w-head { touch-action: pan-y; cursor: default; height: 40px; }
+#board.compact .w-resize, #board.compact .w-btn.lock { display: none; }
+#board.compact .ghost { position: relative; left: auto !important; top: auto !important; width: auto !important; height: 72px !important; }
+#board.compact .paused-cover { position: fixed; }
+body.compact .topbar { top: 8px; left: 8px; right: 8px; gap: 6px; }
+body.compact .pill { height: 44px; min-width: 44px; padding: 0 12px; font-size: 18px; }
+body.compact .pill.name { font-size: 15px; max-width: 46vw; }
+body.compact #class-pill > span { display: none; }
+body.compact .dock { bottom: 6px; }
+body.compact .dock-items { padding: 5px; border-radius: 18px; }
+body.compact .dock-btn { min-width: 62px; height: 58px; padding: 2px 4px; border-radius: 12px; }
+body.compact .dock-cat { min-width: 70px; }
+body.compact .dock-btn .di { font-size: 23px; }
+body.compact .dock-btn .dl { font-size: 11px; }
+body.compact .dock-pop { max-height: calc(100vh - 110px); overflow-y: auto; }
+body.compact .dock-pop-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+body.compact .pop-tile { min-height: 78px; }
+@media (max-height: 520px) {
+  body.compact .dock-recent, body.compact .dock-group + .dock-group { display: none; }
+  #board.compact { padding-top: 60px; padding-bottom: 96px; }
+}
+#board.compact .widget.settings-open { height: auto !important; min-height: min(560px, calc(100vh - 150px)); }
+#board.compact .widget.settings-open .w-settings { overflow: visible; }
+/* Frosted strip behind the top buttons so scrolled widgets don't clash with them. */
+body.compact::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 64px; z-index: 99999; pointer-events: none; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); background: rgb(255 255 255 / 0.3); -webkit-mask: linear-gradient(#000 75%, transparent); mask: linear-gradient(#000 75%, transparent); }
