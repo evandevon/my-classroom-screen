@@ -182,7 +182,7 @@ export default {
     });
     const eraser = toolBtn('🧽', 'Eraser', () => { tool = tool === 'eraser' ? 'pen' : 'eraser'; sync(); });
     const recBtn = h('button', { class: 'wb-tool wb-rec', title: 'Record this whiteboard session', 'aria-label': 'Record', onclick: () => (rec ? stopRec() : startRec()) }, h('span', { class: 'wb-rec-dot' }), h('span', { class: 'wb-rec-t' }));
-    const playBtn = toolBtn('▶', 'Play back the recording', () => openPlayer(), 'wb-play');
+    const playBtn = toolBtn('▶', 'Play back the recording (🔁 Loop is in the player)', () => openPlayer(), 'wb-play');
     const bar = h('div', { class: 'wb-bar' },
       ...penBtns,
       h('span', { class: 'wb-sep' }),
@@ -203,7 +203,7 @@ export default {
     const pScrub = h('input', { type: 'range', min: 0, max: 1000, value: 0, class: 'wb-scrub', 'aria-label': 'Position' });
     const pTime = h('span', { class: 'wb-ptime' });
     const pSpeed = h('button', { class: 'wb-tool wb-speed', title: 'Speed' });
-    const pLoop = h('button', { class: 'wb-tool', title: 'Loop (play again and again)', 'aria-label': 'Loop', onclick: () => { s.loop = !s.loop; ctx.save(); drawPlayer(); } }, '🔁');
+    const pLoop = h('button', { class: 'wb-tool wb-loop', title: 'Loop: play again and again', 'aria-label': 'Loop', onclick: () => { s.loop = !s.loop; ctx.save(); drawPlayer(); } }, '🔁', h('span', {}, ' Loop'));
     const player = h('div', { class: 'wb-bar wb-player', hidden: true },
       pPlay,
       toolBtn('⏮', 'Back to the start', () => seek(0)),
@@ -454,6 +454,8 @@ export default {
       pTime.textContent = `${fmt(pb.T)} / ${fmt(pb.dur)}`;
       pSpeed.textContent = pb.speed === 0.5 ? '½×' : `${pb.speed}×`;
       pLoop.classList.toggle('on', !!s.loop);
+      pLoop.setAttribute('aria-pressed', String(!!s.loop));
+      pLoop.title = s.loop ? 'Loop is on — tap to play just once' : 'Loop is off — tap to play again and again';
       drawNow();
     }
 
@@ -579,6 +581,7 @@ export default {
           h('button', { class: 'btn', onclick: download }, '⬇ Save drawing as picture'),
           h('h4', {}, '⏺ Recording'),
           checkbox('Record my voice too (microphone)', s.recVoice, (v) => { s.recVoice = v; ctx.save(); }),
+          checkbox('Loop playback (play again and again)', s.loop, (v) => { s.loop = v; ctx.save(); }),
           checkbox('Skip long pauses when playing back (drawing-only recordings)', s.skipPauses, (v) => { s.skipPauses = v; ctx.save(); }),
           s.rec ? h('p', {}, `Last recording: ${fmt(s.rec.dur)}${s.recAudioAssetId ? ' with voice' : ''}.`) : h('p', { class: 'hint' }, 'Press ⏺ on the toolbar to start recording, and again to stop. Then ▶ plays it back.'),
           s.rec ? h('div', { class: 'row' },
