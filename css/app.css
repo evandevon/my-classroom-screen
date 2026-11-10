@@ -875,3 +875,6 @@ input.bg-swatch { min-height: 56px; }
 .cal-add select { flex: 1; }
 .cal-icons { max-height: 160px; }
 .term-row input[type="date"] { min-height: 40px; border: 1px solid #cfd4dc; border-radius: 10px; padding: 4px 6px; font-weight: 700; }
+.cal-addterms { margin-left: auto; }
+.cal-termask { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #fff8e1; border: 2px solid #e9c46a; border-radius: 12px; padding: 6px 6px 6px 12px; font-weight: 700; }
+.cal-termask span { flex: 1; min-width: 12em; }
