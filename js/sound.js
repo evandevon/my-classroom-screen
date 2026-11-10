@@ -150,6 +150,16 @@ export const SOUNDS = {
   // short feedback sounds (not listed in alarm menus)
   tick: { label: 'Tick', group: 'short', play: () => tone(1500, 0, 0.04, { type: 'square', gain: 0.07 }) },
   pop: { label: 'Pop', group: 'short', play: () => tone(500, 0, 0.09, { gain: 0.35, to: 900 }) },
+  tick3: { label: 'Countdown beep', group: 'short', play: () => tone(1046, 0, 0.13, { type: 'triangle', gain: 0.35 }) },
+  // quiz buzzers — one per team, easy to tell apart
+  buzzA: { label: 'Buzzer', group: 'buzz', play: () => { tone(196, 0, 0.6, { type: 'square', gain: 0.18 }); tone(198, 0, 0.6, { type: 'sawtooth', gain: 0.12 }); } },
+  buzzB: { label: 'Ding-dong', group: 'buzz', play: () => { strike(N.E5 * 1.25, 0, 0.9, 0.35); strike(N.C5 * 1.25, 0.35, 1.1, 0.35); } },
+  buzzC: { label: 'Zap up', group: 'buzz', play: () => tone(300, 0, 0.45, { type: 'square', gain: 0.18, to: 1400 }) },
+  buzzD: { label: 'Triple beep', group: 'buzz', play: () => [0, 0.14, 0.28].forEach((t) => tone(1320, t, 0.1, { type: 'square', gain: 0.18 })) },
+  buzzE: { label: 'Horn', group: 'buzz', play: () => { tone(330, 0, 0.55, { type: 'sawtooth', gain: 0.18 }); tone(415, 0, 0.55, { type: 'sawtooth', gain: 0.12 }); } },
+  buzzF: { label: 'Bell', group: 'buzz', play: () => strike(N.E6, 0, 1.2, 0.4) },
+  buzzG: { label: 'Arpeggio', group: 'buzz', play: () => [N.C5, N.E5, N.G5, N.C6].forEach((f, i) => tone(f, i * 0.07, 0.25, { type: 'triangle', gain: 0.3 })) },
+  buzzH: { label: 'Boing', group: 'buzz', play: () => tone(700, 0, 0.5, { gain: 0.35, to: 160 }) },
 };
 
 /** Durations (seconds) so alarms can repeat without overlapping. */
