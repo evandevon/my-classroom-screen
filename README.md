@@ -17,7 +17,8 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 | 📅 Calendar (tap a day to add events, repeats, “coming up” countdowns, NSW term & week numbers) |
 | ⏰ Alarms (school bells with a pack-up warning beforehand, choice of days and sounds) | | | 🤫 Work symbols (voice levels + how to work) | 🎲 Dice (1–6 dice, any number of sides from 2) |
 | 📝 Text (bold, lists, sizes, colours) | 🎡 Name picker (spinning wheel or flash card, no repeats) | 🏆 Scoreboard (2–8 teams) |
-| ✅ List / checklist | 👥 Group maker (by number of groups or group size) | 🔳 QR code (works offline) |
+| ✅ List / checklist | 👥 Group maker (by number of groups or group size) |
+| | 🔢 Tally (count interruptions, great answers… for the class or each student) | 🔳 QR code (works offline) |
 | 🖼️ Image (upload or link) | | ➡️ Now / Next visual schedule |
 | 🎬 Video / Web (YouTube, Google Drive files & folders, Slides, Docs, Vimeo, Canva, Spotify, websites; pop-up window for sites that block embedding) | | |
 | 🎵 Audio (upload, MP3 link, Drive, YouTube, Spotify) | | |
@@ -28,6 +29,13 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 - **Screens:** tap ☰ to make, switch, rename, duplicate or delete screens. You can start blank or from a template (Morning routine, Group work, Quiet reading, Maths lesson).
 - **Share link:** ☰ → *Share link* puts the whole layout inside a long URL you can copy. Student names are **left out** unless you tick the box. Uploaded pictures and audio can't fit in a link.
 - **Project file:** ☰ → *Download screen* or *Download all* saves a `.classroom.json` file that includes uploaded pictures and audio. *Open project file* loads it on any computer. Download a backup now and then.
+
+## Recording data (stays on this device)
+
+- Tap **👥 Class** at the top to label what you record with a class (or let the School day timeline fill it in).
+- Use the **Tally** widget, or turn on **📊 Record** in the settings of the Scoreboard, Stopwatch (e.g. time off-task), Noise meter, Traffic light or Name picker. A red **● REC** shows while recording.
+- **☰ → 📊 Data** lets you filter by date, class, widget or student, see totals, **download a CSV** for Excel or Sheets, copy rows, and delete records. You can also have old records deleted automatically.
+- Records stay only in this browser on this device. They are never put into share links or screen files. They're for your own teaching notes; official records still belong in your school's system.
 
 ## Smartboard tips
 

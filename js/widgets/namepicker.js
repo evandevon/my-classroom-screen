@@ -1,6 +1,7 @@
 import { h, parseLines, shuffle } from '../util.js';
 import { play, soundSelect } from '../sound.js';
 import { panel, select, checkbox, textarea, field } from './_common.js';
+import { logEvent, recBadge, RECORD_HINT } from '../datalog.js';
 
 const COLORS = ['#e63946', '#f4a261', '#e9c46a', '#2a9d8f', '#457b9d', '#7b2cbf', '#ff6fb5', '#8ac926', '#1982c4', '#fb8500'];
 
@@ -12,7 +13,7 @@ export default {
   size: [440, 460],
   hasSettings: true,
   privateKeys: ['names', 'picked', 'last'],
-  defaultState: () => ({ names: '', mode: 'wheel', removePicked: true, picked: [], last: '', sound: 'fanfare' }),
+  defaultState: () => ({ record: false, names: '', mode: 'wheel', removePicked: true, picked: [], last: '', sound: 'fanfare' }),
 
   mount(ctx) {
     const s = ctx.state;
@@ -27,9 +28,10 @@ export default {
       h('button', { class: 'btn primary', onclick: () => ctx.openSettings() }, 'Add names'),
     );
     const foot = h('div', { class: 'pick-foot' });
+    const badge = recBadge();
     ctx.view.append(h('div', { class: 'picker' }, empty, stage, result,
       foot,
-    ));
+    ), badge);
     foot.append(
         h('button', { class: 'btn primary big', onclick: pick }, 'Pick'),
         info,
@@ -67,6 +69,7 @@ export default {
     function done(winner) {
       spinning = false;
       s.last = winner;
+      if (s.record) logEvent({ widget: 'namepicker', widgetId: ctx.rec.id, kind: 'pick', label: 'Picked', who: winner, value: 1, unit: 'count' });
       if (s.removePicked && !s.picked.includes(winner)) s.picked.push(winner);
       play(s.sound);
       result.textContent = winner;
@@ -172,6 +175,7 @@ export default {
       empty.hidden = has;
       stage.hidden = !has;
       foot.hidden = !has;
+      badge.hidden = !s.record;
       result.hidden = !has;
       stage.dataset.mode = s.mode;
       canvas.hidden = s.mode !== 'wheel';
@@ -199,6 +203,7 @@ export default {
           field('Style', select([['wheel', 'Spinning wheel'], ['card', 'Flash card']], s.mode, (v) => { s.mode = v; ctx.save(); })),
           checkbox('Don’t pick the same person twice (until everyone has had a turn)', s.removePicked, (v) => { s.removePicked = v; ctx.save(); }),
           field('Sound', soundSelect(s.sound, (v) => { s.sound = v; ctx.save(); })),
+          checkbox('📊 Record who was picked (see who gets a turn)', s.record, (v) => { s.record = v; ctx.save(); }),
           h('p', { class: 'hint' }, 'Names stay on this device. They are left out of share links unless you choose to include them.'),
         );
       },

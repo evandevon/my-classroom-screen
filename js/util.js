@@ -30,6 +30,11 @@ export function h(tag, attrs = {}, ...children) {
   return el;
 }
 
+/** Like el.replaceChildren(), but skips null/false (so optional pieces can be written inline). */
+export function setKids(el, ...kids) {
+  el.replaceChildren(...kids.flat().filter((k) => k !== null && k !== undefined && k !== false));
+}
+
 export function debounce(fn, ms = 300) {
   let t;
   const d = (...args) => {

@@ -96,6 +96,13 @@ export function parsePlan(text, h12guess = true) {
   rows.sort((a, b) => a.start - b.start);
   return rows.map((r, i) => s_(toHHMM(r.start), toHHMM(r.end ?? rows[i + 1]?.start ?? r.start + 30), r.icon, r.name, COLOURS[i % 10]));
 }
+/** The session running now in a School day widget's state (or null). Used for the class label. */
+export function currentSession(state, d = new Date()) {
+  const plan = state?.plans?.[String(d.getDay())] || state?.plans?.all || [];
+  const now = d.getHours() * 60 + d.getMinutes();
+  return plan.find((p) => now >= toMin(p.start) && now < toMin(p.end)) || null;
+}
+
 const planToText = (plan) => plan.map((p) => `${p.start}-${p.end} ${p.icon} ${p.name}`).join('\n');
 
 export default {
