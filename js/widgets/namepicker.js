@@ -134,6 +134,7 @@ export default {
       const cx = W / 2;
       const cy = H / 2;
       const R = Math.min(W, H) / 2 - 4;
+      if (R < 10) return; // not laid out yet
       const seg = (Math.PI * 2) / names.length;
       names.forEach((name, i) => {
         const a0 = angle + i * seg;

@@ -19,6 +19,9 @@ import tally from './tally.js';
 import whiteboard from './whiteboard.js';
 import calculator from './calculator.js';
 import dice from './dice.js';
+import spinner from './spinner.js';
+import coin from './coin.js';
+import storydice from './storydice.js';
 import scoreboard from './scoreboard.js';
 import qrcode from './qrcode.js';
 import nownext from './nownext.js';
@@ -26,7 +29,7 @@ import nownext from './nownext.js';
 const ALL = [
   timer, stopwatch, clock, alarm, schoolday, calendar, text, list, image, embed, audio,
   noise, traffic, worksymbols, namepicker, groupmaker, tally,
-  whiteboard, calculator, dice, scoreboard, qrcode, nownext,
+  whiteboard, calculator, dice, spinner, coin, storydice, scoreboard, qrcode, nownext,
 ];
 
 export const WIDGETS = Object.fromEntries(ALL.map((w) => [w.type, w]));
