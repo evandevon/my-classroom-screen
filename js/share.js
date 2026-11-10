@@ -52,7 +52,14 @@ export function linkSafeScreen(screen, { includeNames = false, dropHeavy = false
         w.state[k] = null;
         dropped.add('uploaded files (images/audio)');
       }
+      if (k.endsWith('AssetIds') && w.state[k]?.length) {
+        w.state[k] = structuredClone(defaults[k] ?? []);
+        for (const extra of def.assetCompanions?.[k] || []) w.state[extra] = structuredClone(defaults[extra]);
+        dropped.add('uploaded files (images/audio)');
+      }
     }
+    // Cached data (e.g. the last weather) is fetched again on the other computer.
+    for (const k of def.cacheKeys || []) w.state[k] = structuredClone(defaults[k]);
     if (dropHeavy) {
       for (const k of def.heavyKeys || []) {
         if (w.state[k]) {
@@ -112,6 +119,7 @@ function assetIdsIn(screen) {
   for (const w of screen.widgets) {
     for (const [k, v] of Object.entries(w.state || {})) {
       if (k.endsWith('AssetId') && v) ids.add(v);
+      if (k.endsWith('AssetIds') && Array.isArray(v)) v.forEach((id) => id && ids.add(id));
     }
   }
   return ids;
@@ -152,6 +160,7 @@ export function prepareImportedScreen(screen, idMap = {}) {
     w.id = uid('w');
     for (const k of Object.keys(w.state || {})) {
       if (k.endsWith('AssetId') && w.state[k]) w.state[k] = idMap[w.state[k]] || null;
+      if (k.endsWith('AssetIds') && Array.isArray(w.state[k])) w.state[k] = w.state[k].map((id) => idMap[id] || null);
     }
   }
   return s;

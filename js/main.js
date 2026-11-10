@@ -211,7 +211,7 @@ async function duplicateScreen(s) {
   await db.putScreen(copy);
   renderDrawer();
 }
-const assetIds = (s) => [s.background?.assetId, ...s.widgets.flatMap((w) => Object.entries(w.state || {}).filter(([k, v]) => k.endsWith('AssetId') && v).map(([, v]) => v))].filter(Boolean);
+const assetIds = (s) => [s.background?.assetId, ...s.widgets.flatMap((w) => Object.entries(w.state || {}).flatMap(([k, v]) => (k.endsWith('AssetId') && v ? [v] : k.endsWith('AssetIds') && Array.isArray(v) ? v : [])))].filter(Boolean);
 
 async function deleteScreen(s) {
   if (!confirm(`Delete “${s.name}”? This can’t be undone.`)) return;

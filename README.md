@@ -20,6 +20,8 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 | ✅ List / checklist | 👥 Group maker (by number of groups or group size) |
 | | 🔢 Tally (count interruptions, great answers… for the class or each student) | 🔳 QR code (works offline) |
 | 🖼️ Image (upload or link) | | ➡️ Now / Next visual schedule |
+| 🎴 Random picture (choose a folder of pictures from the computer; no repeats, auto-change, captions, blurry “mystery” reveal — pictures stay in this browser) | | |
+| 🌦️ Weather (now, next 6 hours, 5 days, UV sun-safety tips, rain alerts, °C/°F; free data from [Open-Meteo](https://open-meteo.com/), only the rough place is sent) | | |
 | 🎬 Video / Web (YouTube, Google Drive files & folders, Slides, Docs, Vimeo, Canva, Spotify, websites; pop-up window for sites that block embedding) | | |
 | 🎵 Audio (upload, MP3 link, Drive, YouTube, Spotify) | | |
 
@@ -88,5 +90,3 @@ To add a widget, copy an existing widget file. Export an object with `type`, `ti
 - Maths tools: number line, ten-frame, 120 chart
 - Timetable that highlights the current lesson, and an event countdown
 - Polls and exit tickets, brain-break spinner
-- Webcam / document camera widget
-- Saved class lists shared between the name picker and group maker
