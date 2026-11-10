@@ -1,6 +1,6 @@
 // Service worker: keeps the app working when school wifi drops.
 // Bump VERSION whenever files change so classrooms get the update.
-const VERSION = 'mcs-v1';
+const VERSION = 'mcs-v2';
 const FILES = [
   './',
   'index.html',
@@ -20,6 +20,7 @@ const FILES = [
   'js/widgets/timer.js',
   'js/widgets/stopwatch.js',
   'js/widgets/clock.js',
+  'js/widgets/alarm.js',
   'js/widgets/text.js',
   'js/widgets/list.js',
   'js/widgets/image.js',

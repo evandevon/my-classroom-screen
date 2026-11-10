@@ -341,6 +341,7 @@ function buildDock() {
   }
   $('#dock-toggle').addEventListener('click', () => {
     const hidden = document.body.classList.toggle('dock-hidden');
+    setTimeout(() => board.layoutAll(), 300); // the safe area for title bars changed
     $('#dock-toggle').setAttribute('aria-expanded', String(!hidden));
     db.setMeta('dockHidden', hidden);
   });

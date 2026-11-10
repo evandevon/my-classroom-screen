@@ -7,8 +7,9 @@ export function doneButton(ctx, label = 'Done') {
 }
 
 export function panel(ctx, title, ...rows) {
+  // Done sits at the top so it is never hidden behind the widget bar at the bottom of the screen.
   ctx.settings.replaceChildren(
-    h('div', { class: 'settings-panel' }, h('h3', {}, title), ...rows, h('div', { class: 'settings-foot' }, doneButton(ctx))),
+    h('div', { class: 'settings-panel' }, h('div', { class: 'settings-head' }, h('h3', {}, title), doneButton(ctx)), ...rows),
   );
 }
 
