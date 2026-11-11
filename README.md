@@ -55,6 +55,10 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 - **☰ → 📊 Data** lets you filter by date, class, widget or student, see totals, **download a CSV** for Excel or Sheets, copy rows, and delete records. You can also have old records deleted automatically.
 - Records stay only in this browser on this device. They are never put into share links or screen files. They're for your own teaching notes; official records still belong in your school's system.
 
+## Widget colour themes
+
+Every widget can be **Light, Dark, Transparent · white, Transparent · dark, Blue, Green, Yellow, Pink or Purple**, with an optional **drop shadow** on words and pictures (handy for the transparent themes over a photo background). Menu → *Widget theme* changes every widget on the screen (and new ones); each widget's ⚙ settings has its own theme at the bottom. Settings panels always stay light so they're easy to read.
+
 ## Phones and tablets
 
 Tablets use the same free layout as the smartboard. On phones (and short landscape screens) widgets stack in a scrolling column — two side by side in landscape — in the same reading order as the big layout. Nothing about the saved layout changes, so a screen set up on a phone still looks right on the smartboard and vice versa. Moving and resizing are switched off in this view.
