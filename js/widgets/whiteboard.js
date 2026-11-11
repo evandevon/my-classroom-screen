@@ -74,22 +74,35 @@ class Ink {
   }
 }
 
-/** Paper for saved pictures and videos (the live board uses CSS). */
-function paintPaper(g, bg, W, H) {
-  g.fillStyle = BG_FILL[bg] || '#ffffff';
-  g.fillRect(0, 0, W, H);
-  const step = Math.max(14, Math.round(Math.min(W, H) / 22));
-  g.lineWidth = 1;
-  if (bg === 'grid' || bg === 'lines') {
-    g.strokeStyle = bg === 'grid' ? '#c9d6ea' : '#a8c4e8';
-    g.beginPath();
-    for (let y = step; y < H; y += step) { g.moveTo(0, y + 0.5); g.lineTo(W, y + 0.5); }
-    if (bg === 'grid') for (let x = step; x < W; x += step) { g.moveTo(x + 0.5, 0); g.lineTo(x + 0.5, H); }
-    g.stroke();
-  } else if (bg === 'dots') {
-    g.fillStyle = '#9aa7ba';
-    for (let y = step; y < H; y += step) for (let x = step; x < W; x += step) g.fillRect(x - 1, y - 1, 2.5, 2.5);
+const PAPERS = [['blank', '▭', 'Blank'], ['lines', '☰', 'Lines'], ['grid', '▦', 'Grid']];
+const PAPER_LINES = { white: { grid: '#c9d6ea', lines: '#a8c4e8', dots: '#9aa7ba' }, black: { grid: '#ffffff38', lines: '#ffffff40', dots: '#ffffff60' }, clear: { grid: '#0004', lines: '#0004', dots: '#0006' } };
+
+/**
+ * Board colour plus lines / grid / dots. The same drawing is used on the live board, in playback
+ * and in saved pictures and videos, so they always match. `gap` is a fraction of the short side.
+ */
+function paintPaper(g, bg, paper, gap, W, H, fill = true) {
+  if (fill) {
+    g.fillStyle = BG_FILL[bg] || '#ffffff';
+    g.fillRect(0, 0, W, H);
+  } else g.clearRect(0, 0, W, H);
+  if (!paper || paper === 'blank') return;
+  const step = Math.max(6, (gap || 0.055) * Math.min(W, H));
+  const col = (PAPER_LINES[bg] || PAPER_LINES.white)[paper] || '#c9d6ea';
+  const lw = Math.max(1, Math.round(Math.min(W, H) / 700));
+  if (paper === 'dots') {
+    g.fillStyle = col;
+    const r = Math.max(1.2, lw * 1.3);
+    for (let y = step; y < H; y += step) for (let x = step; x < W; x += step) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+    return;
   }
+  g.strokeStyle = col;
+  g.lineWidth = lw;
+  const o = lw % 2 ? 0.5 : 0;
+  g.beginPath();
+  for (let y = step; y < H; y += step) { const yy = Math.round(y) + o; g.moveTo(0, yy); g.lineTo(W, yy); }
+  if (paper === 'grid') for (let x = step; x < W; x += step) { const xx = Math.round(x) + o; g.moveTo(xx, 0); g.lineTo(xx, H); }
+  g.stroke();
 }
 
 /**
@@ -153,10 +166,17 @@ export default {
   size: [640, 460],
   hasSettings: true,
   heavyKeys: ['strokes', 'rec'],
-  defaultState: () => ({ strokes: [], bg: 'white', rec: null, recAudioAssetId: null, recVoice: false, skipPauses: true, loop: false }),
+  defaultState: () => ({ strokes: [], bg: 'white', paper: 'blank', gap: 0.06, rec: null, recAudioAssetId: null, recVoice: false, skipPauses: true, loop: false }),
 
   mount(ctx) {
     const s = ctx.state;
+    // Older boards kept the paper in `bg` (grid/lines/dots on white).
+    if (['grid', 'lines', 'dots'].includes(s.bg)) { s.paper = s.bg; s.bg = 'white'; }
+    s.paper ||= 'blank';
+    s.gap ||= 0.06;
+    const paperCanvas = h('canvas', { class: 'wb-paper', 'aria-hidden': 'true' });
+    const pg = paperCanvas.getContext('2d');
+    let paperKey = '';
     const canvas = h('canvas', { class: 'wb-canvas' });
     const g = canvas.getContext('2d');
     let color = PENS[0];
@@ -181,6 +201,14 @@ export default {
       return b;
     });
     const eraser = toolBtn('🧽', 'Eraser', () => { tool = tool === 'eraser' ? 'pen' : 'eraser'; sync(); });
+    // Background: each tap goes Blank → Lines → Grid; a slider sets the spacing.
+    const paperBtn = h('button', { class: 'wb-tool wb-paperbtn', onclick: () => {
+      const i = PAPERS.findIndex(([k]) => k === s.paper);
+      s.paper = PAPERS[(i + 1) % PAPERS.length][0];
+      ctx.save(); sync(); drawPaper(true);
+    } });
+    const gapRange = h('input', { type: 'range', class: 'wb-gap', min: 2.5, max: 15, step: 0.5, 'aria-label': 'Line spacing', title: 'Spacing' });
+    gapRange.addEventListener('input', () => { s.gap = Number(gapRange.value) / 100; drawPaper(true); ctx.save(); });
     const recBtn = h('button', { class: 'wb-tool wb-rec', title: 'Record this whiteboard session', 'aria-label': 'Record', onclick: () => (rec ? stopRec() : startRec()) }, h('span', { class: 'wb-rec-dot' }), h('span', { class: 'wb-rec-t' }));
     const playBtn = toolBtn('▶', 'Play back the recording (🔁 Loop is in the player)', () => openPlayer(), 'wb-play');
     const bar = h('div', { class: 'wb-bar' },
@@ -192,6 +220,9 @@ export default {
       toolBtn('↶', 'Undo', undo),
       toolBtn('↷', 'Redo', redoStroke),
       toolBtn('🗑', 'Clear all', () => { if (s.strokes.length && confirm('Clear the whiteboard?')) clearAll(); }),
+      h('span', { class: 'wb-sep' }),
+      paperBtn,
+      gapRange,
       h('span', { class: 'wb-sep' }),
       recBtn,
       playBtn,
@@ -218,7 +249,7 @@ export default {
     pSpeed.addEventListener('click', () => { if (!pb) return; pb.speed = pb.speed === 1 ? 2 : pb.speed === 2 ? 4 : pb.speed === 4 ? 0.5 : 1; if (pb.audio) pb.audio.playbackRate = pb.speed; drawPlayer(); });
     pScrub.addEventListener('input', () => pb && seek((pScrub.value / 1000) * pb.dur));
 
-    const surface = h('div', { class: 'wb-surface' }, canvas, badge);
+    const surface = h('div', { class: 'wb-surface' }, paperCanvas, canvas, badge);
     ctx.view.append(h('div', { class: 'wb' }, surface, bar, player));
 
     function sync() {
@@ -227,6 +258,12 @@ export default {
       eraser.classList.toggle('on', tool === 'eraser');
       surface.dataset.bg = s.bg;
       surface.classList.toggle('erasing', tool === 'eraser');
+      const [, icon, name] = PAPERS.find(([k]) => k === s.paper) || [s.paper, '⁘', 'Dots'];
+      paperBtn.textContent = icon;
+      paperBtn.title = `Background: ${name} — tap to change`;
+      paperBtn.setAttribute('aria-label', `Background: ${name}. Tap to change.`);
+      gapRange.hidden = s.paper === 'blank';
+      gapRange.value = String(s.gap * 100);
       playBtn.hidden = !s.rec || !!rec;
     }
 
@@ -247,8 +284,19 @@ export default {
       requestAnimationFrame(() => { queued = false; drawNow(); });
     }
     const ink = new Ink();
+    /** Lines/grid behind the ink, redrawn only when the size, colour, kind or spacing changes. */
+    function drawPaper(force = false) {
+      const W = canvas.width;
+      const H = canvas.height;
+      if (paperCanvas.width !== W || paperCanvas.height !== H) { paperCanvas.width = W; paperCanvas.height = H; force = true; }
+      const key = `${W}x${H}|${s.bg}|${s.paper}|${s.gap}`;
+      if (!force && key === paperKey) return;
+      paperKey = key;
+      paintPaper(pg, s.bg, s.paper, s.gap, W, H, false);
+    }
     function drawNow() {
       fit();
+      drawPaper();
       if (pb) ink.render(g, frameAt(s.rec, pb.ops, pb.T), canvas.width, canvas.height);
       else {
         const live = new Set([...active.values()].map((a) => a.st));
@@ -483,7 +531,7 @@ export default {
       const ig = inkC.getContext('2d');
       const cache = new Ink();
       const paint = (T) => {
-        paintPaper(o, s.bg, W, H);
+        paintPaper(o, s.bg, s.paper, s.gap, W, H);
         cache.render(ig, frameAt(s.rec, src.ops, T), W, H);
         o.drawImage(inkC, 0, 0);
       };
@@ -577,7 +625,9 @@ export default {
       },
       openSettings() {
         panel(ctx, 'Whiteboard',
-          field('Background', select([['white', 'White'], ['grid', 'Grid paper'], ['lines', 'Lined paper'], ['dots', 'Dot paper'], ['black', 'Chalkboard'], ['clear', 'See-through']], s.bg, (v) => { s.bg = v; sync(); ctx.save(); })),
+          field('Board', select([['white', 'White'], ['black', 'Chalkboard'], ['clear', 'See-through']], s.bg, (v) => { s.bg = v; sync(); drawPaper(true); ctx.save(); })),
+          field('Background', select([['blank', 'Blank'], ['lines', 'Lines'], ['grid', 'Grid'], ['dots', 'Dots']], s.paper, (v) => { s.paper = v; sync(); drawPaper(true); ctx.save(); })),
+          field('Spacing', h('input', { type: 'range', min: 2.5, max: 15, step: 0.5, value: s.gap * 100, oninput: (e) => { s.gap = Number(e.target.value) / 100; sync(); drawPaper(true); ctx.save(); } })),
           h('button', { class: 'btn', onclick: download }, '⬇ Save drawing as picture'),
           h('h4', {}, '⏺ Recording'),
           checkbox('Record my voice too (microphone)', s.recVoice, (v) => { s.recVoice = v; ctx.save(); }),
@@ -599,7 +649,7 @@ export default {
       out.width = canvas.width;
       out.height = canvas.height;
       const o = out.getContext('2d');
-      paintPaper(o, s.bg, out.width, out.height);
+      paintPaper(o, s.bg, s.paper, s.gap, out.width, out.height);
       o.drawImage(canvas, 0, 0);
       const a = h('a', { href: out.toDataURL('image/png'), download: 'whiteboard.png' });
       a.click();
