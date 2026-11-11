@@ -3,6 +3,8 @@
 
 import { WIDGETS } from './widgets/index.js';
 import { h, uid, clamp, toast } from './util.js';
+import { applyTheme, themePicker } from './themes.js';
+import { panel } from './widgets/_common.js';
 
 const MIN_W = 150;
 const MIN_H = 110;
@@ -102,6 +104,9 @@ export class Board {
       locked: false,
       state: state ? structuredClone(state) : def.defaultState(),
     };
+    // New widgets follow the theme last chosen for the whole screen.
+    if (this.screen.widgetTheme) rec.theme = this.screen.widgetTheme;
+    if (this.screen.widgetShadow) rec.shadow = true;
     this.screen.widgets.push(rec);
     this.mount(rec);
     this.setActive(rec.id);
@@ -276,7 +281,8 @@ export class Board {
     const btn = (label, icon, onclick, cls = '') =>
       h('button', { class: `w-btn ${cls}`, title: label, 'aria-label': label, onclick }, icon);
 
-    const settingsBtn = def.hasSettings ? btn('Settings', '⚙', () => toggleSettings()) : null;
+    // Every widget has settings now: at least its colour theme.
+    const settingsBtn = btn('Settings', '⚙', () => toggleSettings());
     const lockBtn = btn('Lock position', '🔓', () => {
       rec.locked = !rec.locked;
       lockBtn.textContent = rec.locked ? '🔒' : '🔓';
@@ -302,6 +308,7 @@ export class Board {
       resize,
     );
 
+    applyTheme(el, rec);
     const m = { rec, el, inst: null, ro: null };
     this.mounted.set(rec.id, m);
     this.el.append(el);
@@ -325,9 +332,27 @@ export class Board {
       settings.hidden = !open;
       view.hidden = open;
       el.classList.toggle('settings-open', open);
-      if (open) m.inst?.openSettings?.();
-      else m.inst?.closeSettings?.();
+      if (open) {
+        if (m.inst?.openSettings) m.inst.openSettings();
+        else panel({ settings, closeSettings: () => toggleSettings(false) }, def.title);
+        addThemeSection();
+      } else m.inst?.closeSettings?.();
     };
+    // Colour theme section at the bottom of every widget's settings (re-added if a widget redraws its panel).
+    const addThemeSection = () => {
+      const host = settings.querySelector('.settings-panel') || settings;
+      if (host.querySelector('.theme-section')) return;
+      host.append(h('div', { class: 'theme-section' },
+        h('h4', {}, '🎨 Colour theme'),
+        themePicker({ theme: rec.theme, shadow: rec.shadow }, (c) => {
+          if ('theme' in c) rec.theme = c.theme;
+          if ('shadow' in c) rec.shadow = c.shadow;
+          applyTheme(el, rec);
+          this.changed();
+        }),
+      ));
+    };
+    new MutationObserver(() => { if (!settings.hidden) addThemeSection(); }).observe(settings, { childList: true });
 
     try {
       m.inst = def.mount(ctx) || {};
@@ -488,3 +513,15 @@ export class Board {
     });
   }
 }
+
+/** Apply a theme to every widget on the board (and to widgets added later). */
+Board.prototype.setAllThemes = function ({ theme, shadow }) {
+  if (theme !== undefined) this.screen.widgetTheme = theme;
+  if (shadow !== undefined) this.screen.widgetShadow = shadow;
+  for (const [, m] of this.mounted) {
+    if (theme !== undefined) m.rec.theme = theme;
+    if (shadow !== undefined) m.rec.shadow = shadow;
+    applyTheme(m.el, m.rec);
+  }
+  this.changed();
+};

@@ -1360,3 +1360,84 @@ body.clean .widget:not(.active):not(.settings-open) .w-head > * { pointer-events
 .arec-level i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #2a9d8f, #e9c46a 70%, #e63946); transition: width .08s; }
 .arec-hint { color: var(--muted); font-weight: 700; font-size: max(12px, 3.4cqmin); }
 .audio-extra .audio-vol { padding-right: 0; }
+
+/* ================= widget colour themes ================= */
+/* Widgets read these variables; a theme just changes them. */
+.widget { --head: #f4f6fa; --head-hover: #eceff6; --btn: #fff; --btn-hover: #f4f6fa; --surface: #f4f6fa; --field: #fff; --grip: #0003; color: var(--ink); }
+.w-head { background: var(--head); }
+.w-head:hover { background: var(--head-hover); }
+.widget .btn:not(.primary), .widget .chip { background: var(--btn); color: inherit; }
+.widget .btn:not(.primary):hover, .widget .chip:hover { background: var(--btn-hover); }
+.widget .w-view :is(input[type="text"], input[type="url"], input[type="number"], select, textarea) { background: var(--field); color: var(--ink); border-color: var(--line); }
+.widget .w-view .hint { color: var(--muted); }
+.w-btn:hover { background: var(--btn-hover); color: var(--ink); }
+.w-resize { background: linear-gradient(135deg, transparent 55%, var(--grip) 55% 62%, transparent 62% 72%, var(--grip) 72% 79%, transparent 79%); }
+/* Settings always stay light and plain, whatever the theme, so they're easy to read. */
+.widget .w-settings { --ink: #1d1d1f; --muted: #5f6368; --line: #e3e5ea; --btn: #fff; --btn-hover: #f4f6fa; --field: #fff; --surface: #f4f6fa; color: var(--ink); filter: none !important; text-shadow: none !important; }
+
+.widget.theme-dark { --card: #1f2430; --ink: #f3f5f9; --muted: #aab2c0; --line: #3a4252; --head: #262c39; --head-hover: #2f3646; --btn: #2c3342; --btn-hover: #363e50; --surface: #2a3040; --field: #262c39; --grip: #fff4; color-scheme: dark; }
+.widget.theme-blue { --card: #eaf3ff; --head: #d8e8fc; --head-hover: #cde0f9; --surface: #d8e8fc; --btn: #f6faff; --line: #c3d6ef; }
+.widget.theme-green { --card: #eafaf1; --head: #d4f1e1; --head-hover: #c7ecd8; --surface: #d4f1e1; --btn: #f5fdf8; --line: #bfe3cf; }
+.widget.theme-yellow { --card: #fff9df; --head: #fdefb5; --head-hover: #fbe89c; --surface: #fdefb5; --btn: #fffcef; --line: #efdc94; }
+.widget.theme-pink { --card: #fff0f5; --head: #fcdde8; --head-hover: #f9d0de; --surface: #fcdde8; --btn: #fff8fb; --line: #f1c3d3; }
+.widget.theme-purple { --card: #f5f0fe; --head: #e7dcfb; --head-hover: #ddcff8; --surface: #e7dcfb; --btn: #fbf9ff; --line: #d4c4f2; }
+
+/* Transparent: no card, no bar — just the content in white (or dark). */
+.widget:is(.theme-glass, .theme-glass-dark) { --card: transparent; --head: transparent; box-shadow: none; }
+.widget.theme-glass { --ink: #ffffff; --muted: #ffffffd9; --line: #ffffff66; --head-hover: #ffffff1f; --btn: #ffffff26; --btn-hover: #ffffff40; --surface: #ffffff1f; --field: #ffffff1f; --grip: #fffa; color-scheme: dark; }
+.widget.theme-glass-dark { --ink: #1d1d1f; --muted: #1d1d1fcc; --line: #1d1d1f55; --head-hover: #0000000f; --btn: #ffffff59; --btn-hover: #ffffff80; --surface: #ffffff40; --field: #ffffff66; --grip: #0006; }
+.widget:is(.theme-glass, .theme-glass-dark) .w-head { border-bottom-color: transparent; }
+.widget:is(.theme-glass, .theme-glass-dark) .w-title { color: var(--ink); }
+.widget:is(.theme-glass, .theme-glass-dark) .w-btn { color: var(--ink); }
+.widget.theme-glass .btn:not(.primary), .widget.theme-glass .chip { border-color: #ffffff59; }
+/* You can still see where a transparent widget is while you're working with it. */
+.widget:is(.theme-glass, .theme-glass-dark):is(.active, .settings-open, .dragging, .resizing) { outline: 2px dashed color-mix(in srgb, var(--ink) 55%, transparent); outline-offset: -2px; }
+.widget:is(.theme-glass, .theme-glass-dark).settings-open { background: #fff; }
+
+/* Drop shadow on everything in the widget (words, numbers, pictures, drawings). */
+.widget.tshadow .w-view, .widget.tshadow .w-head > * { filter: drop-shadow(0 2px 2px rgb(0 0 0 / .55)) drop-shadow(0 0 8px rgb(0 0 0 / .28)); }
+.widget.tshadow.theme-glass-dark .w-view, .widget.tshadow.theme-glass-dark .w-head > * { filter: drop-shadow(0 1px 1px rgb(255 255 255 / .8)) drop-shadow(0 0 8px rgb(255 255 255 / .6)); }
+
+/* Theme picker */
+.theme-section { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.theme-section h4 { margin: 0; }
+.theme-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.theme-tile { border: 2px solid var(--line); border-radius: 14px; background: #fff; padding: 6px; display: grid; gap: 4px; justify-items: center; font-weight: 700; color: #1d1d1f; }
+.theme-tile.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.theme-tile small { font-size: 12px; line-height: 1.1; text-align: center; }
+.theme-swatch { width: 100%; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--sw); border: 1px solid #0001; font-size: 18px; }
+.ts-glass { background: linear-gradient(135deg, #3a5ccc, #2a9d8f 55%, #f4a261) !important; }
+.ts-glass b { text-shadow: 0 2px 3px #0008; }
+.ts-glass-dark { background: linear-gradient(135deg, #fde2ec, #dbeafe 55%, #fff4c7) !important; }
+
+/* Themes other than Light: widget-specific light panels follow the theme. */
+.widget:not(.theme-light) { --panel-solid: var(--card); }
+.widget.theme-dark, .widget:is(.theme-glass, .theme-glass-dark) { --panel-solid: #262c39f2; }
+.widget.theme-glass-dark { --panel-solid: #ffffffee; }
+/* whole-widget backgrounds: let the theme show through */
+.widget:not(.theme-light) :is(.image-wrap, .noise, .calc, .coin, .sdice, .cd, .wx, .wxt, .rp > .empty, .vl > .empty) { background: transparent; color: var(--ink); }
+.widget:not(.theme-light) .iv { background: color-mix(in srgb, var(--c) 18%, transparent); }
+.widget:not(.theme-light) :is(.iv-round, .iv-total) { color: var(--muted); }
+.widget:not(.theme-light) .iv-bar { background: color-mix(in srgb, var(--ink) 15%, transparent); }
+/* panels inside widgets */
+.widget:not(.theme-light) :is(.image-caption, .noise-foot, .ws-card, .calc-display, .nn-card, .al-next, .sday-nextbox, .sday-nowbox.idle, .cal-cell, .cal-add, .tally-kid, .wx-h, .wx-d, .wx-wet, .wxt-slot, .wxt-tip, .sdice-prompt, .empty-note, .cal-badge) { background: var(--surface); color: var(--ink); }
+.widget:not(.theme-light) .ws-pick.on { background: var(--btn-hover); }
+.widget:not(.theme-light) .noise-overlay { background: color-mix(in srgb, var(--panel-solid) 70%, transparent); }
+.widget:not(.theme-light) .calc-key { background: var(--btn); color: var(--ink); box-shadow: none; border: 1px solid var(--line); }
+.widget:not(.theme-light) .calc-key.op { background: var(--surface); color: inherit; }
+.widget:not(.theme-light) .calc-key.eq { background: var(--accent); color: #fff; }
+.widget:not(.theme-light) .nn-card.now { background: color-mix(in srgb, var(--green) 28%, transparent); }
+.widget:not(.theme-light) .al-next.soon { background: color-mix(in srgb, var(--amber) 35%, transparent); }
+.widget:not(.theme-light) .cal-cell.weekend { background: color-mix(in srgb, var(--surface) 60%, transparent); }
+.widget:not(.theme-light) .cal-cell.hols { background: repeating-linear-gradient(45deg, color-mix(in srgb, #e9c46a 30%, transparent) 0 6px, transparent 6px 12px); }
+.widget:not(.theme-light) :is(.cal-chip, .cal-up, .cal-list li) { background: color-mix(in srgb, var(--c, #ccc) 30%, transparent); color: var(--ink); }
+.widget:not(.theme-light) .tally-btn { background: color-mix(in srgb, var(--c) 30%, transparent); color: var(--ink); }
+.widget:not(.theme-light) .tally-kid.has { background: color-mix(in srgb, var(--c) 30%, transparent); }
+.widget:not(.theme-light) :is(.cal-day, .rp-progress) { background: var(--panel-solid); color: var(--ink); }
+.widget:not(.theme-light) .wx-placechip { background: var(--surface); color: var(--ink); }
+.widget:not(.theme-light) .image-dl { background: var(--btn); }
+.widget:not(.theme-light) .coin-bar { background: color-mix(in srgb, var(--ink) 20%, transparent); }
+/* Big numbers and labels that use an accent colour: keep them readable on dark/transparent themes. */
+.widget:is(.theme-dark, .theme-glass) :is(.al-next-in, .cd-big, .iv-phase, .tb-count) { color: color-mix(in srgb, var(--c, var(--accent)) 35%, #fff); filter: none; }
+.widget.theme-glass-dark :is(.al-next-in, .cd-big, .iv-phase, .tb-count) { color: color-mix(in srgb, var(--c, var(--accent)) 70%, #000); }
+.widget:is(.theme-dark, .theme-glass) :is(.ws-level, .li-marker, .cal-badge, .cal-wk) { color: color-mix(in srgb, var(--accent) 35%, #fff); }

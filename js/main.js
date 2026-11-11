@@ -1,6 +1,7 @@
 // App shell: screens, menu, dock, backgrounds, sharing.
 
 import { Board } from './board.js';
+import { themePicker } from './themes.js';
 import { db, assetURL, sweepAssets, assetIdsOfScreen } from './storage.js';
 import { WIDGETS, CATEGORIES } from './widgets/index.js';
 import { TEMPLATES, GRADIENTS, SOLIDS } from './templates.js';
@@ -78,6 +79,14 @@ async function openScreen(s) {
   document.title = `${screen.name} · My Classroom Screen`;
   db.setMeta('lastScreen', screen.id);
   updateClassPill();
+}
+
+// ---------- widget theme for the whole screen ----------
+function themeDialog() {
+  modal('Widget theme',
+    h('p', {}, 'Changes every widget on this screen, and new ones you add. Each widget can still have its own theme in its ⚙ settings.'),
+    themePicker({ theme: screen.widgetTheme || 'light', shadow: !!screen.widgetShadow }, (c) => board.setAllThemes(c)),
+  );
 }
 
 // ---------- pause / carry on ----------
@@ -221,6 +230,7 @@ async function renderDrawer() {
       screen.paused
         ? menuBtn('▶', 'Carry on', () => { resumeScreen(); closeDrawer(); })
         : menuBtn('⏸', 'Pause screen', () => { pauseScreen(); closeDrawer(); }),
+      menuBtn('🎨', 'Widget theme', () => { closeDrawer(); themeDialog(); }),
       menuBtn('🔗', 'Share link', shareDialog),
       menuBtn('⬇', 'Download screen', () => exportScreens([screen], screen.name)),
       menuBtn('🧹', 'Clear widgets', () => { if (screen.paused) { toast('Carry on with the paused screen first.'); return; } if (confirm('Remove all widgets from this screen?')) board.clearAll(); }),
