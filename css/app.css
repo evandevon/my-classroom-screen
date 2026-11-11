@@ -1256,8 +1256,6 @@ body.compact .pop-tile { min-height: 78px; }
   body.compact .dock-recent, body.compact .dock-group + .dock-group { display: none; }
   #board.compact { padding-top: 60px; padding-bottom: 96px; }
 }
-#board.compact .widget.settings-open { height: auto !important; min-height: min(560px, calc(100vh - 150px)); }
-#board.compact .widget.settings-open .w-settings { overflow: visible; }
 /* Frosted strip behind the top buttons so scrolled widgets don't clash with them. */
 body.compact::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 64px; z-index: 99999; pointer-events: none; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); background: rgb(255 255 255 / 0.3); -webkit-mask: linear-gradient(#000 75%, transparent); mask: linear-gradient(#000 75%, transparent); }
 
@@ -1373,7 +1371,7 @@ body.clean .widget:not(.active):not(.settings-open) .w-head > * { pointer-events
 .w-btn:hover { background: var(--btn-hover); color: var(--ink); }
 .w-resize { background: linear-gradient(135deg, transparent 55%, var(--grip) 55% 62%, transparent 62% 72%, var(--grip) 72% 79%, transparent 79%); }
 /* Settings always stay light and plain, whatever the theme, so they're easy to read. */
-.widget .w-settings { --ink: #1d1d1f; --muted: #5f6368; --line: #e3e5ea; --btn: #fff; --btn-hover: #f4f6fa; --field: #fff; --surface: #f4f6fa; color: var(--ink); filter: none !important; text-shadow: none !important; }
+.w-settings { --ink: #1d1d1f; --muted: #5f6368; --line: #e3e5ea; --btn: #fff; --btn-hover: #f4f6fa; --field: #fff; --surface: #f4f6fa; color: var(--ink); filter: none !important; text-shadow: none !important; }
 
 .widget.theme-dark { --card: #1f2430; --ink: #f3f5f9; --muted: #aab2c0; --line: #3a4252; --head: #262c39; --head-hover: #2f3646; --btn: #2c3342; --btn-hover: #363e50; --surface: #2a3040; --field: #262c39; --grip: #fff4; color-scheme: dark; }
 .widget.theme-blue { --card: #eaf3ff; --head: #d8e8fc; --head-hover: #cde0f9; --surface: #d8e8fc; --btn: #f6faff; --line: #c3d6ef; }
@@ -1392,7 +1390,6 @@ body.clean .widget:not(.active):not(.settings-open) .w-head > * { pointer-events
 .widget.theme-glass .btn:not(.primary), .widget.theme-glass .chip { border-color: #ffffff59; }
 /* You can still see where a transparent widget is while you're working with it. */
 .widget:is(.theme-glass, .theme-glass-dark):is(.active, .settings-open, .dragging, .resizing) { outline: 2px dashed color-mix(in srgb, var(--ink) 55%, transparent); outline-offset: -2px; }
-.widget:is(.theme-glass, .theme-glass-dark).settings-open { background: #fff; }
 
 /* Drop shadow on everything in the widget (words, numbers, pictures, drawings). */
 .widget.tshadow .w-view, .widget.tshadow .w-head > * { filter: drop-shadow(0 2px 2px rgb(0 0 0 / .55)) drop-shadow(0 0 8px rgb(0 0 0 / .28)); }
@@ -1492,3 +1489,27 @@ body.clean .widget:not(.active):not(.settings-open) .w-head > * { pointer-events
 .widget:is(.theme-dark, .theme-glass) .group-title { color: color-mix(in srgb, var(--c) 40%, #fff); filter: none; }
 .widget:not(.theme-light) .list-items li.current { background: color-mix(in srgb, var(--amber) 38%, transparent); }
 .widget:is(.theme-dark, .theme-glass) .nn-label { color: var(--muted); }
+
+/* ---------- settings side panel ---------- */
+.side-settings {
+  position: fixed; top: 8px; bottom: 8px; right: 8px; z-index: 100002;
+  width: min(440px, calc(100vw - 16px));
+  background: #fff; color: #1d1d1f; border-radius: 20px;
+  box-shadow: 0 18px 50px rgb(0 0 0 / .28), 0 2px 8px rgb(0 0 0 / .12);
+  overflow: auto; overscroll-behavior: contain; touch-action: pan-y;
+}
+.side-settings.left { right: auto; left: 8px; }
+.side-settings[hidden] { display: none; }
+.side-settings.in { animation: side-in .22s cubic-bezier(.2, .8, .2, 1); }
+.side-settings.left.in { animation-name: side-in-left; }
+@keyframes side-in { from { transform: translateX(30px); opacity: 0; } }
+@keyframes side-in-left { from { transform: translateX(-30px); opacity: 0; } }
+.side-settings .w-settings { flex: none; overflow: visible; padding: 0 16px 18px; background: transparent; }
+.side-settings .settings-head { position: sticky; top: 0; margin: 0 -16px 4px; padding: 12px 16px; border-radius: 20px 20px 0 0; background: #fff; }
+.side-settings .settings-panel h3 { font-size: 20px; }
+/* The widget being set up gets a highlight so it's easy to see the changes. */
+.widget.settings-open { outline: 3px solid var(--accent); outline-offset: 3px; }
+/* Phones: the panel comes up from the bottom, leaving the top of the screen visible. */
+body.compact .side-settings { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 55vh; border-radius: 20px 20px 0 0; }
+body.compact .side-settings.in { animation-name: side-up; }
+@keyframes side-up { from { transform: translateY(40px); opacity: 0; } }

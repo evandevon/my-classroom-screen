@@ -55,6 +55,10 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 - **☰ → 📊 Data** lets you filter by date, class, widget or student, see totals, **download a CSV** for Excel or Sheets, copy rows, and delete records. You can also have old records deleted automatically.
 - Records stay only in this browser on this device. They are never put into share links or screen files. They're for your own teaching notes; official records still belong in your school's system.
 
+## Widget settings
+
+Tapping ⚙ opens the widget's settings in a panel at the side of the screen (on the left if the widget is on the right), so you can watch the widget change as you adjust it. Tap anywhere outside the panel, press Esc, or tap Done to close it. On phones the panel comes up from the bottom.
+
 ## Widget colour themes
 
 Every widget can be **Light, Dark, Transparent · white, Transparent · dark, Transparent with a white or dark edge, Blue, Green, Yellow, Pink or Purple**, with an optional **drop shadow** on words and pictures (handy for the transparent themes over a photo background). Menu → *Widget theme* changes every widget on the screen (and new ones); each widget's ⚙ settings has its own theme at the bottom. Settings panels always stay light so they're easy to read.
