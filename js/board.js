@@ -189,6 +189,7 @@ export class Board {
   unmount(id) {
     const m = this.mounted.get(id);
     if (!m) return;
+    if (this.openSettings === m) m.closeSettings();
     try {
       m.inst?.destroy?.();
     } catch (e) {
@@ -197,6 +198,45 @@ export class Board {
     m.ro?.disconnect();
     m.el.remove();
     this.mounted.delete(id);
+  }
+
+  /** The side panel that holds the open widget's settings (one at a time). */
+  get side() {
+    if (!this._side) {
+      this._side = h('aside', { class: 'side-settings', hidden: true, role: 'dialog', 'aria-label': 'Widget settings' });
+      document.body.append(this._side);
+      // Tapping anywhere outside the panel closes it (but not dialogs or messages it opened).
+      document.addEventListener('pointerdown', (e) => {
+        const m = this.openSettings;
+        if (!m || this._side.contains(e.target)) return;
+        if (e.target.closest?.('dialog, .modal, .toast, .side-keep')) return;
+        if (m.settingsBtn && m.settingsBtn.contains(e.target)) return; // its ⚙ toggles it
+        m.closeSettings();
+      }, true);
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && this.openSettings && !document.querySelector('dialog[open]')) this.openSettings.closeSettings();
+      });
+    }
+    return this._side;
+  }
+
+  showSide(m) {
+    const side = this.side;
+    side.replaceChildren(m.el.querySelector('.w-settings'));
+    // Open on the right, unless the widget is over there — then on the left so it stays visible.
+    const r = m.el.getBoundingClientRect();
+    const left = !this.compact && r.left + r.width / 2 > innerWidth * 0.6;
+    side.classList.toggle('left', left);
+    side.hidden = false;
+    side.classList.remove('in');
+    void side.offsetWidth;
+    side.classList.add('in');
+    side.scrollTop = 0;
+    if (this.compact) requestAnimationFrame(() => m.el.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  }
+
+  hideSide() {
+    this.side.hidden = true;
   }
 
   setActive(id) {
@@ -327,17 +367,29 @@ export class Board {
       addWidget: (type, state) => this.addWidget(type, { state }),
     };
 
+    // Settings open in a side panel, so the widget stays in view and shows changes as you make them.
     const toggleSettings = (force) => {
       const open = force ?? settings.hidden;
-      settings.hidden = !open;
-      view.hidden = open;
-      el.classList.toggle('settings-open', open);
       if (open) {
+        if (this.openSettings && this.openSettings !== m) this.openSettings.closeSettings();
+        this.openSettings = m;
+        settings.hidden = false;
+        this.showSide(m);
+        el.classList.add('settings-open');
         if (m.inst?.openSettings) m.inst.openSettings();
         else panel({ settings, closeSettings: () => toggleSettings(false) }, def.title);
         addThemeSection();
-      } else m.inst?.closeSettings?.();
+      } else {
+        if (settings.hidden) return;
+        settings.hidden = true;
+        el.classList.remove('settings-open');
+        if (this.openSettings === m) { this.openSettings = null; this.hideSide(); }
+        el.querySelector('.w-body').append(settings); // keep it with its widget while closed
+        m.inst?.closeSettings?.();
+      }
     };
+    m.closeSettings = () => toggleSettings(false);
+    m.settingsBtn = settingsBtn;
     // Colour theme section at the bottom of every widget's settings (re-added if a widget redraws its panel).
     const addThemeSection = () => {
       const host = settings.querySelector('.settings-panel') || settings;
