@@ -1441,3 +1441,54 @@ body.clean .widget:not(.active):not(.settings-open) .w-head > * { pointer-events
 .widget:is(.theme-dark, .theme-glass) :is(.al-next-in, .cd-big, .iv-phase, .tb-count) { color: color-mix(in srgb, var(--c, var(--accent)) 35%, #fff); filter: none; }
 .widget.theme-glass-dark :is(.al-next-in, .cd-big, .iv-phase, .tb-count) { color: color-mix(in srgb, var(--c, var(--accent)) 70%, #000); }
 .widget:is(.theme-dark, .theme-glass) :is(.ws-level, .li-marker, .cal-badge, .cal-wk) { color: color-mix(in srgb, var(--accent) 35%, #fff); }
+
+/* Edge-box transparent themes: a line around the widget to group or separate it. */
+.widget.theme-boxed { border: 3px solid color-mix(in srgb, var(--ink) 80%, transparent); }
+.widget.theme-boxed.tshadow { box-shadow: 0 2px 6px rgb(0 0 0 / .4), inset 0 0 6px rgb(0 0 0 / .25); }
+.widget.theme-boxed.tshadow.theme-glass-dark { box-shadow: 0 0 8px rgb(255 255 255 / .7), inset 0 0 6px rgb(255 255 255 / .5); }
+.ts-boxed { outline: 3px solid #fff; outline-offset: -6px; }
+.ts-glass-dark.ts-boxed { outline-color: #1d1d1f; }
+
+/* ---- drawn faces follow the theme: --face is the fill behind numbers and hands ---- */
+.widget { --face: #fff; --face-line: var(--ink); }
+.widget.theme-dark { --face: #2a3040; }
+.widget:is(.theme-glass, .theme-glass-dark) { --face: transparent; }
+.clock-face .cf-bg { fill: var(--face); stroke: var(--face-line); }
+.widget:not(.theme-light) .clock-face .tick { stroke: var(--muted); }
+.widget:not(.theme-light) .cf-teaching .tc-inner, .widget:not(.theme-light) .cf-teaching .tc-minbg { fill: var(--face); }
+.widget:not(.theme-light) .cf-teaching .tc-minbg { stroke: var(--muted); }
+.widget:not(.theme-light) .cf-teaching .tc-min { fill: var(--ink); }
+.widget:not(.theme-light) .cf-teaching .tc-past { fill: color-mix(in srgb, #4d8af0 35%, transparent); }
+.widget:not(.theme-light) .cf-teaching .tc-to { fill: color-mix(in srgb, #f4a261 35%, transparent); }
+.widget:is(.theme-dark, .theme-glass) .cf-teaching .tc-word.past { fill: #a9c6ff; }
+.widget:is(.theme-dark, .theme-glass) .cf-teaching .tc-word.to { fill: #ffc58a; }
+.widget:is(.theme-dark, .theme-glass) .cf-teaching .hand.min { stroke: #8fb0ff; }
+.widget:not(.theme-light) .tc-sentence { background: var(--surface); }
+.widget:is(.theme-dark, .theme-glass) .tc-digital { color: #a9c6ff; }
+/* Roman: parchment on light themes; line-art on dark and transparent ones */
+.widget:is(.theme-dark, .theme-glass, .theme-glass-dark) .cf-roman .cf-bg { fill: var(--face); stroke: var(--ink); }
+.widget:is(.theme-dark, .theme-glass, .theme-glass-dark) .cf-roman :is(.rm-ring, .tick, .tick.big, .hand.hour, .hand.min) { stroke: var(--ink); }
+.widget:is(.theme-dark, .theme-glass, .theme-glass-dark) .cf-roman :is(.num, .pin) { fill: var(--ink); }
+.widget:is(.theme-dark, .theme-glass, .theme-glass-dark) .rm-time { color: var(--ink); }
+
+/* ---- theme audit fixes ---- */
+/* timers: white faces follow --face; outlines follow the text colour */
+.widget:not(.theme-light) .ring-bg { stroke: color-mix(in srgb, var(--ink) 22%, transparent); }
+.widget:not(.theme-light) .timer-bar { background: color-mix(in srgb, var(--ink) 18%, transparent); }
+.widget:not(.theme-light) .timer-face[data-style="pie"] .timer-pie { border-color: var(--ink); box-shadow: none; }
+.widget:not(.theme-light) .timer-face[data-style="rect"] .timer-rect { background: var(--face); border-color: var(--ink); box-shadow: none; }
+.widget:is(.theme-dark, .theme-glass) .timer-face[data-style="rect"] :is(.timer-time, .timer-label) { text-shadow: 0 0 .15em #000a, 0 0 .3em #0006; }
+.widget.theme-glass-dark .timer-face[data-style="rect"] :is(.timer-time, .timer-label) { text-shadow: 0 0 .15em #fff, 0 0 .3em #fffa; }
+/* water clock scale */
+.widget:is(.theme-dark, .theme-glass) .wt-num { fill: var(--ink); }
+.widget:is(.theme-dark, .theme-glass) .wt-mark { stroke: var(--ink); }
+/* weather text */
+.widget:not(.theme-light) .wxt-head { color: var(--ink); }
+.widget:is(.theme-dark, .theme-glass) :is(.wx-p, .wxt-lo) { color: #9fd3ff; }
+.widget:is(.theme-dark, .theme-glass) .wxt-hi { color: #ff9aa5; }
+.widget:is(.theme-dark, .theme-glass) .wx-placechip small { color: #ffd08a; }
+/* group maker cards and the current turn in a list */
+.widget:not(.theme-light) .group { background: color-mix(in srgb, var(--c) 30%, transparent); }
+.widget:is(.theme-dark, .theme-glass) .group-title { color: color-mix(in srgb, var(--c) 40%, #fff); filter: none; }
+.widget:not(.theme-light) .list-items li.current { background: color-mix(in srgb, var(--amber) 38%, transparent); }
+.widget:is(.theme-dark, .theme-glass) .nn-label { color: var(--muted); }

@@ -246,7 +246,7 @@ export default {
       bar.firstChild.style.width = `${frac * 100}%`;
       bar.firstChild.style.background = traffic;
       // White turning red: red grows clockwise from 12 o'clock as time is used.
-      pie.style.background = `conic-gradient(var(--red) 0 ${used * 360}deg, #fff ${used * 360}deg 360deg)`;
+      pie.style.background = `conic-gradient(var(--red) 0 ${used * 360}deg, var(--face, #fff) ${used * 360}deg 360deg)`;
       rectFill.style.width = `${used * 100}%`;
       hg.update(frac, s.running);
 
