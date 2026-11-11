@@ -57,7 +57,7 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 
 ## Widget colour themes
 
-Every widget can be **Light, Dark, Transparent · white, Transparent · dark, Blue, Green, Yellow, Pink or Purple**, with an optional **drop shadow** on words and pictures (handy for the transparent themes over a photo background). Menu → *Widget theme* changes every widget on the screen (and new ones); each widget's ⚙ settings has its own theme at the bottom. Settings panels always stay light so they're easy to read.
+Every widget can be **Light, Dark, Transparent · white, Transparent · dark, Transparent with a white or dark edge, Blue, Green, Yellow, Pink or Purple**, with an optional **drop shadow** on words and pictures (handy for the transparent themes over a photo background). Menu → *Widget theme* changes every widget on the screen (and new ones); each widget's ⚙ settings has its own theme at the bottom. Settings panels always stay light so they're easy to read.
 
 ## Phones and tablets
 
