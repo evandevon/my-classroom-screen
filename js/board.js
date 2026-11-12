@@ -416,9 +416,10 @@ export class Board {
     m.ro = new ResizeObserver(() => m.inst?.resize?.());
     m.ro.observe(view);
 
-    el.addEventListener('pointerdown', () => {
-      // "Hide title bars" mode: the tap that reveals the hidden buttons mustn't also press one.
-      if (document.body.classList.contains('clean') && !el.classList.contains('active')) {
+    el.addEventListener('pointerdown', (e) => {
+      // "Hide title bars" mode on touch screens: the tap that reveals hidden buttons mustn't also
+      // press one (a mouse shows them on hover first, and ⚙ is always safe to press).
+      if (e.pointerType !== 'mouse' && document.body.classList.contains('clean') && !el.classList.contains('active')) {
         el.classList.add('arming');
         const done = () => setTimeout(() => el.classList.remove('arming'), 350);
         window.addEventListener('pointerup', done, { once: true, capture: true });
