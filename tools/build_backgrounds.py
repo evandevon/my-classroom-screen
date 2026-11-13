@@ -5,7 +5,7 @@ Drop pictures (jpg, png, webp, gif) or looping videos (mp4, webm) into backgroun
 This runs automatically on GitHub (see .github/workflows/backgrounds.yml); to run it
 yourself you need Python 3 and ffmpeg:  python3 tools/build_backgrounds.py
 """
-import json, os, re, subprocess, sys
+import hashlib, json, os, re, subprocess, sys
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'backgrounds')
 THUMBS = os.path.join(ROOT, 'thumbs')
@@ -32,8 +32,21 @@ def nice(name):
     return re.sub(r'[_-]+', ' ', os.path.splitext(name)[0]).strip()
 
 
+def file_hash(path):
+    h = hashlib.sha1()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(1 << 20), b''):
+            h.update(chunk)
+    return h.hexdigest()[:10]
+
+
 def main():
     os.makedirs(THUMBS, exist_ok=True)
+    try:  # previous versions, so previews are only remade for changed files
+        with open(os.path.join(ROOT, 'index.json')) as f:
+            before = {i['file']: i.get('v') for i in json.load(f).get('items', [])}
+    except (OSError, ValueError):
+        before = {}
     items, skipped, keep = [], [], set()
     for name in sorted(os.listdir(ROOT), key=lambda n: n.lower()):
         path = os.path.join(ROOT, name)
@@ -49,12 +62,13 @@ def main():
         thumb = f'{slug(os.path.splitext(name)[0])}.jpg'
         keep.add(thumb)
         tpath = os.path.join(THUMBS, thumb)
-        if not os.path.exists(tpath) or os.path.getmtime(tpath) < os.path.getmtime(path):
+        v = file_hash(path)
+        if not os.path.exists(tpath) or before.get(name) != v:
             at = ['-ss', f"{min(1.0, info['duration'] / 3):.2f}"] if kind == 'video' and info['duration'] > 0.5 else []
             subprocess.run(['ffmpeg', '-v', 'error', '-y', *at, '-i', path, '-frames:v', '1',
                             '-vf', 'scale=320:180:force_original_aspect_ratio=increase,crop=320:180', '-q:v', '4', tpath], check=True)
         items.append({
-            'file': name, 'name': nice(name), 'kind': kind, 'thumb': f'thumbs/{thumb}',
+            'file': name, 'v': v, 'name': nice(name), 'kind': kind, 'thumb': f'thumbs/{thumb}',
             'width': info['w'], 'height': info['h'],
             **({'duration': round(info['duration'], 1)} if kind == 'video' else {}),
             'bytes': os.path.getsize(path),
