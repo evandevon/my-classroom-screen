@@ -39,6 +39,16 @@
    "height": 1080,
    "duration": 7.3,
    "bytes": 959015
+  },
+  {
+   "file": "Ocean Loop 1.mp4",
+   "name": "Ocean Loop 1",
+   "kind": "video",
+   "thumb": "thumbs/ocean-loop-1.jpg",
+   "width": 1920,
+   "height": 1080,
+   "duration": 15.1,
+   "bytes": 2795950
   }
  ],
  "skipped": [
