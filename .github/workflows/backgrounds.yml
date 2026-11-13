@@ -1,0 +1,47 @@
+# Rebuilds the background library (backgrounds/index.json + preview pictures)
+# whenever pictures or videos are added to, changed in, or removed from backgrounds/.
+name: Background library
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backgrounds/**'
+      - '!backgrounds/index.json'
+      - '!backgrounds/thumbs/**'
+      - 'tools/build_backgrounds.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: background-library
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Build previews and list
+        run: python3 tools/build_backgrounds.py
+      - name: Save changes
+        run: |
+          git add backgrounds/index.json backgrounds/thumbs
+          if git diff --cached --quiet; then
+            echo "Background library already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update background library"
+          git push
+      - name: Republish the site
+        # Pushes made by this job may not trigger a Pages build on their own.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds" || true

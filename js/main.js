@@ -9,7 +9,7 @@ import { makeShareLink, readShareHash, buildProjectFile, importProjectFile, prep
 import { h, uid, debounce, toast, pickFile, downloadBlob, enableMultiTouchTaps } from './util.js';
 enableMultiTouchTaps();
 import { showSoundHelp } from './help.js';
-import { ANIMS, renderMoving, classifyLink, MOVING_TYPES } from './background.js';
+import { ANIMS, renderMoving, classifyLink, MOVING_TYPES, loadLibrary, libURL } from './background.js';
 import { setLogContext } from './datalog.js';
 import { showDataScreen } from './datascreen.js';
 import { initClasses, currentClassName, fromTimeline, onClassChange, showClassPicker, showClassManager } from './classes.js';
@@ -376,6 +376,43 @@ function backgroundDialog() {
   // Tweak the current moving background (speed, darken, slideshow timing) without starting over.
   const tweak = debounce(async (patch) => { await set({ ...cur(), ...patch }); }, 250);
 
+  // --- library: ready-made pictures and loops that come with the site
+  const libGrid = h('div', { class: 'bg-lib-grid' }, h('p', { class: 'hint' }, 'Loading…'));
+  const libTiles = [];
+  const fmtSecs = (d) => (d >= 60 ? `${Math.floor(d / 60)}:${String(Math.round(d % 60)).padStart(2, '0')}` : `${Math.round(d)}s`);
+  loadLibrary().then((items) => {
+    if (!items.length) { libGrid.replaceChildren(h('p', { class: 'hint' }, 'No library backgrounds yet.')); return; }
+    libGrid.replaceChildren(...items.map((it) => {
+      const thumb = h('img', { src: libURL(it.thumb), alt: '', loading: 'lazy' });
+      const tile = h('button', {
+        class: 'bg-lib-tile', title: it.name, 'aria-label': `Library background: ${it.name}${it.kind === 'video' ? ' (moving)' : ''}`,
+        onclick: () => {
+          const url = libURL(it.file);
+          set(it.kind === 'video' ? { type: 'video', url, lib: it.file, name: it.name, dim: cur().dim || 0 } : { type: 'image', value: url, lib: it.file, name: it.name });
+        },
+      },
+        h('span', { class: 'bg-lib-pic' }, thumb, it.kind === 'video' ? h('span', { class: 'bg-lib-badge' }, `▶ ${fmtSecs(it.duration || 0)}`) : null),
+        h('small', {}, it.name),
+      );
+      tile.dataset.file = it.file;
+      // Hover (mouse) plays a little preview of a moving background.
+      if (it.kind === 'video') {
+        let pv = null;
+        tile.addEventListener('pointerenter', (e) => {
+          if (e.pointerType !== 'mouse' || pv) return;
+          pv = h('video', { class: 'bg-lib-preview', src: libURL(it.file), muted: true, loop: true, autoplay: true, playsinline: true, preload: 'auto' });
+          pv.muted = true;
+          tile.firstChild.append(pv);
+          pv.play().catch(() => {});
+        });
+        tile.addEventListener('pointerleave', () => { if (pv) { pv.pause(); pv.removeAttribute('src'); pv.load(); pv.remove(); pv = null; } });
+      }
+      libTiles.push(tile);
+      return tile;
+    }));
+    syncControls();
+  });
+
   // --- animated
   const speed = h('input', { type: 'range', min: 0.25, max: 2, step: 0.25, 'aria-label': 'Speed' });
   speed.addEventListener('input', () => tweak({ speed: Number(speed.value) }));
@@ -441,19 +478,22 @@ function backgroundDialog() {
   function syncControls() {
     const b = cur();
     animTiles.forEach((t, i) => t.classList.toggle('on', b.type === 'anim' && Object.keys(ANIMS)[i] === b.preset));
+    libTiles.forEach((t) => t.classList.toggle('on', b.lib === t.dataset.file));
     speed.value = String(b.speed || 1);
     dim.value = String(b.dim || 0);
     animControls.hidden = b.type !== 'anim';
     dimRow.hidden = !MOVING_TYPES.includes(b.type);
     every.value = String(b.every || 15);
     effect.value = b.effect || 'fade';
-    const what = { anim: `Animated: ${ANIMS[b.preset]?.label || ''}`, video: b.assetId ? 'Your video' : 'Video link', youtube: 'YouTube video', drive: 'Google Drive file', slides: `Slideshow: ${b.assetIds?.length || 0} items${b.folder ? ` from “${b.folder}”` : ''}`, image: 'Picture', gradient: 'Gradient', color: 'Colour' }[b.type] || '';
+    const what = b.lib ? `Library: ${b.name || b.lib}` : { anim: `Animated: ${ANIMS[b.preset]?.label || ''}`, video: b.assetId ? 'Your video' : 'Video link', youtube: 'YouTube video', drive: 'Google Drive file', slides: `Slideshow: ${b.assetIds?.length || 0} items${b.folder ? ` from “${b.folder}”` : ''}`, image: 'Picture', gradient: 'Gradient', color: 'Colour' }[b.type] || '';
     now.textContent = what ? `Now showing: ${what}` : '';
   }
 
   modal('Background',
     now,
     dimRow,
+    h('h3', {}, '📚 Library'),
+    libGrid,
     h('h3', {}, '✨ Animated'),
     h('div', { class: 'bg-anim-grid' }, ...animTiles),
     animControls,

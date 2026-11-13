@@ -419,3 +419,17 @@ export function renderMoving(host, bg, { assetURL, onProblem = () => {} }) {
 }
 
 export const MOVING_TYPES = ['anim', 'video', 'youtube', 'drive', 'slides'];
+
+// ---------------------------------------------------------------- library (backgrounds/ in the repo)
+const LIB_BASE = () => new URL('backgrounds/', document.baseURI);
+export const libURL = (file) => new URL(file.split('/').map(encodeURIComponent).join('/'), LIB_BASE()).href;
+/** The pictures and loops in the site's backgrounds/ folder (list built by tools/build_backgrounds.py). */
+export async function loadLibrary() {
+  try {
+    const r = await fetch(new URL('index.json', LIB_BASE()), { cache: 'no-cache' });
+    if (!r.ok) return [];
+    return (await r.json()).items || [];
+  } catch {
+    return [];
+  }
+}
