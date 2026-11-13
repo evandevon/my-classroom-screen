@@ -3,7 +3,7 @@
 
 import { WIDGETS } from './widgets/index.js';
 import { h, uid, clamp, toast } from './util.js';
-import { applyTheme, themePicker } from './themes.js';
+import { applyTheme, themePicker, textSizeSlider } from './themes.js';
 import { panel } from './widgets/_common.js';
 
 const MIN_W = 150;
@@ -395,6 +395,8 @@ export class Board {
       const host = settings.querySelector('.settings-panel') || settings;
       if (host.querySelector('.theme-section')) return;
       host.append(h('div', { class: 'theme-section' },
+        h('h4', {}, '🔠 Text size'),
+        textSizeSlider(rec.fs || 1, (fs) => { rec.fs = fs; applyTheme(el, rec); this.changed(); }),
         h('h4', {}, '🎨 Colour theme'),
         themePicker({ theme: rec.theme, shadow: rec.shadow }, (c) => {
           if ('theme' in c) rec.theme = c.theme;
@@ -568,12 +570,13 @@ export class Board {
 }
 
 /** Apply a theme to every widget on the board (and to widgets added later). */
-Board.prototype.setAllThemes = function ({ theme, shadow }) {
+Board.prototype.setAllThemes = function ({ theme, shadow, fs }) {
   if (theme !== undefined) this.screen.widgetTheme = theme;
   if (shadow !== undefined) this.screen.widgetShadow = shadow;
   for (const [, m] of this.mounted) {
     if (theme !== undefined) m.rec.theme = theme;
     if (shadow !== undefined) m.rec.shadow = shadow;
+    if (fs !== undefined) m.rec.fs = fs;
     applyTheme(m.el, m.rec);
   }
   this.changed();

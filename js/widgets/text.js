@@ -67,7 +67,7 @@ export default {
     ctx.view.append(h('div', { class: 'text-wrap' }, editor, toolbar));
 
     function apply() {
-      editor.style.fontSize = `${s.size}cqmin`;
+      editor.style.fontSize = `calc(${s.size}cqmin * var(--fs, 1))`;
       editor.style.color = s.color;
       editor.style.textAlign = s.align;
       editor.style.fontFamily = FONTS[s.font] || FONTS.sans;

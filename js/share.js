@@ -42,10 +42,11 @@ export function linkSafeScreen(screen, { includeNames = false, dropHeavy = false
   // A paused screen is shared ready to go (held timers simply show their time left).
   delete copy.paused;
   for (const w of copy.widgets) if (w.state?.held) w.state.held = false;
-  if (copy.background?.assetId) {
+  if (copy.background?.assetId || copy.background?.assetIds?.length) {
     delete copy.background.assetId;
-    copy.background.type = 'color';
-    dropped.add('uploaded background image');
+    delete copy.background.assetIds;
+    copy.background = { type: 'gradient', value: 'sky' };
+    dropped.add('uploaded background (picture, video or slideshow)');
   }
   for (const w of copy.widgets) {
     const def = WIDGETS[w.type];
@@ -120,6 +121,7 @@ export async function readShareHash() {
 function assetIdsIn(screen) {
   const ids = new Set();
   if (screen.background?.assetId) ids.add(screen.background.assetId);
+  for (const id of screen.background?.assetIds || []) ids.add(id);
   for (const w of screen.widgets) {
     for (const [k, v] of Object.entries(w.state || {})) {
       if (k.endsWith('AssetId') && v) ids.add(v);
@@ -194,6 +196,7 @@ export function prepareImportedScreen(screen, idMap = {}) {
   s.id = uid('screen');
   s.updated = Date.now();
   if (s.background?.assetId) s.background.assetId = idMap[s.background.assetId] || null;
+  if (Array.isArray(s.background?.assetIds)) s.background.assetIds = s.background.assetIds.map((id) => idMap[id] || null);
   for (const w of s.widgets || []) {
     w.id = uid('w');
     for (const k of Object.keys(w.state || {})) {

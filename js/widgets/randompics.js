@@ -37,6 +37,7 @@ function release(ids) {
       const used = new Set();
       for (const sc of await db.listScreens()) {
         if (sc.background?.assetId) used.add(sc.background.assetId);
+        for (const id of sc.background?.assetIds || []) used.add(id);
         for (const w of sc.widgets || []) {
           for (const [k, v] of Object.entries(w.state || {})) {
             if (k.endsWith('AssetId') && v) used.add(v);
