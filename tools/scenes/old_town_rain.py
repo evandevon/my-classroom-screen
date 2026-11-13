@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Original night view over the tiled roofs of an old town in a rainstorm. Loops every T seconds.
+"""Original night view (calm: no lightning or flicker) over the tiled roofs of an old town in a rainstorm. Loops every T seconds.
 
 Seen from a high roof: rows of kawara-tiled houses with lit paper windows and shop signs,
 a bathhouse chimney, a pagoda on a hill, a far city skyline, power lines, rain at three
@@ -450,6 +450,7 @@ def flicker(t):
 
 
 def lightning(t):
+    return 0.0   # calm version: no lightning (sudden flashes distract a class)
     v = 0
     for c, w, a in ((7.0, .07, 1), (7.18, .05, .6), (7.32, .18, .9)):
         if t >= c: v += a * math.exp(-(t - c) / w) * (t - c < 1.2)
@@ -459,9 +460,9 @@ def lightning(t):
 def frame(i):
     t = i / FPS
     L = lightning(t)
-    tvv = .6 + .25 * math.sin(TAU * 23 * t / T) + .15 * math.sin(TAU * 41 * t / T + 1)
-    w = {'steady': 1.0, 'flickA': flicker(t), 'blinkB': .15 + .85 * (math.sin(TAU * 3 * t / T) > -.2), 'lantern': .93 + .07 * math.sin(TAU * 5 * t / T),
-         'warn': max(0, math.sin(TAU * 6 * t / T)) ** 4, 'tv': tvv, 'bolt': min(1.5, L * 1.6) * (L > .08), 'uplight': 1.0}
+    # everything changes slowly and smoothly: no flicker, blinking or flashes
+    w = {'steady': 1.0, 'flickA': .9 + .1 * math.sin(TAU * t / T), 'blinkB': .8 + .2 * math.sin(TAU * 2 * t / T), 'lantern': .95 + .05 * math.sin(TAU * 3 * t / T),
+         'warn': .45 + .45 * math.sin(TAU * 3 * t / T), 'tv': .78 + .1 * math.sin(TAU * 2 * t / T + 1), 'bolt': 0.0, 'uplight': 1.0}
     img = sky_rgb * (1 + 2.2 * L) + cloud_lit * (1 + 9 * L)
     img = base_rgb * (1 + .9 * L) + img * (1 - base_a[..., None])
     for k, (e_rgb, e_a) in emits.items():
