@@ -58,6 +58,8 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 ## Backgrounds
 
 Menu → *Background*:
+
+- **📚 Library**: ready-made pictures and moving loops that come with the site, shown as preview tiles (hover with a mouse to see a moving one play). To add more, drop pictures (jpg, png, webp, gif) or short looping videos (mp4, webm) into the `backgrounds/` folder on GitHub. The *Background library* GitHub Action then makes the previews and the list (`backgrounds/index.json`) automatically. Library backgrounds also work in share links, because they live on the site.
 - **Animated** (drawn live, no downloads): aurora, calm waves, bubbles, snow, rain, night sky, fireflies, clouds, autumn leaves, confetti — with a speed slider. They pause when the screen is paused or the tab is hidden, and stay still if the computer asks for reduced motion.
 - **Video or web link**: upload a looping video, or paste a link to a video file, a picture or animated GIF, a YouTube video (plays muted and looping), or a Google Drive file shared as “Anyone with the link”.
 - **Slideshow**: choose a folder of pictures (and short videos) from the computer; fade or slow-zoom, every 5 s–5 min, shuffled.

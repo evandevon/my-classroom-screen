@@ -1,6 +1,6 @@
 // Service worker: keeps the app working when school wifi drops.
 // Bump VERSION whenever files change so classrooms get the update.
-const VERSION = 'mcs-v36';
+const VERSION = 'mcs-v37';
 const FILES = [
   './',
   'index.html',
@@ -80,11 +80,17 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
+  // Big media (library backgrounds, videos) go straight to the network: they're streamed in
+  // pieces and would fill up the offline cache.
+  if (url.pathname.includes('/backgrounds/') && !url.pathname.endsWith('.json') && !url.pathname.includes('/thumbs/')) return;
+  if (e.request.headers.has('range') || /\.(mp4|webm|mov|m4v|mp3|m4a|ogg|wav)$/i.test(url.pathname)) return;
   e.respondWith(
     fetch(e.request)
       .then((res) => {
-        const copy = res.clone();
-        caches.open(VERSION).then((c) => c.put(e.request, copy));
+        if (res.ok && res.status === 200) {
+          const copy = res.clone();
+          caches.open(VERSION).then((c) => c.put(e.request, copy)).catch(() => {});
+        }
         return res;
       })
       .catch(() => caches.match(e.request, { ignoreSearch: true }).then((r) => r || caches.match('index.html'))),
