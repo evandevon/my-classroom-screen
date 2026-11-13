@@ -1547,3 +1547,5 @@ body.moving-bg #board { background: transparent !important; }
 .fs-a.small { font-size: 13px; }
 .fs-a.big { font-size: 22px; }
 .fs-val { min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
+.bg-yt { opacity: 0; transition: opacity .8s ease; }
+.bg-yt.on { opacity: 1; }

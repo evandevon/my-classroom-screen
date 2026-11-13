@@ -264,6 +264,7 @@ export function renderMoving(host, bg, { assetURL, onProblem = () => {} }) {
   let paused = false;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const videos = [];
+  const cleanups = [];
   const playAll = () => videos.forEach((v) => (paused ? v.pause() : v.play().catch(() => {})));
   const api = { dark: false, stop() {}, setPaused(p) { paused = p; playAll(); } };
 
@@ -329,11 +330,41 @@ export function renderMoving(host, bg, { assetURL, onProblem = () => {} }) {
       playAll();
     } else if (bg.type === 'youtube') {
       // YouTube can't be a true background: shown muted and looping, scaled to fill, not clickable.
+      // YouTube's own loop reloads the video (a black flash), so we listen to the player and jump
+      // back to the start just before the end instead. Its loop setting stays on as a fallback.
       const id = bg.id;
+      const origin = 'https://www.youtube-nocookie.com';
       const f = h('iframe', {
         class: 'bg-yt', title: 'Background video', allow: 'autoplay; encrypted-media', referrerpolicy: 'strict-origin-when-cross-origin',
-        src: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&disablekb=1&modestbranding=1&playsinline=1&rel=0&iv_load_policy=3`,
+        src: `${origin}/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&disablekb=1&modestbranding=1&playsinline=1&rel=0&iv_load_policy=3&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`,
       });
+      const send = (func, args = []) => f.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), origin);
+      let duration = 0;
+      let jumpedAt = 0;
+      const onMsg = (e) => {
+        if (e.source !== f.contentWindow) return;
+        let d;
+        try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch { return; }
+        const info = d?.info;
+        if (!info) return;
+        if (info.duration) duration = info.duration;
+        if (info.playerState === 1) f.classList.add('on'); // playing: fade in (hides the black loading screen)
+        const t = info.currentTime;
+        if (typeof t === 'number' && duration > 2 && t > duration - 0.6 && performance.now() - jumpedAt > 1500) {
+          jumpedAt = performance.now();
+          send('seekTo', [0, true]);
+        }
+      };
+      addEventListener('message', onMsg);
+      f.addEventListener('load', () => {
+        // Ask the player to report its position (YouTube's iframe message protocol).
+        f.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'bg', channel: 'widget' }), origin);
+        send('mute');
+        if (!paused) send('playVideo');
+      });
+      setTimeout(() => f.classList.add('on'), 6000); // show it anyway if the player never reports
+      api.setPaused = (p) => { paused = p; send(p ? 'pauseVideo' : 'playVideo'); };
+      cleanups.push(() => removeEventListener('message', onMsg));
       host.append(f, dim);
     } else if (bg.type === 'drive') {
       // Google Drive: a shared video plays from its download link; a shared picture shows full size.
@@ -383,7 +414,7 @@ export function renderMoving(host, bg, { assetURL, onProblem = () => {} }) {
       next();
     }
   })();
-  api.stop = () => { clearTimeout(timer); videos.forEach((v) => { v.pause(); v.removeAttribute('src'); }); };
+  api.stop = () => { clearTimeout(timer); cleanups.forEach((c) => c()); videos.forEach((v) => { v.pause(); v.removeAttribute('src'); }); };
   return api;
 }
 
