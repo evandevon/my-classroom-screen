@@ -24,8 +24,9 @@ const nameBtn = $('#screen-name');
 
 let screen = null;
 
+const deletedScreens = new Set(); // never save these again (a late save would bring a deleted screen back)
 const persist = debounce(async () => {
-  if (!screen) return;
+  if (!screen || deletedScreens.has(screen.id)) return;
   screen.updated = Date.now();
   try {
     await db.putScreen(screen);
@@ -307,6 +308,8 @@ const assetIds = (s) => [s.background?.assetId, ...(s.background?.assetIds || []
 
 async function deleteScreen(s) {
   if (!confirm(`Delete “${s.name}”? This can’t be undone.`)) return;
+  if (s.id === screen.id) persist.cancel();
+  deletedScreens.add(s.id);
   await db.deleteScreen(s.id);
   if (s.id === screen.id) {
     const rest = await sortedScreens();
