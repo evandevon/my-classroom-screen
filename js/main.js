@@ -246,19 +246,25 @@ async function renderDrawer() {
     list,
     h('h3', {}, 'This screen'),
     h('div', { class: 'menu-grid' },
-      menuBtn('🎨', 'Background', backgroundDialog),
+      menuBtn('🖼️', 'Background', backgroundDialog),
+      menuBtn('🎨', 'Widget theme & text size', () => { closeDrawer(); themeDialog(); }),
       screen.paused
         ? menuBtn('▶', 'Carry on', () => { resumeScreen(); closeDrawer(); })
         : menuBtn('⏸', 'Pause screen', () => { pauseScreen(); closeDrawer(); }),
-      menuBtn('🎨', 'Widget theme & text size', () => { closeDrawer(); themeDialog(); }),
-      menuBtn('🔗', 'Share link', shareDialog),
-      menuBtn('⬇', 'Download screen', () => exportScreens([screen], screen.name)),
       menuBtn('🧹', 'Clear widgets', () => { if (screen.paused) { toast('Carry on with the paused screen first.'); return; } if (confirm('Remove all widgets from this screen?')) board.clearAll(); }),
     ),
-    h('h3', {}, 'All screens'),
+    h('h3', {}, 'Save & share'),
     h('div', { class: 'menu-grid' },
-      menuBtn('📂', 'Open project file', importDialog),
-      menuBtn('💾', 'Download all', async () => exportScreens(await sortedScreens(), 'my-classroom-screens')),
+      menuBtn('⬇', 'Download this screen', () => exportScreens([screen], screen.name)),
+      menuBtn('💾', 'Download all screens', async () => exportScreens(await sortedScreens(), 'my-classroom-screens')),
+      menuBtn('📂', 'Open a saved file', importDialog),
+      menuBtn('🔗', 'Share link', shareDialog),
+    ),
+    h('p', { class: 'hint menu-note' }, 'Downloads are .classroom files with everything inside (pictures, videos, recordings). Share links are quick to send but leave out files from this computer.'),
+    h('h3', {}, 'Classes & data'),
+    h('div', { class: 'menu-grid' },
+      menuBtn('👥', 'Classes & student lists', () => { closeDrawer(); showClassManager(); }),
+      menuBtn('📊', 'Data you’ve recorded', () => { closeDrawer(); showDataScreen(); }),
     ),
     h('h3', {}, 'Options'),
     h('div', { class: 'stack' },
@@ -266,16 +272,11 @@ async function renderDrawer() {
       toggle('Hide widget title bars (tap a widget to show)', document.body.classList.contains('clean'), (v) => { document.body.classList.toggle('clean', v); db.setMeta('clean', v); }),
       toggle('Large buttons', document.body.classList.contains('large'), (v) => { document.body.classList.toggle('large', v); db.setMeta('large', v); }),
     ),
-    h('h3', {}, 'Classes & data'),
-    h('div', { class: 'menu-grid' },
-      menuBtn('👥', 'Classes & student lists', () => { closeDrawer(); showClassManager(); }),
-      menuBtn('📊', 'Data you’ve recorded', () => { closeDrawer(); showDataScreen(); }),
-    ),
     h('h3', {}, 'Help'),
     h('div', { class: 'menu-grid' },
       menuBtn('🔔', 'Keep alarms ringing (stop tabs sleeping)', showSoundHelp),
     ),
-    h('p', { class: 'hint' }, 'Everything is saved automatically in this browser. Use “Download all” now and then as a backup.'),
+    h('p', { class: 'hint' }, 'Everything is saved automatically in this browser. Use “Download all screens” now and then as a backup.'),
   );
 }
 const menuBtn = (icon, label, onclick) => h('button', { class: 'menu-btn', onclick }, h('span', { class: 'mi' }, icon), label);
@@ -525,7 +526,7 @@ function shareDialog() {
       lines.push(h('p', {}, h('b', {}, '⚠️ Your files won’t be in this link. '), `Pictures, video clips and sounds you added from this computer stay on this computer, so people opening the link will see empty widgets: ${which.join(', ')}.`));
     }
     if (other.length) lines.push(h('p', {}, h('b', {}, files.length ? 'Also missing: ' : '⚠️ Not in this link: '), `${other.join(', ')}.`));
-    if (lines.length) lines.push(h('p', {}, 'To share everything, download the screen file and send that instead (they open it with “Open project file”).'));
+    if (lines.length) lines.push(h('p', {}, 'To share everything, download the screen file and send that instead (they open it with ☰ → “Open a saved file”).'));
     warn.replaceChildren(...lines);
     warn.hidden = !lines.length;
     fileBtn.className = lines.length ? 'btn primary' : 'btn';
