@@ -49,6 +49,16 @@
    "height": 1080,
    "duration": 15.1,
    "bytes": 2795950
+  },
+  {
+   "file": "Town Loop 1.mp4",
+   "name": "Town Loop 1",
+   "kind": "video",
+   "thumb": "thumbs/town-loop-1.jpg",
+   "width": 1322,
+   "height": 738,
+   "duration": 1.1,
+   "bytes": 143391
   }
  ],
  "skipped": [
