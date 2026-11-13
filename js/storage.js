@@ -99,6 +99,7 @@ navigator.storage?.persist?.().catch(() => {});
 export function assetIdsOfScreen(screen) {
   const ids = new Set();
   if (screen?.background?.assetId) ids.add(screen.background.assetId);
+  for (const id of screen?.background?.assetIds || []) ids.add(id);
   for (const w of screen?.widgets || []) {
     for (const [k, v] of Object.entries(w.state || {})) {
       if (k.endsWith('AssetId') && v) ids.add(v);

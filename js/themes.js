@@ -24,6 +24,24 @@ export function applyTheme(el, rec) {
   el.classList.add(`theme-${t.base || t.id}`);
   el.classList.toggle('theme-boxed', !!t.boxed);
   el.classList.toggle('tshadow', !!rec.shadow);
+  // Text size: scales the words, numbers and emoji inside the widget.
+  if (rec.fs && rec.fs !== 1) el.style.setProperty('--wfs', String(rec.fs)); else el.style.removeProperty('--wfs');
+}
+
+/** "Text size" slider (50%–250%) with a reset. onChange(fs). */
+export function textSizeSlider(value = 1, onChange) {
+  const out = h('b', { class: 'fs-val' });
+  const r = h('input', { type: 'range', min: 0.5, max: 2.5, step: 0.05, value: String(value || 1), 'aria-label': 'Text size' });
+  const show = () => { out.textContent = `${Math.round(Number(r.value) * 100)}%`; };
+  r.addEventListener('input', () => { show(); onChange(Number(r.value)); });
+  show();
+  return h('div', { class: 'fs-row' },
+    h('span', { class: 'fs-a small', 'aria-hidden': 'true' }, 'A'),
+    r,
+    h('span', { class: 'fs-a big', 'aria-hidden': 'true' }, 'A'),
+    out,
+    h('button', { class: 'btn small', onclick: () => { r.value = '1'; show(); onChange(1); } }, 'Reset'),
+  );
 }
 
 /** Tiles for each theme, plus the drop-shadow switch. onChange({ theme?, shadow? }). */

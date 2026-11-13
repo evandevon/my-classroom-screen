@@ -1,7 +1,7 @@
 // App shell: screens, menu, dock, backgrounds, sharing.
 
 import { Board } from './board.js';
-import { themePicker } from './themes.js';
+import { themePicker, textSizeSlider } from './themes.js';
 import { db, assetURL, sweepAssets, assetIdsOfScreen } from './storage.js';
 import { WIDGETS, CATEGORIES } from './widgets/index.js';
 import { TEMPLATES, GRADIENTS, SOLIDS } from './templates.js';
@@ -9,12 +9,17 @@ import { makeShareLink, readShareHash, buildProjectFile, importProjectFile, prep
 import { h, uid, debounce, toast, pickFile, downloadBlob, enableMultiTouchTaps } from './util.js';
 enableMultiTouchTaps();
 import { showSoundHelp } from './help.js';
+import { ANIMS, renderMoving, classifyLink, MOVING_TYPES } from './background.js';
 import { setLogContext } from './datalog.js';
 import { showDataScreen } from './datascreen.js';
 import { initClasses, currentClassName, fromTimeline, onClassChange, showClassPicker, showClassManager } from './classes.js';
 
 const $ = (sel) => document.querySelector(sel);
 const boardEl = $('#board');
+// Moving backgrounds (animations, videos, slideshows) sit in their own layer behind the board.
+const bgLayer = h('div', { id: 'bg-layer', 'aria-hidden': 'true' });
+boardEl.before(bgLayer);
+let moving = null;
 const nameBtn = $('#screen-name');
 
 let screen = null;
@@ -86,6 +91,8 @@ function themeDialog() {
   modal('Widget theme',
     h('p', {}, 'Changes every widget on this screen, and new ones you add. Each widget can still have its own theme in its ⚙ settings.'),
     themePicker({ theme: screen.widgetTheme || 'light', shadow: !!screen.widgetShadow }, (c) => board.setAllThemes(c)),
+    h('h3', {}, '🔠 Text size of every widget'),
+    textSizeSlider(1, (fs) => board.setAllThemes({ fs })),
   );
 }
 
@@ -113,21 +120,34 @@ function resumeScreen() {
 }
 function updatePauseBadge() {
   document.body.classList.toggle('screen-paused', !!screen.paused);
+  moving?.setPaused(!!screen.paused);
 }
 
 async function applyBackground() {
   const bg = screen.background || { type: 'gradient', value: 'sky' };
+  moving?.stop();
+  moving = null;
+  bgLayer.replaceChildren();
+  bgLayer.style.background = '';
   boardEl.style.backgroundImage = '';
   boardEl.style.backgroundColor = '';
-  if (bg.type === 'color') boardEl.style.backgroundColor = bg.value;
+  const isMoving = MOVING_TYPES.includes(bg.type);
+  document.body.classList.toggle('moving-bg', isMoving);
+  let dark = false;
+  if (isMoving) {
+    moving = renderMoving(bgLayer, bg, { assetURL, onProblem: (msg) => toast(msg, { ms: 9000 }) });
+    moving.setPaused(!!screen.paused);
+    dark = moving.dark || (bg.dim || 0) >= 35;
+  } else if (bg.type === 'color') boardEl.style.backgroundColor = bg.value;
   else if (bg.type === 'gradient') boardEl.style.backgroundImage = GRADIENTS[bg.value] || GRADIENTS.sky;
   else if (bg.type === 'image') {
     const url = bg.assetId ? await assetURL(bg.assetId) : /^https?:\/\//.test(bg.value || '') ? bg.value : null;
     if (url) boardEl.style.backgroundImage = `url("${url.replace(/"/g, '%22')}")`;
   }
-  const dark = (bg.type === 'gradient' && ['night', 'forest', 'ocean'].includes(bg.value)) || (bg.type === 'color' && /^#(0|1|2)/.test(bg.value));
+  dark ||= (bg.type === 'gradient' && ['night', 'forest', 'ocean'].includes(bg.value)) || (bg.type === 'color' && /^#(0|1|2)/.test(bg.value));
   document.body.classList.toggle('dark-bg', dark);
 }
+
 
 async function sortedScreens() {
   return (await db.listScreens()).sort((a, b) => (b.updated || 0) - (a.updated || 0));
@@ -230,7 +250,7 @@ async function renderDrawer() {
       screen.paused
         ? menuBtn('▶', 'Carry on', () => { resumeScreen(); closeDrawer(); })
         : menuBtn('⏸', 'Pause screen', () => { pauseScreen(); closeDrawer(); }),
-      menuBtn('🎨', 'Widget theme', () => { closeDrawer(); themeDialog(); }),
+      menuBtn('🎨', 'Widget theme & text size', () => { closeDrawer(); themeDialog(); }),
       menuBtn('🔗', 'Share link', shareDialog),
       menuBtn('⬇', 'Download screen', () => exportScreens([screen], screen.name)),
       menuBtn('🧹', 'Clear widgets', () => { if (screen.paused) { toast('Carry on with the paused screen first.'); return; } if (confirm('Remove all widgets from this screen?')) board.clearAll(); }),
@@ -282,7 +302,7 @@ async function duplicateScreen(s) {
   await db.putScreen(copy);
   renderDrawer();
 }
-const assetIds = (s) => [s.background?.assetId, ...s.widgets.flatMap((w) => Object.entries(w.state || {}).flatMap(([k, v]) => (k.endsWith('AssetId') && v ? [v] : k.endsWith('AssetIds') && Array.isArray(v) ? v : [])))].filter(Boolean);
+const assetIds = (s) => [s.background?.assetId, ...(s.background?.assetIds || []), ...s.widgets.flatMap((w) => Object.entries(w.state || {}).flatMap(([k, v]) => (k.endsWith('AssetId') && v ? [v] : k.endsWith('AssetIds') && Array.isArray(v) ? v : [])))].filter(Boolean);
 
 async function deleteScreen(s) {
   if (!confirm(`Delete “${s.name}”? This can’t be undone.`)) return;
@@ -320,14 +340,134 @@ function newScreenDialog() {
 }
 
 // ---------- background ----------
+const MAX_SLIDES = 200;
+/** Shrink big photos for a full-screen slideshow (keeps hundreds within the browser's storage). */
+async function shrinkForScreen(file) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 2560 / Math.max(bmp.width, bmp.height));
+    if (k === 1 && file.size < 2.5e6) { bmp.close?.(); return file; }
+    const c = h('canvas', { width: Math.round(bmp.width * k), height: Math.round(bmp.height * k) });
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close?.();
+    return (await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.88))) || file;
+  } catch { return file; }
+}
+function chooseFiles({ folder = false, accept = 'image/*,video/*' } = {}) {
+  return new Promise((resolve) => {
+    const input = h('input', { type: 'file', accept, multiple: true, style: { display: 'none' } });
+    if (folder) input.setAttribute('webkitdirectory', '');
+    input.addEventListener('change', () => { resolve([...input.files]); input.remove(); });
+    input.addEventListener('cancel', () => { resolve([]); input.remove(); });
+    document.body.append(input);
+    input.click();
+  });
+}
+
 function backgroundDialog() {
+  const cur = () => screen.background || {};
   const set = async (bg) => {
     screen.background = bg;
     await applyBackground();
     persist();
+    syncControls();
   };
-  const urlIn = h('input', { type: 'url', placeholder: 'https://… image link' });
+  // Tweak the current moving background (speed, darken, slideshow timing) without starting over.
+  const tweak = debounce(async (patch) => { await set({ ...cur(), ...patch }); }, 250);
+
+  // --- animated
+  const speed = h('input', { type: 'range', min: 0.25, max: 2, step: 0.25, 'aria-label': 'Speed' });
+  speed.addEventListener('input', () => tweak({ speed: Number(speed.value) }));
+  const dim = h('input', { type: 'range', min: 0, max: 70, step: 5, 'aria-label': 'Darken' });
+  dim.addEventListener('input', () => tweak({ dim: Number(dim.value) }));
+  const animTiles = Object.entries(ANIMS).map(([k, a]) => h('button', {
+    class: 'bg-anim-tile', style: { background: a.base }, title: a.label, 'aria-label': `Animated background: ${a.label}`,
+    onclick: () => set({ type: 'anim', preset: k, speed: cur().type === 'anim' ? cur().speed || 1 : 1, dim: cur().dim || 0 }),
+  }, h('span', { class: 'bg-anim-ic' }, a.icon), h('small', {}, a.label)));
+  const speedRow = h('label', { class: 'bg-slider' }, h('span', {}, '🐢 Speed 🐇'), speed);
+  const dimRow = h('label', { class: 'bg-slider' }, h('span', {}, '🌗 Darken (helps widgets stand out)'), dim);
+
+  // --- video / web link / Drive / YouTube
+  const urlIn = h('input', { type: 'url', placeholder: 'Paste a link: video, picture, GIF, YouTube or Google Drive' });
+  const useLink = () => {
+    const l = classifyLink(urlIn.value);
+    if (!l) return;
+    if (l.type === 'image') set({ type: 'image', value: l.value });
+    else set({ ...l, dim: cur().dim || 0 });
+    if (l.type === 'drive') toast('Google Drive: the file must be shared as “Anyone with the link”. Videos over about 100 MB can’t play this way.', { ms: 9000 });
+    if (l.type === 'youtube') toast('YouTube plays muted and looping. It needs the internet, and school filters may block it.', { ms: 8000 });
+  };
+  urlIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') useLink(); });
+  const uploadVideo = async () => {
+    const [f] = await chooseFiles({ accept: 'video/*' });
+    if (!f) return;
+    if (f.size > 300e6) { toast('That video is very big — use a short clip (under 300 MB, ideally under 50 MB).'); return; }
+    const id = uid('asset');
+    await db.putAsset({ id, blob: f, name: f.name, type: f.type });
+    set({ type: 'video', assetId: id, dim: cur().dim || 0 });
+  };
+
+  // --- slideshow from a folder
+  const every = h('select', { 'aria-label': 'Change picture every' }, ...[[5, '5 seconds'], [10, '10 seconds'], [15, '15 seconds'], [30, '30 seconds'], [60, '1 minute'], [300, '5 minutes']].map(([v, t]) => h('option', { value: v }, t)));
+  every.addEventListener('change', () => tweak({ every: Number(every.value) }));
+  const effect = h('select', { 'aria-label': 'Effect' }, h('option', { value: 'fade' }, 'Fade'), h('option', { value: 'kenburns' }, 'Slow zoom (Ken Burns)'));
+  effect.addEventListener('change', () => tweak({ effect: effect.value }));
+  const progress = h('p', { class: 'hint', hidden: true });
+  const slideshowFrom = async (folder) => {
+    const files = (await chooseFiles({ folder })).filter((f) => /^(image|video)\//.test(f.type) || /\.(jpe?g|png|gif|webp|avif|mp4|webm|mov)$/i.test(f.name))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })).slice(0, MAX_SLIDES);
+    if (!files.length) return;
+    const ids = [];
+    const kinds = [];
+    progress.hidden = false;
+    for (let i = 0; i < files.length; i++) {
+      progress.textContent = `Adding ${i + 1} of ${files.length}…`;
+      const f = files[i];
+      const isVid = f.type.startsWith('video/') || /\.(mp4|webm|mov)$/i.test(f.name);
+      const blob = isVid ? f : await shrinkForScreen(f);
+      const id = uid('asset');
+      await db.putAsset({ id, blob, name: f.name, type: blob.type || f.type });
+      ids.push(id);
+      kinds.push(isVid ? 'video' : 'image');
+    }
+    progress.hidden = true;
+    set({ type: 'slides', assetIds: ids, kinds, every: Number(every.value) || 15, effect: effect.value, shuffle: true, dim: cur().dim || 0, folder: files[0].webkitRelativePath?.split('/')[0] || '' });
+  };
+
+  const animControls = h('div', { class: 'bg-controls' }, speedRow);
+  const slideControls = h('div', { class: 'row' }, h('label', { class: 'field' }, h('span', {}, 'Change every'), every), h('label', { class: 'field' }, h('span', {}, 'Effect'), effect));
+  const now = h('p', { class: 'bg-now' });
+  function syncControls() {
+    const b = cur();
+    animTiles.forEach((t, i) => t.classList.toggle('on', b.type === 'anim' && Object.keys(ANIMS)[i] === b.preset));
+    speed.value = String(b.speed || 1);
+    dim.value = String(b.dim || 0);
+    animControls.hidden = b.type !== 'anim';
+    dimRow.hidden = !MOVING_TYPES.includes(b.type);
+    every.value = String(b.every || 15);
+    effect.value = b.effect || 'fade';
+    const what = { anim: `Animated: ${ANIMS[b.preset]?.label || ''}`, video: b.assetId ? 'Your video' : 'Video link', youtube: 'YouTube video', drive: 'Google Drive file', slides: `Slideshow: ${b.assetIds?.length || 0} items${b.folder ? ` from “${b.folder}”` : ''}`, image: 'Picture', gradient: 'Gradient', color: 'Colour' }[b.type] || '';
+    now.textContent = what ? `Now showing: ${what}` : '';
+  }
+
   modal('Background',
+    now,
+    dimRow,
+    h('h3', {}, '✨ Animated'),
+    h('div', { class: 'bg-anim-grid' }, ...animTiles),
+    animControls,
+    h('h3', {}, '🎬 Video or web link'),
+    h('div', { class: 'row stretch' }, urlIn, h('button', { class: 'btn', onclick: useLink }, 'Use link')),
+    h('div', { class: 'row' }, h('button', { class: 'btn', onclick: uploadVideo }, '⬆ Upload a looping video')),
+    h('p', { class: 'hint' }, 'Short MP4 loops work best (e.g. 10–30 seconds). Google Drive: share the file as “Anyone with the link”, then paste its link. Videos always play muted.'),
+    h('h3', {}, '🖼️ Slideshow'),
+    h('div', { class: 'row' },
+      h('button', { class: 'btn', onclick: () => slideshowFrom(true) }, '📁 Choose a folder'),
+      h('button', { class: 'btn', onclick: () => slideshowFrom(false) }, 'Choose pictures'),
+    ),
+    slideControls,
+    progress,
+    h('p', { class: 'hint' }, 'Pictures stay on this computer (big photos are shrunk to screen size). Videos in the folder play through once each.'),
     h('h3', {}, 'Gradients'),
     h('div', { class: 'bg-grid' },
       ...Object.entries(GRADIENTS).map(([k, v]) => h('button', { class: 'bg-swatch', style: { backgroundImage: v }, 'aria-label': k, title: k, onclick: () => set({ type: 'gradient', value: k }) })),
@@ -342,7 +482,7 @@ function backgroundDialog() {
       })(),
     ),
     h('h3', {}, 'Picture'),
-    h('div', { class: 'row stretch' },
+    h('div', { class: 'row' },
       h('button', {
         class: 'btn',
         onclick: async () => {
@@ -353,10 +493,9 @@ function backgroundDialog() {
           set({ type: 'image', assetId: id });
         },
       }, 'Upload picture'),
-      urlIn,
-      h('button', { class: 'btn', onclick: () => urlIn.value && set({ type: 'image', value: urlIn.value.trim() }) }, 'Use link'),
     ),
   );
+  syncControls();
 }
 
 // ---------- sharing ----------
@@ -382,7 +521,7 @@ function shareDialog() {
     const lines = [];
     if (files.length) {
       const which = [...new Set(screen.widgets.filter((w) => Object.entries(w.state || {}).some(([k, v]) => (k.endsWith('AssetId') && v) || (k.endsWith('AssetIds') && v?.length))).map((w) => WIDGETS[w.type]?.title || w.type))];
-      if (screen.background?.assetId) which.unshift('Background picture');
+      if (screen.background?.assetId || screen.background?.assetIds?.length) which.unshift('Background');
       lines.push(h('p', {}, h('b', {}, '⚠️ Your files won’t be in this link. '), `Pictures, video clips and sounds you added from this computer stay on this computer, so people opening the link will see empty widgets: ${which.join(', ')}.`));
     }
     if (other.length) lines.push(h('p', {}, h('b', {}, files.length ? 'Also missing: ' : '⚠️ Not in this link: '), `${other.join(', ')}.`));
