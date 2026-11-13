@@ -54,6 +54,17 @@
    "height": 1080,
    "duration": 15.1,
    "bytes": 2795950
+  },
+  {
+   "file": "Old Town Rain Loop 1.mp4",
+   "v": "cd0158701a",
+   "name": "Old Town Rain Loop 1",
+   "kind": "video",
+   "thumb": "thumbs/old-town-rain-loop-1.jpg",
+   "width": 1920,
+   "height": 1080,
+   "duration": 12.0,
+   "bytes": 4294754
   }
  ],
  "skipped": [
