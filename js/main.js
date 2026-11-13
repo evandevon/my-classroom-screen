@@ -9,7 +9,7 @@ import { makeShareLink, readShareHash, buildProjectFile, importProjectFile, prep
 import { h, uid, debounce, toast, pickFile, downloadBlob, enableMultiTouchTaps } from './util.js';
 enableMultiTouchTaps();
 import { showSoundHelp } from './help.js';
-import { ANIMS, renderMoving, classifyLink, MOVING_TYPES, loadLibrary, libURL } from './background.js';
+import { ANIMS, renderMoving, classifyLink, MOVING_TYPES, loadLibrary, libURL, freshLibraryBackground } from './background.js';
 import { setLogContext } from './datalog.js';
 import { showDataScreen } from './datascreen.js';
 import { initClasses, currentClassName, fromTimeline, onClassChange, showClassPicker, showClassManager } from './classes.js';
@@ -125,7 +125,13 @@ function updatePauseBadge() {
 }
 
 async function applyBackground() {
-  const bg = screen.background || { type: 'gradient', value: 'sky' };
+  let bg = screen.background || { type: 'gradient', value: 'sky' };
+  if (bg.lib) { // use the newest version of a library file that has been replaced on the site
+    const forScreen = screen;
+    const fresh = await freshLibraryBackground(bg);
+    if (screen !== forScreen || screen.background !== bg) return; // switched away meanwhile
+    if (fresh.url !== bg.url || fresh.value !== bg.value) { screen.background = bg = fresh; persist(); }
+  }
   moving?.stop();
   moving = null;
   bgLayer.replaceChildren();
@@ -386,11 +392,11 @@ function backgroundDialog() {
   loadLibrary().then((items) => {
     if (!items.length) { libGrid.replaceChildren(h('p', { class: 'hint' }, 'No library backgrounds yet.')); return; }
     libGrid.replaceChildren(...items.map((it) => {
-      const thumb = h('img', { src: libURL(it.thumb), alt: '', loading: 'lazy' });
+      const thumb = h('img', { src: libURL(it.thumb, it.v), alt: '', loading: 'lazy' });
       const tile = h('button', {
         class: 'bg-lib-tile', title: it.name, 'aria-label': `Library background: ${it.name}${it.kind === 'video' ? ' (moving)' : ''}`,
         onclick: () => {
-          const url = libURL(it.file);
+          const url = libURL(it.file, it.v);
           set(it.kind === 'video' ? { type: 'video', url, lib: it.file, name: it.name, dim: cur().dim || 0 } : { type: 'image', value: url, lib: it.file, name: it.name });
         },
       },
@@ -403,7 +409,7 @@ function backgroundDialog() {
         let pv = null;
         tile.addEventListener('pointerenter', (e) => {
           if (e.pointerType !== 'mouse' || pv) return;
-          pv = h('video', { class: 'bg-lib-preview', src: libURL(it.file), muted: true, loop: true, autoplay: true, playsinline: true, preload: 'auto' });
+          pv = h('video', { class: 'bg-lib-preview', src: libURL(it.file, it.v), muted: true, loop: true, autoplay: true, playsinline: true, preload: 'auto' });
           pv.muted = true;
           tile.firstChild.append(pv);
           pv.play().catch(() => {});

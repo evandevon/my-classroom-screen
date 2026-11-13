@@ -2,6 +2,7 @@
  "items": [
   {
    "file": "Blue Particles Loop 1.mp4",
+   "v": "2fa3cbbf56",
    "name": "Blue Particles Loop 1",
    "kind": "video",
    "thumb": "thumbs/blue-particles-loop-1.jpg",
@@ -12,6 +13,7 @@
   },
   {
    "file": "Cafe Loop 1.mp4",
+   "v": "1f08bf2119",
    "name": "Cafe Loop 1",
    "kind": "video",
    "thumb": "thumbs/cafe-loop-1.jpg",
@@ -22,6 +24,7 @@
   },
   {
    "file": "Chilling Cat Loop 1.mp4",
+   "v": "b3e747a529",
    "name": "Chilling Cat Loop 1",
    "kind": "video",
    "thumb": "thumbs/chilling-cat-loop-1.jpg",
@@ -32,6 +35,7 @@
   },
   {
    "file": "Chilling Cat Loop 2.mp4",
+   "v": "01d73180de",
    "name": "Chilling Cat Loop 2",
    "kind": "video",
    "thumb": "thumbs/chilling-cat-loop-2.jpg",
@@ -42,6 +46,7 @@
   },
   {
    "file": "Ocean Loop 1.mp4",
+   "v": "65493f0f2a",
    "name": "Ocean Loop 1",
    "kind": "video",
    "thumb": "thumbs/ocean-loop-1.jpg",
@@ -52,6 +57,7 @@
   },
   {
    "file": "Town Loop 1.mp4",
+   "v": "070e3dd3a8",
    "name": "Town Loop 1",
    "kind": "video",
    "thumb": "thumbs/town-loop-1.jpg",

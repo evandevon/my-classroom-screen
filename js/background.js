@@ -422,14 +422,27 @@ export const MOVING_TYPES = ['anim', 'video', 'youtube', 'drive', 'slides'];
 
 // ---------------------------------------------------------------- library (backgrounds/ in the repo)
 const LIB_BASE = () => new URL('backgrounds/', document.baseURI);
-export const libURL = (file) => new URL(file.split('/').map(encodeURIComponent).join('/'), LIB_BASE()).href;
+/** Address of a library file. `v` (a fingerprint of the file) changes whenever the file is replaced,
+ *  so the browser fetches the new one instead of reusing its stored copy. */
+export const libURL = (file, v) => {
+  const u = new URL(file.split('/').map(encodeURIComponent).join('/'), LIB_BASE());
+  if (v) u.searchParams.set('v', v);
+  return u.href;
+};
+let libCache = null;
 /** The pictures and loops in the site's backgrounds/ folder (list built by tools/build_backgrounds.py). */
-export async function loadLibrary() {
-  try {
-    const r = await fetch(new URL('index.json', LIB_BASE()), { cache: 'no-cache' });
-    if (!r.ok) return [];
-    return (await r.json()).items || [];
-  } catch {
-    return [];
-  }
+export function loadLibrary() {
+  libCache ||= fetch(new URL('index.json', LIB_BASE()), { cache: 'no-cache' })
+    .then((r) => (r.ok ? r.json() : {}))
+    .then((d) => d.items || [])
+    .catch(() => []);
+  return libCache;
+}
+/** A saved library background, pointed at the newest version of its file. */
+export async function freshLibraryBackground(bg) {
+  if (!bg?.lib) return bg;
+  const it = (await loadLibrary()).find((i) => i.file === bg.lib);
+  if (!it) return bg;
+  const url = libURL(it.file, it.v);
+  return bg.type === 'video' ? { ...bg, url } : { ...bg, value: url };
 }
