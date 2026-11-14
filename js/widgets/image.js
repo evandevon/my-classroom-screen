@@ -1,4 +1,4 @@
-import { h, uid, pickFile, downloadBlob } from '../util.js';
+import { h, uid, pickFile, downloadBlob, toast } from '../util.js';
 import { db, assetURL } from '../storage.js';
 import { panel, select, textInput, field } from './_common.js';
 
@@ -19,9 +19,10 @@ export default {
       h('p', {}, 'Add a picture'),
       h('div', { class: 'row' },
         h('button', { class: 'btn primary', onclick: upload }, 'Upload image'),
+        navigator.clipboard?.read ? h('button', { class: 'btn', title: 'Paste a picture you copied', onclick: pasteFromClipboard }, '📋 Paste') : null,
         h('button', { class: 'btn', onclick: () => ctx.openSettings() }, 'Paste a link'),
       ),
-      h('p', { class: 'hint' }, 'or drag an image file here'),
+      h('p', { class: 'hint' }, 'or drag an image file here — or copy a picture and press Ctrl+V anywhere on the screen'),
     );
     // Download button for pictures kept on this computer (e.g. webcam photos).
     const dl = h('button', { class: 'btn small image-dl', title: 'Download this picture', 'aria-label': 'Download this picture', onclick: async () => {
@@ -39,6 +40,22 @@ export default {
       s.url = '';
       ctx.save();
       render();
+    }
+    /** For smartboards with no keyboard: read a copied picture (or picture link) from the clipboard. */
+    async function pasteFromClipboard() {
+      try {
+        for (const item of await navigator.clipboard.read()) {
+          const type = item.types.find((t) => t.startsWith('image/'));
+          if (type) { const blob = await item.getType(type); setFile(new File([blob], `pasted-picture.${type.split('/')[1]}`, { type })); return; }
+          if (item.types.includes('text/plain')) {
+            const t = (await (await item.getType('text/plain')).text()).trim();
+            if (/^https?:\/\/\S+$/i.test(t)) { s.url = t; s.imageAssetId = null; ctx.save(); render(); return; }
+          }
+        }
+        toast('There’s no picture on the clipboard. Copy one first (right-click a picture → Copy image).');
+      } catch {
+        toast('The browser didn’t allow reading the clipboard. Try Ctrl+V instead.');
+      }
     }
     async function upload() {
       setFile(await pickFile('image/*'));
