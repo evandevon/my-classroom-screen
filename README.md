@@ -66,6 +66,9 @@ Menu → *Background*:
 - **Darken** slider for any moving background, so widgets stand out.
 - Gradients, colours and pictures as before. Uploaded videos and slideshows stay on the computer and go in `.classroom` files, not share links.
 
+Audio widget → **🎧 Sound library**: sounds that come with the site, for quiet background sound in class. Library sounds loop with no gap and fade gently in and out. To add more, drop sound files (mp3, m4a, ogg, wav) into the `sounds/` folder on GitHub; the same GitHub Action adds them to the list (`sounds/index.json`) automatically. Short seamless loops work best.
+
+
 ## Widget settings
 
 Tapping ⚙ opens the widget's settings in a panel at the side of the screen (on the left if the widget is on the right), so you can watch the widget change as you adjust it. Tap anywhere outside the panel, press Esc, or tap Done to close it. On phones the panel comes up from the bottom.
