@@ -899,11 +899,12 @@ function shareDialog() {
   const hasNames = screen.widgets.some((w) => (WIDGETS[w.type]?.privateKeys || []).some((k) => {
     const v = w.state[k];
     return v && (Array.isArray(v) ? v.length : String(v).trim().length);
-  }));
+  }) || (w.state?.source && w.state.source !== 'own'));   // uses a class list
   const out = h('textarea', { class: 'share-url', readonly: true, rows: 3 });
   const notes = h('p', { class: 'hint' });
   const warn = h('div', { class: 'share-warn', hidden: true, role: 'alert' });
   const includeNames = h('input', { type: 'checkbox' });
+  includeNames.checked = true;   // sharing a class screen with its class lists is the usual case; untick to leave them out
   const copyBtn = h('button', { class: 'btn primary' }, '📋 Copy link');
   const fileBtn = h('button', { class: 'btn', onclick: () => exportScreens([screen], screen.name) }, '⬇ Download screen file');
   let missing = [];
@@ -947,7 +948,7 @@ function shareDialog() {
   modal('Share this screen',
     h('p', {}, 'Anyone who opens this link gets their own copy of this screen layout.'),
     warn,
-    hasNames ? h('label', { class: 'check' }, includeNames, h('span', {}, 'Include student names and calendar events (only share with colleagues at your school)')) : null,
+    hasNames ? h('label', { class: 'check' }, includeNames, h('span', {}, 'Include class lists and student names (and calendar events). Anyone with the link will see them, so only share it with colleagues.')) : null,
     out,
     notes,
     h('div', { class: 'row end' }, fileBtn, copyBtn),
@@ -970,7 +971,7 @@ async function importDialog() {
     const screens = await importProjectFile(f);
     for (const s of screens) await db.putScreen(s);
     await openScreen(screens[0]);
-    toast(`Opened ${screens.length} screen${screens.length === 1 ? '' : 's'} from the file.`);
+    toast(`Added ${screens.length} screen${screens.length === 1 ? '' : 's'} from the file (your other screens are unchanged).${screens.addedClasses?.length ? ` Class list${screens.addedClasses.length === 1 ? '' : 's'} added: ${screens.addedClasses.join(', ')}.` : ''}`, { ms: 7000 });
     renderDrawer();
   } catch (e) {
     toast(e.message || 'That file could not be opened.');
@@ -1081,14 +1082,14 @@ async function init() {
 
   // Opened from a share link?
   try {
-    const shared = await readShareHash();
-    if (shared) {
-      const s = prepareImportedScreen(shared);
+    const got = await readShareHash();
+    if (got) {
+      const s = got.screen;
       s.name = s.name || 'Shared screen';
       if (screens.some((x) => x.name === s.name)) s.name += ' (shared)';
       await db.putScreen(s);
       target = s;
-      toast(`Added “${s.name}” to your screens.`);
+      toast(`Added “${s.name}” to your screens.${got.addedClasses.length ? ` Class list${got.addedClasses.length === 1 ? '' : 's'} added: ${got.addedClasses.join(', ')}.` : ''}`);
     }
   } catch (e) {
     console.error(e);

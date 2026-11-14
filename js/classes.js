@@ -49,6 +49,53 @@ export async function initClasses(getScreen) {
 
 export const classLists = () => st.lists;
 
+/** The classes a set of screens use (for sharing): copies of { id, name, students, apart }, and which one is current. */
+export function classesForScreens(screens) {
+  const ids = new Set();
+  for (const sc of screens) for (const w of sc.widgets || []) {
+    const src = w.state?.source;
+    if (src === 'current') { const c = currentClass(); if (c) ids.add(c.id); }
+    else if (src && src !== 'own') ids.add(src);
+  }
+  const cur = currentClass();
+  return {
+    classes: st.lists.filter((c) => ids.has(c.id)).map((c) => ({ id: c.id, name: c.name, students: [...c.students], apart: (c.apart || []).map((p) => [...p]) })),
+    current: cur && ids.has(cur.id) ? cur.id : '',
+  };
+}
+
+/**
+ * Classes that came with a shared screen or file. A class with the same name and the same students is
+ * reused (its keep-apart pairs merged); a same-named class with different students is added as "(shared)".
+ * Returns a map from the sender's class ids to ids on this computer.
+ */
+export async function addSharedClasses(classes = [], current = '') {
+  const idMap = {};
+  const added = [];
+  const same = (a, b) => a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
+  for (const c of classes) {
+    if (!c?.name || !Array.isArray(c.students)) continue;
+    const match = st.lists.find((l) => l.name === c.name && same(l.students, c.students));
+    if (match) {
+      match.apart ||= [];
+      for (const p of c.apart || []) if (!match.apart.some(([a, b]) => (a === p[0] && b === p[1]) || (a === p[1] && b === p[0]))) match.apart.push([...p]);
+      idMap[c.id] = match.id;
+      continue;
+    }
+    let name = c.name;
+    if (st.lists.some((l) => l.name === name)) name = `${c.name} (shared)`;
+    const nc = { id: uid('class'), name, students: cleanNames(c.students.join('\n')), apart: (c.apart || []).map((p) => [...p]) };
+    st.lists.push(nc);
+    idMap[c.id] = nc.id;
+    added.push(name);
+  }
+  if (classes.length) await save();
+  // No class chosen here yet? Use the one the sender had.
+  if (!st.currentId && current && idMap[current]) await setCurrentClass(idMap[current]);
+  else if (added.length) emit();
+  return { idMap, added };
+}
+
 /** If the Activity timeline on this screen is in a session, which class is it? */
 function sessionMatch() {
   if (!st.auto) return null;

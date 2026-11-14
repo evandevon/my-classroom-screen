@@ -4,7 +4,7 @@ import { makeZip, readZip, isZip } from './zip.js';
 import { db } from './storage.js';
 import { dataURLToBlob, uid } from './util.js';
 import { WIDGETS } from './widgets/index.js';
-import { classLists } from './classes.js';
+import { classLists, classesForScreens, addSharedClasses } from './classes.js';
 
 const FORMAT = 'my-classroom-screen';
 const VERSION = 1;
@@ -93,17 +93,19 @@ export function linkSafeScreen(screen, { includeNames = false, dropHeavy = false
 
 const MAX_LINK = 16000; // characters; longer links break in email/Teams
 
-async function encodeScreen(safe) {
-  const payload = JSON.stringify({ f: FORMAT, v: VERSION, screen: safe });
+async function encodeScreen(safe, cls) {
+  const payload = JSON.stringify({ f: FORMAT, v: VERSION, screen: safe, ...(cls?.classes.length ? { classes: cls.classes, currentClass: cls.current } : {}) });
   return toB64url(await deflate(payload));
 }
 
+/** With includeNames, the class lists the screen uses travel with it (the teacher decides who gets the link). */
 export async function makeShareLink(screen, opts = {}) {
+  const cls = opts.includeNames ? classesForScreens([screen]) : null;
   let { screen: safe, dropped } = linkSafeScreen(screen, opts);
-  let encoded = await encodeScreen(safe);
+  let encoded = await encodeScreen(safe, cls);
   if (encoded.length > MAX_LINK) {
     ({ screen: safe, dropped } = linkSafeScreen(screen, { ...opts, dropHeavy: true }));
-    encoded = await encodeScreen(safe);
+    encoded = await encodeScreen(safe, cls);
   }
   const url = `${location.origin}${location.pathname}#s=${encoded}`;
   return { url, dropped, long: encoded.length > MAX_LINK };
@@ -114,7 +116,8 @@ export async function readShareHash() {
   if (!m) return null;
   const data = JSON.parse(await inflate(fromB64url(m[1])));
   if (data.f !== FORMAT || !data.screen) throw new Error('Not a My Classroom Screen link');
-  return data.screen;
+  const { idMap, added } = await addSharedClasses(data.classes, data.currentClass);
+  return { screen: prepareImportedScreen(data.screen, {}, idMap), addedClasses: added };
 }
 
 // ---------- project files ----------
@@ -138,7 +141,7 @@ https://evandevon.github.io/my-classroom-screen/
 To open: in My Classroom Screen, menu → Save & share → Open a saved file, and choose this file.
 
 This file is a normal zip. Rename it to .zip to look inside:
-  classroom.json   the screens and their settings
+  classroom.json   the screens and their settings (and any class lists they use)
   files/           photos, video clips, pictures and sounds used by the screens
 `;
 
@@ -161,7 +164,8 @@ export async function buildProjectFile(screens) {
       files.push({ name: file, data: a.blob, compress: !/^(image\/(jpeg|png|gif|webp)|video|audio)/.test(type) });
     }
   }
-  const json = JSON.stringify({ format: FORMAT, version: VERSION, exported: new Date().toISOString(), screens, assets }, null, 1);
+  const { classes, current } = classesForScreens(screens);   // the class lists these screens use go with them
+  const json = JSON.stringify({ format: FORMAT, version: VERSION, exported: new Date().toISOString(), screens, assets, ...(classes.length ? { classes, currentClass: current } : {}) }, null, 1);
   return makeZip([{ name: 'classroom.json', data: json, compress: true }, { name: 'README.txt', data: README }, ...files], 'application/x-classroom+zip');
 }
 
@@ -188,10 +192,13 @@ export async function importProjectFile(file) {
     idMap[oldId] = id;
     await db.putAsset({ id, name: a.name, type: a.type, blob });
   }
-  return data.screens.map((s) => prepareImportedScreen(s, idMap));
+  const { idMap: classMap, added } = await addSharedClasses(data.classes, data.currentClass);
+  const screens = data.screens.map((s) => prepareImportedScreen(s, idMap, classMap));
+  screens.addedClasses = added;
+  return screens;
 }
 
-export function prepareImportedScreen(screen, idMap = {}) {
+export function prepareImportedScreen(screen, idMap = {}, classMap = {}) {
   const s = structuredClone(screen);
   s.id = uid('screen');
   s.updated = Date.now();
@@ -199,6 +206,7 @@ export function prepareImportedScreen(screen, idMap = {}) {
   if (Array.isArray(s.background?.assetIds)) s.background.assetIds = s.background.assetIds.map((id) => idMap[id] || null);
   for (const w of s.widgets || []) {
     w.id = uid('w');
+    if (w.state?.source && classMap[w.state.source]) w.state.source = classMap[w.state.source];   // the class as saved on this computer
     for (const k of Object.keys(w.state || {})) {
       if (k.endsWith('AssetId') && w.state[k]) w.state[k] = idMap[w.state[k]] || null;
       if (k.endsWith('AssetIds') && Array.isArray(w.state[k])) w.state[k] = w.state[k].map((id) => idMap[id] || null);
