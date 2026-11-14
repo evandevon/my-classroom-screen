@@ -66,7 +66,7 @@ export function classesForScreens(screens) {
 
 /**
  * Classes that came with a shared screen or file. A class with the same name and the same students is
- * reused (its keep-apart pairs merged); a same-named class with different students is added as "(shared)".
+ * reused (its keep-apart pairs merged); a same-named class with different students is added as "Name (2)".
  * Returns a map from the sender's class ids to ids on this computer.
  */
 export async function addSharedClasses(classes = [], current = '') {
@@ -83,7 +83,7 @@ export async function addSharedClasses(classes = [], current = '') {
       continue;
     }
     let name = c.name;
-    if (st.lists.some((l) => l.name === name)) name = `${c.name} (shared)`;
+    for (let n = 2; st.lists.some((l) => l.name === name); n++) name = `${c.name} (${n})`;   // e.g. "3/4K (2)"
     const nc = { id: uid('class'), name, students: cleanNames(c.students.join('\n')), apart: (c.apart || []).map((p) => [...p]) };
     st.lists.push(nc);
     idMap[c.id] = nc.id;

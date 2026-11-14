@@ -116,8 +116,8 @@ export async function readShareHash() {
   if (!m) return null;
   const data = JSON.parse(await inflate(fromB64url(m[1])));
   if (data.f !== FORMAT || !data.screen) throw new Error('Not a My Classroom Screen link');
-  const { idMap, added } = await addSharedClasses(data.classes, data.currentClass);
-  return { screen: prepareImportedScreen(data.screen, {}, idMap), addedClasses: added };
+  // Read only: nothing is added until the teacher chooses (see addImported).
+  return { kind: 'link', screens: [data.screen], classes: data.classes || [], currentClass: data.currentClass || '', assets: {}, zip: null };
 }
 
 // ---------- project files ----------
@@ -138,7 +138,7 @@ const EXT_BY_TYPE = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif
 const README = `My Classroom Screen — saved screens
 https://evandevon.github.io/my-classroom-screen/
 
-To open: in My Classroom Screen, menu → Save & share → Open a saved file, and choose this file.
+To open: in My Classroom Screen, menu ☰ → Save & share → Open a file (or drag this file onto the screen), then tick the screens you want.
 
 This file is a normal zip. Rename it to .zip to look inside:
   classroom.json   the screens and their settings (and any class lists they use)
@@ -170,7 +170,8 @@ export async function buildProjectFile(screens) {
 }
 
 /** Opens a .classroom (zip) file, or an older .json project file. */
-export async function importProjectFile(file) {
+/** Look inside a .classroom file (or an older .json one) without changing anything. */
+export async function readProjectFile(file) {
   let data;
   let zip = null;
   if (typeof file !== 'string' && (await isZip(file))) {
@@ -179,22 +180,52 @@ export async function importProjectFile(file) {
     if (!entry) throw new Error('This is not a My Classroom Screen file.');
     data = JSON.parse(new TextDecoder().decode(await entry.read()));
   } else {
-    data = JSON.parse(typeof file === 'string' ? file : await file.text());
+    try { data = JSON.parse(typeof file === 'string' ? file : await file.text()); } catch { throw new Error('This is not a My Classroom Screen file.'); }
   }
-  if (data.format !== FORMAT || !Array.isArray(data.screens)) throw new Error('This is not a My Classroom Screen project file.');
+  if (data.format !== FORMAT || !Array.isArray(data.screens)) throw new Error('This is not a My Classroom Screen file.');
+  return { kind: 'file', name: file.name || '', screens: data.screens, classes: data.classes || [], currentClass: data.currentClass || '', assets: data.assets || {}, zip };
+}
+
+/** Which of a file's class lists a screen uses ('current' means the sender's current class). */
+export function classIdsUsed(screen, currentClass = '') {
+  const ids = new Set();
+  for (const w of screen.widgets || []) {
+    const src = w.state?.source;
+    if (src === 'current') { if (currentClass) ids.add(currentClass); }
+    else if (src && src !== 'own') ids.add(src);
+  }
+  return ids;
+}
+/** Does a screen in a file carry its own pictures, clips or sounds? */
+export const hasFiles = (screen, parsed) => [...assetIdsIn(screen)].some((id) => parsed.assets?.[id]);
+
+/**
+ * Add the chosen screens from a file or link, with only the pictures, clips, sounds and class lists
+ * those screens use. Returns the screens as stored on this computer and the class lists that were added.
+ */
+export async function addImported(parsed, chosen) {
+  const need = new Set(chosen.flatMap((sc) => [...assetIdsIn(sc)]));
   const idMap = {};
-  for (const [oldId, a] of Object.entries(data.assets || {})) {
+  for (const [oldId, a] of Object.entries(parsed.assets || {})) {
+    if (!need.has(oldId)) continue;
     let blob = null;
-    if (a.file && zip?.get(a.file)) blob = await zip.get(a.file).blob(a.type);
+    if (a.file && parsed.zip?.get(a.file)) blob = await parsed.zip.get(a.file).blob(a.type);
     else if (a.data) blob = await dataURLToBlob(a.data); // older .json files
     if (!blob) continue;
     const id = uid('asset');
     idMap[oldId] = id;
-    await db.putAsset({ id, name: a.name, type: a.type, blob });
+    await db.putAsset({ id, name: a.name, type: a.type, blob, created: Date.now() });
   }
-  const { idMap: classMap, added } = await addSharedClasses(data.classes, data.currentClass);
-  const screens = data.screens.map((s) => prepareImportedScreen(s, idMap, classMap));
-  screens.addedClasses = added;
+  const used = new Set(chosen.flatMap((sc) => [...classIdsUsed(sc, parsed.currentClass)]));
+  const { idMap: classMap, added } = await addSharedClasses((parsed.classes || []).filter((c) => used.has(c.id)), used.has(parsed.currentClass) ? parsed.currentClass : '');
+  return { screens: chosen.map((sc) => prepareImportedScreen(sc, idMap, classMap)), addedClasses: added };
+}
+
+/** Everything in a file, added in one go (kept for older callers). */
+export async function importProjectFile(file) {
+  const parsed = await readProjectFile(file);
+  const { screens, addedClasses } = await addImported(parsed, parsed.screens);
+  screens.addedClasses = addedClasses;
   return screens;
 }
 
