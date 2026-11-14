@@ -61,9 +61,27 @@ const weather = {
 
     const temp = (c) => (c == null ? '–' : s.unit === 'F' ? `${Math.round(c * 9 / 5 + 32)}°` : `${Math.round(c)}°`);
 
+    // Each load gets a number; a newer load (e.g. a new place) makes older replies ignored.
+    let loadSeq = 0;
+    let retryTimer = null;
+    const TIMEOUT_MS = 12000;
+    const tryFetch = async (url) => {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);   // don't wait minutes on a dropped connection
+      try {
+        const r = await fetch(url, { cache: 'no-store', signal: ctrl.signal });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        if (!data.current) throw new Error('No weather in the reply');
+        return data;
+      } finally { clearTimeout(t); }
+    };
+
     async function load(force = false) {
-      if (loading) return;
-      if (!force && s.data && Date.now() - s.fetchedAt < REFRESH_MS && s.data._for === `${s.lat},${s.lon}`) { render(); return; }
+      const key = `${s.lat},${s.lon}`;
+      if (!force && s.data && Date.now() - s.fetchedAt < REFRESH_MS && s.data._for === key) { render(); return; }
+      const seq = ++loadSeq;
+      clearTimeout(retryTimer);
       loading = true;
       error = '';
       render();
@@ -76,24 +94,28 @@ const weather = {
         timezone: 'auto',
         forecast_days: '7',
       });
-      try {
-        const r = await fetch(`${API}?${q}`, { cache: 'no-store' });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const data = await r.json();
-        if (!data.current) throw new Error('No weather in the reply');
-        data._for = `${s.lat},${s.lon}`;
+      let data = null;
+      let lastErr;
+      for (const wait of [0, 1500, 4000]) {   // a couple of quick retries: one dropped request shouldn't stop the weather
+        if (wait) await new Promise((r) => setTimeout(r, wait));
+        if (seq !== loadSeq) return;           // a newer request has taken over
+        try { data = await tryFetch(`${API}?${q}`); break; } catch (e) { lastErr = e; }
+      }
+      if (seq !== loadSeq) return;
+      loading = false;
+      if (data) {
+        data._for = key;
         s.data = data;
         s.fetchedAt = Date.now();
         ctx.save();
-      } catch (e) {
+      } else {
         error = navigator.onLine === false
           ? 'You’re offline — showing the last weather we had.'
-          : 'Couldn’t get the weather (the school network may block the weather service). Showing the last weather we had.';
-        console.warn('weather', e);
-      } finally {
-        loading = false;
-        render();
+          : 'Couldn’t reach the weather service (the school network may block it). Trying again in a minute…';
+        console.warn('weather', lastErr);
+        retryTimer = setTimeout(() => load(true), 60000);   // keep trying every minute until it works
       }
+      render();
     }
 
     function render() {
@@ -101,7 +123,7 @@ const weather = {
       if (!d) {
         setKids(box, h('div', { class: 'empty' },
           h('p', {}, loading ? '⏳ Getting the weather…' : '🌦️ Weather'),
-          error ? h('p', { class: 'error' }, error) : null,
+          error ? h('p', { class: 'error' }, error.replace(' — showing the last weather we had.', '.')) : null,
           !loading ? h('button', { class: 'btn primary', onclick: () => load(true) }, 'Try again') : null,
           h('button', { class: 'btn', onclick: () => ctx.openSettings() }, '📍 Choose the place'),
         ));
@@ -218,7 +240,7 @@ const weather = {
     window.addEventListener('online', onOnline);
 
     return {
-      destroy() { clearInterval(timer); window.removeEventListener('online', onOnline); },
+      destroy() { clearInterval(timer); clearTimeout(retryTimer); loadSeq++; window.removeEventListener('online', onOnline); },
       resize: render,
       openSettings() {
         const results = h('div', { class: 'wx-results' });
