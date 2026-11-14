@@ -5,7 +5,7 @@ import { themePicker, textSizeSlider } from './themes.js';
 import { db, assetURL, sweepAssets, assetIdsOfScreen } from './storage.js';
 import { WIDGETS, CATEGORIES } from './widgets/index.js';
 import { TEMPLATES, GRADIENTS, SOLIDS } from './templates.js';
-import { makeShareLink, readShareHash, buildProjectFile, importProjectFile, prepareImportedScreen } from './share.js';
+import { makeShareLink, readShareHash, buildProjectFile, readProjectFile, addImported, classIdsUsed, hasFiles, prepareImportedScreen } from './share.js';
 import { h, uid, debounce, toast, pickFile, downloadBlob, enableMultiTouchTaps } from './util.js';
 enableMultiTouchTaps();
 import { showSoundHelp } from './help.js';
@@ -460,13 +460,13 @@ async function renderDrawer() {
       menuBtn('🧹', 'Clear widgets', () => { if (screen.paused) { toast('Carry on with the paused screen first.'); return; } if (confirm('Remove all widgets from this screen?')) board.clearAll(); }),
     ),
     h('h3', {}, 'Save & share'),
+    h('p', { class: 'menu-saved' }, '✓ Your screens save themselves on this computer — there’s nothing to do.'),
     h('div', { class: 'menu-grid' },
-      menuBtn('⬇', 'Download this screen', () => exportScreens([screen], screen.name)),
-      menuBtn('💾', 'Download all screens', async () => exportScreens(await sortedScreens(), 'my-classroom-screens')),
-      menuBtn('📂', 'Open a saved file', importDialog),
-      menuBtn('🔗', 'Share link', shareDialog),
+      menuBtn('🔗', 'Share a link', () => { closeDrawer(); shareDialog(); }),
+      menuBtn('💾', 'Save to a file', () => { closeDrawer(); exportDialog(); }),
+      menuBtn('📂', 'Open a file', () => { closeDrawer(); importDialog(); }),
     ),
-    h('p', { class: 'hint menu-note' }, 'Downloads are .classroom files with everything inside (pictures, videos, recordings). Share links are quick to send but leave out files from this computer.'),
+    h('p', { class: 'hint menu-note' }, 'A link is quick for sharing one screen, but leaves out pictures, clips and sounds from this computer. A file keeps everything — use it for backups, a new computer or sharing a set of screens.'),
     h('h3', {}, 'Classes & data'),
     h('div', { class: 'menu-grid' },
       menuBtn('👥', 'Classes & student lists', () => { closeDrawer(); showClassManager(); }),
@@ -482,7 +482,7 @@ async function renderDrawer() {
     h('div', { class: 'menu-grid' },
       menuBtn('🔔', 'Keep alarms ringing (stop tabs sleeping)', showSoundHelp),
     ),
-    h('p', { class: 'hint' }, 'Everything is saved automatically in this browser. Use “Download all screens” now and then as a backup.'),
+    h('p', { class: 'hint' }, 'Everything is saved automatically in this browser. Use ☰ → “Save to a file” now and then as a backup.'),
   );
 }
 const menuBtn = (icon, label, onclick) => h('button', { class: 'menu-btn', onclick }, h('span', { class: 'mi' }, icon), label);
@@ -672,6 +672,8 @@ boardEl.addEventListener('drop', (e) => {
   const r = boardEl.getBoundingClientRect();
   const at = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
   const files = [...(e.dataTransfer.files || [])];
+  const saved = files.find((f) => /\.(classroom|zip|json)$/i.test(f.name));
+  if (saved) { openFileForImport(saved); return; }   // a saved screens file: choose which screens to add
   if (files.length) { dropFiles(files, at); return; }
   // a picture dragged straight from a web page arrives as a link
   const html = e.dataTransfer.getData('text/html') || '';
@@ -906,7 +908,7 @@ function shareDialog() {
   const includeNames = h('input', { type: 'checkbox' });
   includeNames.checked = true;   // sharing a class screen with its class lists is the usual case; untick to leave them out
   const copyBtn = h('button', { class: 'btn primary' }, '📋 Copy link');
-  const fileBtn = h('button', { class: 'btn', onclick: () => exportScreens([screen], screen.name) }, '⬇ Download screen file');
+  const fileBtn = h('button', { class: 'btn', onclick: () => { dlg.close(); exportDialog([screen.id]); } }, '💾 Save to a file instead');
   let missing = [];
   const make = async () => {
     const { url, dropped, long } = await makeShareLink(screen, { includeNames: includeNames.checked });
@@ -921,7 +923,7 @@ function shareDialog() {
       lines.push(h('p', {}, h('b', {}, '⚠️ Your files won’t be in this link. '), `Pictures, video clips and sounds you added from this computer stay on this computer, so people opening the link will see empty widgets: ${which.join(', ')}.`));
     }
     if (other.length) lines.push(h('p', {}, h('b', {}, files.length ? 'Also missing: ' : '⚠️ Not in this link: '), `${other.join(', ')}.`));
-    if (lines.length) lines.push(h('p', {}, 'To share everything, download the screen file and send that instead (they open it with ☰ → “Open a saved file”).'));
+    if (lines.length) lines.push(h('p', {}, 'To share everything, save it to a file and send that instead (they open it with ☰ → “Open a file”, or drag it onto their screen).'));
     warn.replaceChildren(...lines);
     warn.hidden = !lines.length;
     fileBtn.className = lines.length ? 'btn primary' : 'btn';
@@ -942,10 +944,10 @@ function shareDialog() {
       document.execCommand('copy');
     }
     copyBtn.textContent = '✔ Copied';
-    if (missing.some((d) => d.startsWith('uploaded'))) toast('Link copied — remember it doesn’t include your pictures, clips or sounds.', { action: '⬇ Download file', onAction: () => exportScreens([screen], screen.name), ms: 8000 });
+    if (missing.some((d) => d.startsWith('uploaded'))) toast('Link copied — remember it doesn’t include your pictures, clips or sounds.', { action: '💾 Save to a file', onAction: () => exportDialog([screen.id]), ms: 8000 });
     setTimeout(() => (copyBtn.textContent = label), 2000);
   });
-  modal('Share this screen',
+  const dlg = modal('Share this screen',
     h('p', {}, 'Anyone who opens this link gets their own copy of this screen layout.'),
     warn,
     hasNames ? h('label', { class: 'check' }, includeNames, h('span', {}, 'Include class lists and student names (and calendar events). Anyone with the link will see them, so only share it with colleagues.')) : null,
@@ -966,16 +968,155 @@ async function exportScreens(screens, name) {
 
 async function importDialog() {
   const f = await pickFile('.classroom,.zip,.json,application/json,application/zip');
-  if (!f) return;
-  try {
-    const screens = await importProjectFile(f);
-    for (const s of screens) await db.putScreen(s);
-    await openScreen(screens[0]);
-    toast(`Added ${screens.length} screen${screens.length === 1 ? '' : 's'} from the file (your other screens are unchanged).${screens.addedClasses?.length ? ` Class list${screens.addedClasses.length === 1 ? '' : 's'} added: ${screens.addedClasses.join(', ')}.` : ''}`, { ms: 7000 });
-    renderDrawer();
-  } catch (e) {
-    toast(e.message || 'That file could not be opened.');
-  }
+  if (f) openFileForImport(f);
+}
+async function openFileForImport(f) {
+  try { openImport(await readProjectFile(f)); }
+  catch (e) { toast(e.message || 'That file could not be opened.'); }
+}
+
+/** A screen's contents without anything that differs from computer to computer (ids, stored-file ids). */
+function screenSignature(sc) {
+  const clean = (v) => JSON.stringify(v, (k, x) => (/AssetIds?$/.test(k) || k === 'id' || k === 'source' || k === 'updated' || k === 'order' ? undefined : x));
+  return clean({ n: sc.name, b: sc.background, w: (sc.widgets || []).map((w) => ({ t: w.type, s: w.state, x: w.x, y: w.y, w: w.w, h: w.h })) });
+}
+const widgetIcons = (sc) => [...new Set((sc.widgets || []).map((w) => WIDGETS[w.type]?.icon).filter(Boolean))].slice(0, 7).join(' ');
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/**
+ * One window for bringing screens in — from a file, a link or a file dropped on the screen.
+ * Tick the screens you want; ones you already have are unticked; nothing changes until "Add".
+ */
+async function openImport(parsed, { blankToRemove = null } = {}) {
+  persist.flush();
+  const mine = await db.listScreens();
+  const mySigs = new Map(mine.map((m) => [screenSignature(m), m]));
+  const items = parsed.screens.map((sc) => {
+    const already = mySigs.get(screenSignature(sc)) || null;
+    const box = h('input', { type: 'checkbox', 'aria-label': `Add ${sc.name || 'screen'}` });
+    box.checked = !already;
+    return { sc, already, box };
+  });
+  const classesOf = (list) => {
+    const used = new Set(list.flatMap((it) => [...classIdsUsed(it.sc, parsed.currentClass)]));
+    return (parsed.classes || []).filter((c) => used.has(c.id));
+  };
+  const addBtn = h('button', { class: 'btn primary' });
+  const classLine = h('p', { class: 'imp-classes' });
+  const allBox = h('input', { type: 'checkbox', 'aria-label': 'Choose all screens' });
+  const sync = () => {
+    const chosen = items.filter((it) => it.box.checked);
+    addBtn.disabled = !chosen.length;
+    addBtn.textContent = parsed.kind === 'link' && items.length === 1 ? 'Add it to my screens' : chosen.length ? `Add ${plural(chosen.length, 'screen')}` : 'Choose a screen to add';
+    const cls = classesOf(chosen);
+    classLine.textContent = cls.length ? `👥 Comes with class list${cls.length === 1 ? '' : 's'}: ${cls.map((c) => `${c.name} (${plural(c.students.length, 'student')})`).join(', ')} — added to your classes.` : '';
+    classLine.hidden = !cls.length;
+    allBox.checked = chosen.length === items.length;
+    allBox.indeterminate = chosen.length > 0 && chosen.length < items.length;
+  };
+  allBox.addEventListener('change', () => { items.forEach((it) => (it.box.checked = allBox.checked)); sync(); });
+  const rows = items.map((it) => {
+    it.box.addEventListener('change', sync);
+    const bits = [plural((it.sc.widgets || []).length, 'widget')];
+    if (hasFiles(it.sc, parsed)) bits.push('📎 has its own pictures/sounds');
+    return h('label', { class: `imp-row${it.already ? ' already' : ''}` },
+      it.box,
+      h('span', { class: 'imp-main' },
+        h('b', {}, it.sc.name || 'Untitled screen'),
+        h('small', {}, bits.join(' · ')),
+        widgetIcons(it.sc) ? h('span', { class: 'screen-icons', 'aria-hidden': 'true' }, widgetIcons(it.sc)) : null),
+      it.already ? h('span', { class: 'imp-badge' }, 'You already have this') : null);
+  });
+  const intro = parsed.kind === 'link'
+    ? 'Someone shared a screen with you. Add it to your screens? Your own screens won’t change.'
+    : `${parsed.name ? `“${parsed.name.replace(/\.(classroom|zip|json)$/i, '')}” has` : 'This file has'} ${plural(items.length, 'screen')}. Tick the ones you want — they’re added alongside your screens, which won’t change.`;
+  const dlg = modal(parsed.kind === 'link' ? 'A shared screen' : 'Add screens from a file',
+    h('p', {}, intro),
+    items.length > 1 ? h('label', { class: 'check imp-all' }, allBox, h('span', {}, 'All screens')) : null,
+    h('div', { class: 'imp-list' }, ...rows),
+    classLine,
+    h('div', { class: 'row end' },
+      items.length === 1 && items[0].already ? h('button', { class: 'btn', onclick: async () => { dlg.close(); await openScreen(items[0].already); } }, 'Open the one I have') : null,
+      h('button', { class: 'btn', onclick: () => dlg.close() }, parsed.kind === 'link' ? 'No thanks' : 'Cancel'),
+      addBtn),
+  );
+  addBtn.addEventListener('click', async () => {
+    const chosen = items.filter((it) => it.box.checked).map((it) => it.sc);
+    if (!chosen.length) return;
+    addBtn.disabled = true;
+    try {
+      const { screens: added, addedClasses } = await addImported(parsed, chosen);
+      const names = new Set((await db.listScreens()).map((x) => x.name));
+      const top = Math.max(-1, ...(await db.listScreens()).map((x) => (Number.isFinite(x.order) ? x.order : -1)));
+      added.forEach((sc, i) => {
+        let name = sc.name || 'Shared screen';
+        for (let n = 2; names.has(name); n++) name = `${sc.name || 'Shared screen'} (${n})`;
+        sc.name = name; names.add(name);
+        sc.order = top + 1 + i;   // new screens go at the end of your list
+      });
+      for (const sc of added) await db.putScreen(sc);
+      // A first-time visitor's empty starter screen isn't needed once they have the shared one.
+      if (blankToRemove && !undoStack.length && !redoStack.length) {   // they haven't done anything on it yet
+        if (screen?.id === blankToRemove.id) persist.cancel();
+        deletedScreens.add(blankToRemove.id);
+        await db.deleteScreen(blankToRemove.id);
+      }
+      dlg.close();
+      await openScreen(added[0]);
+      renderDrawer();
+      toast(`Added ${added.length === 1 ? `“${added[0].name}”` : plural(added.length, 'screen')}. Your other screens are unchanged.${addedClasses.length ? ` Class list${addedClasses.length === 1 ? '' : 's'} added: ${addedClasses.join(', ')}.` : ''}`, { ms: 7000 });
+    } catch (e) {
+      console.error(e);
+      addBtn.disabled = false;
+      toast('Those screens couldn’t be added — the file may be damaged.');
+    }
+  });
+  sync();
+}
+
+/** Save screens to a .classroom file: tick which ones (this screen is ticked to start with). */
+async function exportDialog(preselect = null) {
+  persist.flush();
+  const all = await sortedScreens();
+  const pick = new Set(preselect || [screen.id]);
+  const items = all.map((sc) => {
+    const box = h('input', { type: 'checkbox', 'aria-label': `Save ${sc.name}` });
+    box.checked = pick.has(sc.id);
+    return { sc, box };
+  });
+  const allBox = h('input', { type: 'checkbox', 'aria-label': 'Choose all screens' });
+  const saveBtn = h('button', { class: 'btn primary' });
+  const sync = () => {
+    const n = items.filter((it) => it.box.checked).length;
+    saveBtn.disabled = !n;
+    saveBtn.textContent = n ? `💾 Save ${plural(n, 'screen')}` : 'Choose a screen to save';
+    allBox.checked = n === items.length;
+    allBox.indeterminate = n > 0 && n < items.length;
+  };
+  allBox.addEventListener('change', () => { items.forEach((it) => (it.box.checked = allBox.checked)); sync(); });
+  const dlg = modal('Save to a file',
+    h('p', {}, 'Saves a .classroom file to your Downloads with everything inside — pictures, clips, sounds, recordings and the class lists these screens use. Open it on any computer with ☰ → “Open a file”, or drag it onto the screen.'),
+    items.length > 1 ? h('label', { class: 'check imp-all' }, allBox, h('span', {}, 'All screens')) : null,
+    h('div', { class: 'imp-list' }, ...items.map((it) => {
+      it.box.addEventListener('change', sync);
+      return h('label', { class: 'imp-row' }, it.box,
+        h('span', { class: 'imp-main' },
+          h('b', {}, it.sc.name + (it.sc.id === screen.id ? ' (showing now)' : '')),
+          h('small', {}, plural(it.sc.widgets.length, 'widget')),
+          widgetIcons(it.sc) ? h('span', { class: 'screen-icons', 'aria-hidden': 'true' }, widgetIcons(it.sc)) : null));
+    })),
+    h('div', { class: 'row end' }, h('button', { class: 'btn', onclick: () => dlg.close() }, 'Cancel'), saveBtn),
+  );
+  saveBtn.addEventListener('click', async () => {
+    const chosen = items.filter((it) => it.box.checked).map((it) => it.sc);
+    if (!chosen.length) return;
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    await exportScreens(chosen, chosen.length === 1 ? chosen[0].name : 'my-classroom-screens');
+    dlg.close();
+    toast(`Saved ${plural(chosen.length, 'screen')} to your Downloads.`);
+  });
+  sync();
 }
 
 // ---------- dock ----------
@@ -1080,33 +1221,24 @@ async function init() {
   let screens = await sortedScreens();
   let target = null;
 
-  // Opened from a share link?
-  try {
-    const got = await readShareHash();
-    if (got) {
-      const s = got.screen;
-      s.name = s.name || 'Shared screen';
-      if (screens.some((x) => x.name === s.name)) s.name += ' (shared)';
-      await db.putScreen(s);
-      target = s;
-      toast(`Added “${s.name}” to your screens.${got.addedClasses.length ? ` Class list${got.addedClasses.length === 1 ? '' : 's'} added: ${got.addedClasses.join(', ')}.` : ''}`);
-    }
-  } catch (e) {
-    console.error(e);
-    toast('That share link looks broken or incomplete.');
-  }
+  // Opened from a share link? Ask first (the same window as opening a file).
+  let sharedLink = null;
+  try { sharedLink = await readShareHash(); } catch (e) { console.error(e); toast('That share link looks broken or incomplete.'); }
   if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  let starter = null;
 
   if (!target) {
     if (!screens.length) {
       const first = newScreenFrom(TEMPLATES[1], 'My first screen');
       await db.putScreen(first);
       screens = [first];
+      starter = structuredClone(first);
     }
     const lastId = await db.getMeta('lastScreen');
     target = screens.find((s) => s.id === lastId) || screens[0];
   }
   await openScreen(target);
+  if (sharedLink) openImport(sharedLink, { blankToRemove: starter });
   // Tidy up files nothing uses any more (deleted widgets / screens), now and every half hour.
   const sweep = () => {
     persist.flush();

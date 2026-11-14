@@ -32,15 +32,20 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 
 ## Saving and sharing
 
-- Photos, clips, pictures and voice recordings are stored in this browser and **embedded in downloaded screen files** (so those files can be large). Files no screen uses any more (e.g. from a deleted widget) are tidied away automatically.
+Your screens **save themselves** in this browser on this computer — there's nothing to do. To move or share them, use ☰ → *Save & share*:
 
-- **Pause screen** (menu → This screen) stops everything — timers and stopwatches keep their time, alarms, cameras, microphones and videos switch off — so you can carry on tomorrow.
-- Share links can’t carry pictures, clips or sounds from your computer; the share window warns you and offers the screen file instead.
+| | 🔗 Share a link | 💾 Save to a file |
+|---|---|---|
+| Good for | Sending one screen quickly | Backups, a new computer, sharing a set of screens |
+| Screens | The one showing | Any you tick |
+| Pictures, clips, sounds from this computer | ✗ Left out (the share window warns you) | ✓ Inside the file |
+| Class lists the screens use | ✓ Unless you untick the box | ✓ |
 
-- **Auto-save:** every change is saved in the browser (IndexedDB) straight away.
-- **Screens:** tap ☰ to make, switch, rename, duplicate or delete screens. You can start blank or from a template (Morning routine, Group work, Quiet reading, Maths lesson).
-- **Share link:** ☰ → *Share link* puts the whole layout inside a long URL you can copy. Student names are **left out** unless you tick the box. Uploaded pictures and audio can't fit in a link.
-- **Project file:** ☰ → *Save & share* → *Download this screen* or *Download all screens* saves a `.classroom` file — a zip containing `classroom.json` (the screens) and a `files/` folder with every photo, clip, picture and sound at its real size (rename to `.zip` to look inside). *Open a saved file* loads it on any computer, and still opens older `.classroom.json` files. Download a backup now and then.
+- **Bringing screens in** always works the same way — ☰ → *Open a file*, dragging a `.classroom` file onto the screen, or opening a share link: a window lists the screens with tick boxes, marks any **you already have** (unticked), and shows which class lists come too. Nothing changes until you press **Add**; added screens go alongside yours and never replace them. A shared class with the same name as one of yours but different students is added as “Name (2)”.
+- A `.classroom` file is a zip: `classroom.json` (screens and class lists) and a `files/` folder with every photo, clip, picture and sound at its real size (rename it to `.zip` to look inside). Older `.json` files still open.
+- Files no screen uses any more (e.g. from a deleted widget) are tidied away automatically. Save a file now and then as a backup — clearing the browser's data would remove your screens.
+- **Screens:** tap ☰ to make, switch, rename, duplicate, delete or drag screens into order. Start blank or from a template.
+- **Pause screen** (☰ → This screen) stops everything — timers and stopwatches keep their time, alarms, cameras, microphones and videos switch off — so you can carry on tomorrow.
 
 ## Classes and student lists (stay on this device)
 
@@ -48,7 +53,7 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 - **👥 button in the top bar:** choose the current class. It can also switch automatically when the Activity timeline's session name contains a class name.
 - The Name picker, Group maker, Tally (per student), Scoreboard ("a row for each student") and Stopwatch use the current class's names, or their own typed list.
 - **🚫 Keep apart:** in a class's list, choose pairs of students who shouldn't be in the same group. The Group maker keeps them apart (and tells you if it can't, e.g. with too few groups).
-- **Sharing:** a screen's class lists (and keep-apart pairs) go with it in screen files, and in share links unless you untick “Include class lists and student names”. Only share with colleagues — it's up to you who gets them. On the other computer they're added to that teacher's classes (a class with the same name and students isn't doubled up).
+- **Sharing:** a screen's class lists (and keep-apart pairs) go with it in screen files, and in share links unless you untick “Include class lists and student names”. Only share with colleagues — it's up to you who gets them. On the other computer they're added to that teacher's classes (a class with the same name and students isn't doubled up; a different class with the same name is added as “Name (2)”).
 
 ## Recording data (stays on this device)
 
