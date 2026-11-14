@@ -222,7 +222,7 @@ export class Board {
 
   showSide(m) {
     const side = this.side;
-    side.replaceChildren(m.el.querySelector('.w-settings'));
+    side.replaceChildren(m.settingsEl);
     // Open on the right, unless the widget is over there — then on the left so it stays visible.
     const r = m.el.getBoundingClientRect();
     const left = !this.compact && r.left + r.width / 2 > innerWidth * 0.6;
@@ -371,14 +371,19 @@ export class Board {
     const toggleSettings = (force) => {
       const open = force ?? settings.hidden;
       if (open) {
+        // Already open? Then a widget is just redrawing its panel (e.g. after a choice): do it in place,
+        // keeping the scroll position, rather than opening it again.
+        const refresh = this.openSettings === m && !settings.hidden;
         if (this.openSettings && this.openSettings !== m) this.openSettings.closeSettings();
         this.openSettings = m;
         settings.hidden = false;
-        this.showSide(m);
+        const keepScroll = this.side.scrollTop;
+        if (!refresh) this.showSide(m);
         el.classList.add('settings-open');
         if (m.inst?.openSettings) m.inst.openSettings();
         else panel({ settings, closeSettings: () => toggleSettings(false) }, def.title);
         addThemeSection();
+        if (refresh) this.side.scrollTop = keepScroll;
       } else {
         if (settings.hidden) return;
         settings.hidden = true;
@@ -390,6 +395,7 @@ export class Board {
     };
     m.closeSettings = () => toggleSettings(false);
     m.settingsBtn = settingsBtn;
+    m.settingsEl = settings;
     // Colour theme section at the bottom of every widget's settings (re-added if a widget redraws its panel).
     const addThemeSection = () => {
       const host = settings.querySelector('.settings-panel') || settings;
