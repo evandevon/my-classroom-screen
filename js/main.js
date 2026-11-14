@@ -585,34 +585,107 @@ async function shrinkPasted(file) {
     return { blob: blob || file, w: c.width, h: c.height };
   } catch { return { blob: file, w: 4, h: 3 }; }
 }
-/** An Image widget sized to the picture's shape, centred (several pictures fan out a little). */
-function addPictureWidget(state, w, h2, i = 0) {
+/**
+ * A widget sized to a picture's or video's shape (w × h), centred on `at` (fractions of the board;
+ * the middle if not given). Several at once fan out a little so none hides another.
+ */
+function addSizedWidget(type, state, w, h2, i = 0, at = null) {
   const r = board.rect;
   const head = 44;   // the widget's title bar
   const maxW = r.width * 0.45, maxH = r.height * 0.55 - head;
   const k = Math.min(maxW / w, maxH / h2, 1.5);
   const pw = Math.max(220, w * k), ph = Math.max(160, h2 * k + head);
   const fw = pw / r.width, fh = ph / r.height;
-  board.addWidget('image', {
-    state: { ...WIDGETS.image.defaultState(), ...state },
-    x: Math.min(1 - fw, Math.max(0, (1 - fw) / 2 + i * 0.03)),
-    y: Math.min(1 - fh, Math.max(0, (1 - fh) / 2 + i * 0.04)),
+  const cx = at ? at.x : 0.5, cy = at ? at.y : 0.5;
+  board.addWidget(type, {
+    state: { ...WIDGETS[type].defaultState(), ...state },
+    x: Math.min(1 - fw, Math.max(0, cx - fw / 2 + i * 0.03)),
+    y: Math.min(1 - fh, Math.max(0, cy - fh / 2 + i * 0.04)),
     w: fw,
     h: fh,
   });
 }
-async function pastePictures(files) {
+const addPictureWidget = (state, w, h2, i = 0, at = null) => addSizedWidget('image', state, w, h2, i, at);
+async function pastePictures(files, at = null, word = 'pasted') {
   if (screen.paused) { toast('This screen is paused — press “Carry on” first.'); return; }
-  beginInteraction({ type: 'paste' });   // one undo step, however the paste happened (keys or right-click menu)
+  beginInteraction({ type: 'paste' });   // one undo step, however it happened (keys, right-click menu or dragging)
   for (const [i, file] of files.slice(0, 6).entries()) {
     const { blob, w, h: hh } = await shrinkPasted(file);
     const id = uid('asset');
     await db.putAsset({ id, blob, name: file.name && file.name !== 'image.png' ? file.name : `pasted-picture.${blob.type === 'image/png' ? 'png' : 'jpg'}`, type: blob.type, created: Date.now() });
-    addPictureWidget({ imageAssetId: id }, w, hh, i);
+    addPictureWidget({ imageAssetId: id }, w, hh, i, at);
   }
   settleSoon(300);
-  toast(files.length > 1 ? `${Math.min(files.length, 6)} pictures pasted` : 'Picture pasted');
+  toast(files.length > 1 ? `${Math.min(files.length, 6)} pictures ${word}` : `Picture ${word}`);
 }
+
+// ---------- drop files on the screen: pictures, videos and sounds become widgets where you drop them ----------
+const videoSize = (url) => new Promise((res) => {
+  const v = document.createElement('video');
+  v.preload = 'metadata'; v.muted = true;
+  const done = (w, h2) => { v.removeAttribute('src'); v.load(); res([w || 16, h2 || 9]); };
+  v.onloadedmetadata = () => done(v.videoWidth, v.videoHeight);
+  v.onerror = () => done(16, 9);
+  setTimeout(() => done(16, 9), 4000);
+  v.src = url;
+});
+async function dropFiles(files, at) {
+  if (screen.paused) { toast('This screen is paused — press “Carry on” first.'); return; }
+  const pics = files.filter((f) => f.type.startsWith('image/'));
+  const vids = files.filter((f) => f.type.startsWith('video/'));
+  const sounds = files.filter((f) => f.type.startsWith('audio/'));
+  const other = files.length - pics.length - vids.length - sounds.length;
+  if (pics.length) await pastePictures(pics, at, 'added');
+  beginInteraction({ type: 'paste' });
+  let i = pics.length;
+  for (const f of vids.slice(0, 4)) {
+    if (f.size > 300e6) { toast(`“${f.name}” is very big — choose a shorter clip (under 300 MB).`); continue; }
+    const id = uid('asset');
+    await db.putAsset({ id, blob: f, name: f.name, type: f.type, created: Date.now() });
+    const url = URL.createObjectURL(f);
+    const [w, hh] = await videoSize(url);
+    URL.revokeObjectURL(url);
+    addSizedWidget('videoloop', { clipAssetId: id, fileName: f.name, label: f.name.replace(/\.[^.]+$/, '') }, w, hh, i++, at);
+  }
+  for (const f of sounds.slice(0, 4)) {
+    const id = uid('asset');
+    await db.putAsset({ id, blob: f, name: f.name, type: f.type, created: Date.now() });
+    addSizedWidget('audio', { audioAssetId: id, label: f.name.replace(/\.[^.]+$/, '') }, 520, 220, i++, at);
+  }
+  settleSoon(300);
+  if (vids.length || sounds.length) toast([vids.length && `${vids.length} video${vids.length === 1 ? '' : 's'}`, sounds.length && `${sounds.length} sound${sounds.length === 1 ? '' : 's'}`].filter(Boolean).join(' and ') + ' added');
+  if (other) toast('Only pictures, videos and sound files can be dropped on the screen.');
+}
+/** Something dragged in from another window carrying files (or a picture from a web page). */
+const carriesFiles = (e) => [...(e.dataTransfer?.types || [])].some((t) => t === 'Files' || t === 'text/uri-list');
+let dragDepth = 0;
+const dropHint = h('div', { class: 'drop-hint', hidden: true, 'aria-hidden': 'true' }, h('span', {}, 'Drop to add it to the screen'));
+document.body.append(dropHint);
+const hideHint = () => { dragDepth = 0; dropHint.hidden = true; };
+boardEl.addEventListener('dragenter', (e) => { if (!carriesFiles(e)) return; dragDepth++; dropHint.hidden = false; });
+boardEl.addEventListener('dragleave', () => { if (--dragDepth <= 0) hideHint(); });
+boardEl.addEventListener('dragover', (e) => { if (carriesFiles(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+boardEl.addEventListener('drop', (e) => {
+  hideHint();
+  if (e.defaultPrevented || !screen) return;   // a widget took it (e.g. dropping onto an Image widget fills that widget)
+  e.preventDefault();
+  const r = boardEl.getBoundingClientRect();
+  const at = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+  const files = [...(e.dataTransfer.files || [])];
+  if (files.length) { dropFiles(files, at); return; }
+  // a picture dragged straight from a web page arrives as a link
+  const html = e.dataTransfer.getData('text/html') || '';
+  const src = html.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1];
+  const link = (src || e.dataTransfer.getData('text/uri-list').split('\n').find((l) => l && !l.startsWith('#')) || '').trim();
+  if (!/^(https?:|data:image\/)/i.test(link)) return;
+  beginInteraction({ type: 'paste' });
+  const img = new Image();
+  img.onload = () => { addPictureWidget({ url: link }, img.naturalWidth || 4, img.naturalHeight || 3, 0, at); settleSoon(300); };
+  img.onerror = () => toast('That doesn’t look like a picture. Try saving it and dropping the file.');
+  img.src = link;
+});
+document.addEventListener('drop', hideHint);
+document.addEventListener('dragend', hideHint);
 const IMAGE_LINK = /^(https?:\/\/\S+\.(png|jpe?g|gif|webp|svg|avif)(\?\S*)?|data:image\/[a-z+]+;base64,\S+)$/i;
 document.addEventListener('paste', (e) => {
   if (!screen || e.target.closest?.('dialog[open], .side-settings')) return;   // pasting into a menu or settings box: leave it alone
