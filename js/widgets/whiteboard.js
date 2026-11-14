@@ -319,6 +319,7 @@ export default {
       }));
     const lineBtn = h('button', { class: 'wb-tool wb-linebtn', title: 'Straight lines and arrows (tap again for styles)', 'aria-label': 'Line tool', 'aria-haspopup': 'menu',
       onclick: () => { if (tool !== 'line') { tool = 'line'; linePop.hidden = false; } else linePop.hidden = !linePop.hidden; sync(); } });
+    const penTool = toolBtn('✏️', 'Pen: draw freehand', () => { tool = 'pen'; sync(); }, 'wb-pentool');
     const moveBtn = toolBtn('✥', 'Move lines: drag an end, a corner or the middle of a line', () => { tool = tool === 'move' ? 'pen' : 'move'; sync(); });
     const straightBtn = h('button', { class: 'wb-tool wb-straight', 'aria-pressed': 'false',
       onclick: () => { s.straighten = !s.straighten; ctx.save(); sync(); toast(s.straighten ? 'Straighten is on: nearly straight lines you draw become straight.' : 'Straighten is off.'); } }, '📐');
@@ -334,27 +335,33 @@ export default {
     const recBtn = h('button', { class: 'wb-tool wb-rec', title: 'Record this whiteboard session', 'aria-label': 'Record', onclick: () => (rec ? stopRec() : startRec()) }, h('span', { class: 'wb-rec-dot' }), h('span', { class: 'wb-rec-t' }));
     const playBtn = toolBtn('▶', 'Play back the recording (🔁 Loop is in the player)', () => openPlayer(), 'wb-play');
     const sep = () => h('span', { class: 'wb-sep' });
-    const bar = h('div', { class: 'wb-bar' },
-      ...penBtns,
-      sep(),
-      ...hlBtns,
-      sep(),
-      ...sizeBtns,
-      sep(),
-      lineBtn,
-      straightBtn,
-      moveBtn,
-      eraser,
-      sep(),
-      toolBtn('↶', 'Undo', undo),
-      toolBtn('↷', 'Redo', redoStep),
-      toolBtn('🗑', 'Clear the board (↶ Undo brings it back)', clearAll),
-      sep(),
-      paperBtn,
-      gapRange,
-      sep(),
-      recBtn,
-      playBtn,
+    // Two rows: what you do (tools), then how it looks and the board itself.
+    const bar = h('div', { class: 'wb-bar wb-tools' },
+      h('div', { class: 'wb-row', role: 'toolbar', 'aria-label': 'Drawing tools' },
+        penTool,
+        lineBtn,
+        ...hlBtns,
+        sep(),
+        straightBtn,
+        moveBtn,
+        eraser,
+        sep(),
+        toolBtn('↶', 'Undo', undo),
+        toolBtn('↷', 'Redo', redoStep),
+        toolBtn('🗑', 'Clear the board (↶ Undo brings it back)', clearAll),
+      ),
+      h('div', { class: 'wb-row', role: 'toolbar', 'aria-label': 'Colour, size and board' },
+        ...penBtns,
+        sep(),
+        ...sizeBtns,
+        sep(),
+        paperBtn,
+        gapRange,
+        sep(),
+        recBtn,
+        playBtn,
+      ),
+      linePop,
     );
     const badge = h('div', { class: 'wb-recbadge', hidden: true });
     const sizeCur = h('div', { class: 'wb-sizecur', hidden: true, 'aria-hidden': 'true' });
@@ -380,7 +387,7 @@ export default {
     pScrub.addEventListener('input', () => pb && seek((pScrub.value / 1000) * pb.dur));
 
     const surface = h('div', { class: 'wb-surface' }, paperCanvas, canvas, overlay, sizeCur, badge);
-    const root = h('div', { class: 'wb' }, surface, linePop, bar, player);
+    const root = h('div', { class: 'wb' }, surface, bar, player);
     ctx.view.append(root);
     // Close the line-style menu when tapping elsewhere on THIS whiteboard (other children using
     // other whiteboards at the same time mustn't close it).
@@ -392,6 +399,7 @@ export default {
       hlBtns.forEach((b) => b.classList.toggle('on', tool === 'hl' && b.dataset.c === hlColor));
       sizeBtns.forEach((b) => b.classList.toggle('on', Number(b.dataset.sz) === size));
       lineBtn.classList.toggle('on', tool === 'line');
+      penTool.classList.toggle('on', tool === 'pen');
       lineBtn.innerHTML = `${lineSvg(lineStyle)}<i aria-hidden="true">▾</i>`;
       [...linePop.children].forEach((b) => { b.classList.toggle('on', b.dataset.ls === lineStyle); b.setAttribute('aria-checked', String(b.dataset.ls === lineStyle)); });
       if (tool !== 'line') linePop.hidden = true;
