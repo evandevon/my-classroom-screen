@@ -1581,9 +1581,16 @@ body.moving-bg #board { background: transparent !important; }
 .wb-sizecur { position: absolute; z-index: 3; pointer-events: none; transform: translate(-50%, -50%); border-radius: 50%; background: var(--c, transparent); border: 1.5px solid rgb(0 0 0 / .65); box-shadow: 0 0 0 1.5px rgb(255 255 255 / .85); }
 .wb-sizecur[hidden] { display: none; }
 .wb-surface[data-tool="eraser"] .wb-sizecur { background: rgb(255 255 255 / .35); }
-/* whiteboard toolbar: two rows (tools · colour, size and board) */
-.wb-bar.wb-tools { flex-direction: column; align-items: stretch; gap: 2px; padding: 4px 6px; position: relative; overflow: visible; }
-.wb-row { display: flex; align-items: center; gap: 4px; overflow-x: auto; min-width: 0; scrollbar-width: thin; }
-.wb-row + .wb-row { padding-right: 30px; }   /* room for the resize corner */
-.wb-tools > .wb-pop { bottom: calc(100% + 6px); left: 6px; }
+/* whiteboard toolbars: tools down the right side, colour/size/board along the bottom */
+.wb { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr) auto; }
+.wb > .wb-surface { grid-column: 1; grid-row: 1; }
+.wb-side { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 5px; border-left: 1px solid var(--line); background: #f4f6fa; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+.wb-side[hidden] { display: none; }
+.wb-side .wb-sep { width: 26px; height: 1px; margin: 3px 0; }
+.wb-side .wb-hl { height: 32px; }
+.wb > .wb-bar, .wb > .wb-player { grid-column: 1 / -1; grid-row: 2; }
+.wb > .wb-pop { left: auto; bottom: auto; }
 .wb-pentool.on, .wb-linebtn.on { box-shadow: inset 0 0 0 2px var(--accent); }
+.wb-bottom .wb-color { width: 31px; height: 31px; }
+.wb-bottom .wb-size { width: 34px; }
+.wb-bottom { gap: 3px; }

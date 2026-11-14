@@ -260,7 +260,7 @@ export default {
   title: 'Whiteboard',
   icon: '✏️',
   group: 'extras',
-  size: [640, 460],
+  size: [780, 540],
   hasSettings: true,
   heavyKeys: ['strokes', 'rec'],
   defaultState: () => ({ strokes: [], bg: 'white', paper: 'blank', gap: 0.06, straighten: false, rec: null, recAudioAssetId: null, recVoice: false, skipPauses: true, loop: false }),
@@ -318,7 +318,14 @@ export default {
         return b;
       }));
     const lineBtn = h('button', { class: 'wb-tool wb-linebtn', title: 'Straight lines and arrows (tap again for styles)', 'aria-label': 'Line tool', 'aria-haspopup': 'menu',
-      onclick: () => { if (tool !== 'line') { tool = 'line'; linePop.hidden = false; } else linePop.hidden = !linePop.hidden; sync(); } });
+      onclick: () => { if (tool !== 'line') { tool = 'line'; linePop.hidden = false; } else linePop.hidden = !linePop.hidden; sync(); placePop(); } });
+    /** Put the line-style menu just left of the line button, kept inside the whiteboard. */
+    function placePop() {
+      if (linePop.hidden) return;
+      const r = root.getBoundingClientRect(), b = lineBtn.getBoundingClientRect(), sd = side.getBoundingClientRect();
+      linePop.style.right = `${Math.round(r.right - sd.left + 6)}px`;
+      linePop.style.top = `${Math.round(Math.max(4, Math.min(b.top - r.top - 8, r.height - linePop.offsetHeight - 4)))}px`;
+    }
     const penTool = toolBtn('✏️', 'Pen: draw freehand', () => { tool = 'pen'; sync(); }, 'wb-pentool');
     const moveBtn = toolBtn('✥', 'Move lines: drag an end, a corner or the middle of a line', () => { tool = tool === 'move' ? 'pen' : 'move'; sync(); });
     const straightBtn = h('button', { class: 'wb-tool wb-straight', 'aria-pressed': 'false',
@@ -335,33 +342,30 @@ export default {
     const recBtn = h('button', { class: 'wb-tool wb-rec', title: 'Record this whiteboard session', 'aria-label': 'Record', onclick: () => (rec ? stopRec() : startRec()) }, h('span', { class: 'wb-rec-dot' }), h('span', { class: 'wb-rec-t' }));
     const playBtn = toolBtn('▶', 'Play back the recording (🔁 Loop is in the player)', () => openPlayer(), 'wb-play');
     const sep = () => h('span', { class: 'wb-sep' });
-    // Two rows: what you do (tools), then how it looks and the board itself.
-    const bar = h('div', { class: 'wb-bar wb-tools' },
-      h('div', { class: 'wb-row', role: 'toolbar', 'aria-label': 'Drawing tools' },
-        penTool,
-        lineBtn,
-        ...hlBtns,
-        sep(),
-        straightBtn,
-        moveBtn,
-        eraser,
-        sep(),
-        toolBtn('↶', 'Undo', undo),
-        toolBtn('↷', 'Redo', redoStep),
-        toolBtn('🗑', 'Clear the board (↶ Undo brings it back)', clearAll),
-      ),
-      h('div', { class: 'wb-row', role: 'toolbar', 'aria-label': 'Colour, size and board' },
-        ...penBtns,
-        sep(),
-        ...sizeBtns,
-        sep(),
-        paperBtn,
-        gapRange,
-        sep(),
-        recBtn,
-        playBtn,
-      ),
-      linePop,
+    // Tools down the right-hand side; colour, size, undo and the board itself along the bottom.
+    const side = h('div', { class: 'wb-side', role: 'toolbar', 'aria-label': 'Drawing tools', 'aria-orientation': 'vertical' },
+      penTool,
+      lineBtn,
+      ...hlBtns,
+      sep(),
+      straightBtn,
+      moveBtn,
+      eraser,
+    );
+    const bar = h('div', { class: 'wb-bar wb-bottom', role: 'toolbar', 'aria-label': 'Colour, size and board' },
+      ...penBtns,
+      sep(),
+      ...sizeBtns,
+      sep(),
+      toolBtn('↶', 'Undo', undo),
+      toolBtn('↷', 'Redo', redoStep),
+      toolBtn('🗑', 'Clear the board (↶ Undo brings it back)', clearAll),
+      sep(),
+      paperBtn,
+      gapRange,
+      sep(),
+      recBtn,
+      playBtn,
     );
     const badge = h('div', { class: 'wb-recbadge', hidden: true });
     const sizeCur = h('div', { class: 'wb-sizecur', hidden: true, 'aria-hidden': 'true' });
@@ -387,7 +391,7 @@ export default {
     pScrub.addEventListener('input', () => pb && seek((pScrub.value / 1000) * pb.dur));
 
     const surface = h('div', { class: 'wb-surface' }, paperCanvas, canvas, overlay, sizeCur, badge);
-    const root = h('div', { class: 'wb' }, surface, bar, player);
+    const root = h('div', { class: 'wb' }, surface, side, bar, player, linePop);
     ctx.view.append(root);
     // Close the line-style menu when tapping elsewhere on THIS whiteboard (other children using
     // other whiteboards at the same time mustn't close it).
@@ -869,6 +873,7 @@ export default {
         }
       }
       bar.hidden = true;
+      side.hidden = true;
       player.hidden = false;
       surface.classList.add('playing');
       playPb(true);
@@ -879,6 +884,7 @@ export default {
       pb.audio?.removeAttribute('src');
       pb = null;
       bar.hidden = false;
+      side.hidden = false;
       player.hidden = true;
       surface.classList.remove('playing');
       sync();
