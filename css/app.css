@@ -1594,3 +1594,12 @@ body.moving-bg #board { background: transparent !important; }
 .wb-bottom .wb-color { width: 31px; height: 31px; }
 .wb-bottom .wb-size { width: 34px; }
 .wb-bottom { gap: 3px; }
+/* Transparent themes: no background boxes behind widget controls — only the controls, text and media show */
+.widget:is(.theme-glass, .theme-glass-dark) :is(.audio-player, .dice, .wc-panel, .cam, .vl, .rp, .cam-start, .cam-controls, .rp-bar, .rp-cap, .wb-side, .wb-bottom, .wb-player) { background: transparent; box-shadow: none; }
+.widget:is(.theme-glass, .theme-glass-dark) :is(.dice-total, .dice-count, .cam-controls, .cam-start, .rp, .audio-player) { color: var(--ink); }
+.widget:is(.theme-glass, .theme-glass-dark) .cam-start .hint { color: var(--muted); }
+.widget.theme-glass-dark .wc-grid span:not(.on) { color: #0000002e; }
+.widget.theme-glass-dark .wc-dot:not(.on) { background: #0000002e; }
+.widget:is(.theme-glass, .theme-glass-dark) .cam-video { background: transparent; }
+.widget:is(.theme-glass, .theme-glass-dark) .cam-controls .btn:not(.primary):not(.on) { background: var(--btn); border-color: var(--line); color: var(--ink); }
+.widget:is(.theme-glass, .theme-glass-dark) .cam-res { color: var(--muted); }
