@@ -27,7 +27,7 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 | 🎴 Random picture (choose a folder of pictures from the computer; no repeats, auto-change, captions, blurry “mystery” reveal — pictures stay in this browser) | | |
 | ☀️ Weather today (one big picture of the day: high/low, school-hours forecast, what to bring — hat, umbrella, jumper, water) | | |
 | 🌦️ Weather (now, next 6 hours, 5 days, UV sun-safety tips, rain alerts, °C/°F; free data from [Open-Meteo](https://open-meteo.com/), only the rough place is sent) | | |
-| 🎬 Video / Web (YouTube, Google Drive files & folders, Slides, Docs, Vimeo, Canva, Spotify, websites; pop-up window for sites that block embedding) | | |
+| 🎬 Video / Web (YouTube, Google Drive files & folders, Slides, Docs, Vimeo, Canva, Spotify, websites; pop-up window for sites that block embedding; plain-words messages when a link is wrong, a YouTube video can't be embedded, or a site is blocked or slow, plus a ❓ *Can't see it?* button) | | |
 | 🎵 Audio (upload, MP3 link, Drive, YouTube, Spotify) | | |
 
 ## Saving and sharing
@@ -42,6 +42,7 @@ Your screens **save themselves** in this browser on this computer — there's no
 | Class lists the screens use | ✓ Unless you untick the box | ✓ |
 
 - **Bringing screens in** always works the same way — ☰ → *Open a file*, dragging a `.classroom` file onto the screen, or opening a share link: a window lists the screens with tick boxes, marks any **you already have** (unticked), and shows which class lists come too. Nothing changes until you press **Add**; added screens go alongside yours and never replace them. A shared class with the same name as one of yours but different students is added as “Name (2)”.
+- **👁 Preview** on any row opens that screen exactly as it is, without adding it. A banner across the top offers **Add this screen**, **Other screens** (back to the list) and **Close**. Nothing you do while previewing is saved, and closing takes you back to where you were.
 - A `.classroom` file is a zip: `classroom.json` (screens and class lists) and a `files/` folder with every photo, clip, picture and sound at its real size (rename it to `.zip` to look inside). Older `.json` files still open.
 - Files no screen uses any more (e.g. from a deleted widget) are tidied away automatically. Save a file now and then as a backup — clearing the browser's data would remove your screens.
 - **Screens:** tap ☰ to make, switch, rename, duplicate, delete or drag screens into order. Start blank or from a template.
@@ -63,14 +64,16 @@ Your screens **save themselves** in this browser on this computer — there's no
 
 ## Backgrounds
 
-Menu → *Background*:
+Menu → *Background* has four tabs, and opens on the one your screen is using:
 
 - **📚 Library**: ready-made pictures and moving loops that come with the site, shown as preview tiles (hover with a mouse to see a moving one play). To add more, drop pictures (jpg, png, webp, gif) or short looping videos (mp4, webm) into the `backgrounds/` folder on GitHub. The *Background library* GitHub Action then makes the previews and the list (`backgrounds/index.json`) automatically. Library backgrounds also work in share links, because they live on the site.
-- **Animated** (drawn live, no downloads): aurora, calm waves, bubbles, snow, rain, night sky, fireflies, clouds, autumn leaves, confetti — with a speed slider. They pause when the screen is paused or the tab is hidden, and stay still if the computer asks for reduced motion.
-- **Video or web link**: upload a looping video, or paste a link to a video file, a picture or animated GIF, a YouTube video (plays muted and looping), or a Google Drive file shared as “Anyone with the link”.
-- **Slideshow**: choose a folder of pictures (and short videos) from the computer; fade or slow-zoom, every 5 s–5 min, shuffled.
+- **✨ Animated** (drawn live, no downloads): aurora, calm waves, bubbles, snow, rain, night sky, fireflies, clouds, autumn leaves, confetti — with a speed slider. They pause when the screen is paused or the tab is hidden, and stay still if the computer asks for reduced motion.
+- **🎨 Colours**: plain colours and gradients.
+- **📁 Your own**: a picture or looping video from the computer, a link, or a slideshow.
+  - **Video or web link**: upload a looping video, or paste a link to a video file, a picture or animated GIF, a YouTube video (plays muted and looping), or a Google Drive file shared as “Anyone with the link”.
+  - **Slideshow**: choose a folder of pictures (and short videos) from the computer; fade or slow-zoom, every 5 s–5 min, shuffled.
 - **Darken** slider for any moving background, so widgets stand out.
-- Gradients, colours and pictures as before. Uploaded videos and slideshows stay on the computer and go in `.classroom` files, not share links.
+- Uploaded pictures, videos and slideshows stay on the computer and go in `.classroom` files, not share links.
 
 Audio widget → **🎧 Sound library**: sounds that come with the site, for quiet background sound in class. Library sounds loop with no gap and fade gently in and out. To add more, drop sound files (mp3, m4a, ogg, wav) into the `sounds/` folder on GitHub; the same GitHub Action adds them to the list (`sounds/index.json`) automatically. Short seamless loops work best.
 
@@ -81,7 +84,7 @@ Tapping ⚙ opens the widget's settings in a panel at the side of the screen (on
 
 ## Widget colour themes
 
-Every widget can be **Light, Dark, Transparent · white, Transparent · dark, Transparent with a white or dark edge, Blue, Green, Yellow, Pink or Purple**, with an optional **drop shadow** on words and pictures (handy for the transparent themes over a photo background). Menu → *Widget theme* changes every widget on the screen (and new ones); each widget's ⚙ settings has its own theme at the bottom. Settings panels always stay light so they're easy to read. Each widget's ⚙ also has a **Text size** slider (50–250%), and *Widget theme & text size* in the menu sets it for every widget.
+Every widget can be **Light, Dark, Transparent · white, Transparent · dark, Blue or Yellow**; the transparent ones have an **Edge** tick box for a white or dark outline. (Green, Pink and Purple are no longer offered, but widgets already using them keep their colour.) Any widget can also have a **drop shadow** on words and pictures (handy for the transparent themes over a photo background). Menu → *Widget theme* changes every widget on the screen (and new ones); each widget's ⚙ settings has its own theme at the bottom. Settings panels always stay light so they're easy to read. Each widget's ⚙ also has a **Text size** slider (50–250%), and *Widget theme & text size* in the menu sets it for every widget.
 
 ## Phones and tablets
 

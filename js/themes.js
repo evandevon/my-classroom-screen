@@ -10,10 +10,11 @@ export const THEMES = [
   { id: 'glass-box', base: 'glass', boxed: true, label: 'Transparent · white edge', swatch: 'transparent', ink: '#fff' },
   { id: 'glass-dark-box', base: 'glass-dark', boxed: true, label: 'Transparent · dark edge', swatch: 'transparent', ink: '#1d1d1f' },
   { id: 'blue', label: 'Blue', swatch: '#dbeafe' },
-  { id: 'green', label: 'Green', swatch: '#dcf5e7' },
   { id: 'yellow', label: 'Yellow', swatch: '#fff4c7' },
-  { id: 'pink', label: 'Pink', swatch: '#fde2ec' },
-  { id: 'purple', label: 'Purple', swatch: '#ece3fb' },
+  // No longer offered, but widgets already using them keep their look.
+  { id: 'green', label: 'Green', swatch: '#dcf5e7', retired: true },
+  { id: 'pink', label: 'Pink', swatch: '#fde2ec', retired: true },
+  { id: 'purple', label: 'Purple', swatch: '#ece3fb', retired: true },
 ];
 
 export function applyTheme(el, rec) {
@@ -44,25 +45,40 @@ export function textSizeSlider(value = 1, onChange) {
   );
 }
 
-/** Tiles for each theme, plus the drop-shadow switch. onChange({ theme?, shadow? }). */
+/**
+ * Six theme tiles, an "edge box" switch for the transparent ones and the drop-shadow switch.
+ * onChange({ theme?, shadow? }). A retired theme a widget already uses is shown too, so it can stay.
+ */
 export function themePicker({ theme = 'light', shadow = false }, onChange) {
-  const tiles = THEMES.map((t) => h('button', {
-    class: `theme-tile${t.id === theme ? ' on' : ''}`,
-    'aria-pressed': String(t.id === theme),
+  const cur = THEMES.find((t) => t.id === theme) || THEMES[0];
+  let base = cur.base || cur.id;
+  let boxed = !!cur.boxed;
+  const offered = THEMES.filter((t) => !t.boxed && (!t.retired || t.id === base));
+  const idFor = () => (boxed && (base === 'glass' || base === 'glass-dark') ? `${base}-box` : base);
+  const edge = h('input', { type: 'checkbox' });
+  edge.checked = boxed;
+  const edgeRow = h('label', { class: 'check' }, edge, h('span', {}, 'Edge box — a thin outline, to set some transparent widgets apart'));
+  const tiles = offered.map((t) => h('button', {
+    class: `theme-tile${t.id === base ? ' on' : ''}`,
+    'aria-pressed': String(t.id === base),
     title: t.label,
     onclick: () => {
-      tiles.forEach((x) => { x.classList.remove('on'); x.setAttribute('aria-pressed', 'false'); });
-      tiles[THEMES.indexOf(t)].classList.add('on');
-      tiles[THEMES.indexOf(t)].setAttribute('aria-pressed', 'true');
-      onChange({ theme: t.id });
+      base = t.id;
+      tiles.forEach((x, i) => { const on = offered[i].id === base; x.classList.toggle('on', on); x.setAttribute('aria-pressed', String(on)); });
+      sync();
+      onChange({ theme: idFor() });
     },
   },
-    h('span', { class: `theme-swatch ts-${t.base || t.id}${t.boxed ? ' ts-boxed' : ''}`, style: { '--sw': t.swatch } }, h('b', { style: { color: t.ink || (t.id === 'dark' ? '#fff' : '#1d1d1f') } }, 'Aa')),
-    h('small', {}, t.label),
+    h('span', { class: `theme-swatch ts-${t.id}`, style: { '--sw': t.swatch } }, h('b', { style: { color: t.ink || (t.id === 'dark' ? '#fff' : '#1d1d1f') } }, 'Aa')),
+    h('small', {}, t.retired ? `${t.label} (older)` : t.label),
   ));
+  const sync = () => { edgeRow.hidden = !(base === 'glass' || base === 'glass-dark'); };
+  edge.addEventListener('change', () => { boxed = edge.checked; onChange({ theme: idFor() }); });
   const sh = h('input', { type: 'checkbox', checked: shadow, onchange: () => onChange({ shadow: sh.checked }) });
+  sync();
   return h('div', { class: 'theme-picker' },
     h('div', { class: 'theme-tiles' }, ...tiles),
+    edgeRow,
     h('label', { class: 'check' }, sh, h('span', {}, 'Drop shadow on words and pictures (helps them stand out on busy backgrounds)')),
   );
 }

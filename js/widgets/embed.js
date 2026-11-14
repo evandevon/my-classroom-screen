@@ -6,9 +6,12 @@ export function normaliseURL(raw) {
   let t = String(raw || '').trim();
   if (!t) return null;
   if (!/^[a-z][a-z0-9+.-]*:/i.test(t)) t = `https://${t.replace(/^\/+/, '')}`;
+  if (/\s/.test(t.replace(/\s+$/, ''))) return null;   // words with spaces aren't a link
   try {
     const u = new URL(t);
-    return /^https?:$/.test(u.protocol) ? u : null;
+    // a real address has a name with a dot in it (or is localhost)
+    if (!/^https?:$/.test(u.protocol) || !(u.hostname.includes('.') || u.hostname === 'localhost') || u.hostname.includes('%')) return null;
+    return u;
   } catch {
     return null;
   }
@@ -76,7 +79,7 @@ export function toEmbedURL(raw, { privacy = false, clipStart = null, clipEnd = n
       const parts = String(t).match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/);
       start = parts ? (Number(parts[1] || 0) * 3600 + Number(parts[2] || 0) * 60 + Number(parts[3] || 0)) : parseInt(t, 10) || 0;
     }
-    const params = new URLSearchParams({ rel: '0', playsinline: '1' });
+    const params = new URLSearchParams({ rel: '0', playsinline: '1', enablejsapi: '1' });
     const from = clipStart ?? start;
     if (from) params.set('start', from);
     if (clipEnd && clipEnd > (from || 0)) params.set('end', clipEnd);
@@ -140,7 +143,7 @@ export default {
     const s = ctx.state;
     const frameHost = h('div', { class: 'embed-host' });
     const urlIn = h('input', { type: 'url', placeholder: 'Paste a YouTube, Google Drive, Slides or web link', 'aria-label': 'Link' });
-    const err = h('p', { class: 'error', hidden: true }, 'That link could not be used.');
+    const err = h('p', { class: 'error', hidden: true }, 'That doesn’t look like a web address. Paste the whole link from the address bar — e.g. https://www.youtube.com/watch?v=… or www.abc.net.au.');
     const empty = h('div', { class: 'empty' },
       err,
       h('p', {}, 'Show a video or web page'),
@@ -148,14 +151,64 @@ export default {
       h('p', { class: 'hint' }, 'YouTube · Google Drive · Slides · Docs · Vimeo · Canva · Spotify · most websites'),
     );
     const blockedCard = h('div', { class: 'empty embed-blocked', hidden: true });
+    // What's happening, in plain words: loading, taking too long, or a problem the player told us about.
+    const status = h('div', { class: 'embed-status', role: 'status', hidden: true });
+    const helpBtn = h('button', { class: 'btn small', title: 'Can’t see it?', onclick: () => showHelp() }, '❓ Can’t see it?');
     const bar = h('div', { class: 'embed-bar' },
-      h('span', { class: 'hint' }, 'Blank, or “refused to connect”? That site blocks being shown here →'),
+      helpBtn,
+      h('span', { class: 'embed-bar-gap' }),
       h('button', { class: 'btn small', onclick: () => popup() }, '↗ Pop-up window'),
       h('button', { class: 'btn small', onclick: () => newTab() }, '⧉ New tab'),
       h('button', { class: 'btn small', 'aria-label': 'Reload', title: 'Reload', onclick: () => { frameHost.replaceChildren(); render(); } }, '⟳'),
     );
     urlIn.addEventListener('keydown', (e) => e.key === 'Enter' && setURL(urlIn.value));
-    ctx.view.append(h('div', { class: 'embed' }, empty, blockedCard, frameHost, bar));
+    ctx.view.append(h('div', { class: 'embed' }, empty, blockedCard, frameHost, status, bar));
+
+    const hostName = () => normaliseURL(s.url)?.hostname.replace(/^www\./, '') || 'this site';
+    function say(kind, title, text, actions = []) {
+      status.className = `embed-status ${kind}`;
+      status.replaceChildren(h('b', {}, title), text ? h('span', {}, text) : null, actions.length ? h('div', { class: 'row' }, ...actions, h('button', { class: 'btn small', onclick: () => (status.hidden = true) }, 'OK')) : null);
+      status.hidden = false;
+    }
+    const openBtns = () => [h('button', { class: 'btn small primary', onclick: popup }, '↗ Open in a pop-up window'), h('button', { class: 'btn small', onclick: newTab }, '⧉ New tab')];
+    function showHelp() {
+      say('info', 'Can’t see it?', ` Some websites don’t allow other pages to show them (you’ll see a blank box, a grey sad face or “refused to connect”). That’s the website’s choice, not a fault here — open it in a pop-up window instead, which sits on top of your board. If it never loads at all, the school network may be blocking ${hostName()}.`, openBtns());
+    }
+    // Loading: if nothing has arrived after 15 seconds, the network is probably blocking it.
+    let slowTimer = null;
+    function watchLoading(frame) {
+      clearTimeout(slowTimer);
+      say('loading', `Loading ${hostName()}…`, '');
+      let loaded = false;
+      frame.addEventListener('load', () => { loaded = true; clearTimeout(slowTimer); if (status.classList.contains('loading')) status.hidden = true; ytListen(frame); });
+      slowTimer = setTimeout(() => {
+        if (!loaded) say('warn', 'This is taking a long time.', ` The school network may be blocking ${hostName()}, or the site is slow. Try a pop-up window — or ask IT to unblock ${hostName()}.`, openBtns());
+      }, 15000);
+    }
+    // YouTube tells us when a video can't play here.
+    const YT_ERRORS = {
+      2: ['That YouTube link isn’t quite right.', ' Copy the link again from the video’s Share button.'],
+      5: ['This video can’t play here.', ' Try opening it on YouTube.'],
+      100: ['This video isn’t available.', ' It may have been removed or made private.'],
+      101: ['The video’s owner doesn’t allow it to be played on other websites.', ' It will play on YouTube itself.'],
+      150: ['The video’s owner doesn’t allow it to be played on other websites.', ' It will play on YouTube itself.'],
+      153: ['YouTube couldn’t check where this video is being played.', ' Try opening it on YouTube.'],
+    };
+    function ytListen(frame) {
+      if (!/youtube(-nocookie)?\.com\/embed/.test(frame.src)) return;
+      try { frame.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: ctx.rec.id }), '*'); } catch { /* ignore */ }
+    }
+    const onMessage = (e) => {
+      const frame = frameHost.firstChild;
+      if (!frame || e.source !== frame.contentWindow || !/youtube/.test(e.origin)) return;
+      let d;
+      try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch { return; }
+      if (d?.event === 'onError') {
+        const [title, text] = YT_ERRORS[d.info] || ['This video can’t play here.', ' Try opening it on YouTube.'];
+        say('error', title, text, [h('button', { class: 'btn small primary', onclick: newTab }, '▶ Open on YouTube')]);
+      }
+    };
+    window.addEventListener('message', onMessage);
 
     const pageURL = () => normaliseURL(s.url)?.href;
     function newTab() {
@@ -201,20 +254,23 @@ export default {
             : 'The pop-up window sits on top of your board and can be moved and resized.'),
         );
       }
+      helpBtn.hidden = !src;
       if (!src) {
         frameHost.replaceChildren();
+        status.hidden = true;
+        clearTimeout(slowTimer);
         return;
       }
       if (frameHost.firstChild?.src === src) return;
-      frameHost.replaceChildren(
-        h('iframe', {
-          src,
-          title: 'Embedded content',
-          allow: 'autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write; web-share',
-          allowfullscreen: true,
-          referrerpolicy: 'strict-origin-when-cross-origin',
-        }),
-      );
+      const frame = h('iframe', {
+        src,
+        title: 'Embedded content',
+        allow: 'autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write; web-share',
+        allowfullscreen: true,
+        referrerpolicy: 'strict-origin-when-cross-origin',
+      });
+      frameHost.replaceChildren(frame);
+      watchLoading(frame);
     }
     render();
 
@@ -236,6 +292,7 @@ export default {
         );
       },
       closeSettings: render,
+      destroy() { clearTimeout(slowTimer); window.removeEventListener('message', onMessage); },
     };
   },
 };
