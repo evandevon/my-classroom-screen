@@ -1,6 +1,13 @@
 {
  "items": [
   {
+   "file": "Babbling Brook Loop.mp3",
+   "v": "5c851b0d73",
+   "name": "Babbling Brook Loop",
+   "duration": 91.5,
+   "bytes": 1465344
+  },
+  {
    "file": "Campfire Loop.mp3",
    "v": "1628886487",
    "name": "Campfire Loop",
@@ -20,6 +27,13 @@
    "name": "Old Train Loop",
    "duration": 8.12,
    "bytes": 131328
+  },
+  {
+   "file": "Rain Loop.mp3",
+   "v": "0eb4beadd6",
+   "name": "Rain Loop",
+   "duration": 120.25,
+   "bytes": 1925376
   }
  ],
  "skipped": []
