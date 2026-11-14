@@ -37,6 +37,148 @@ const persist = debounce(async () => {
 }, 400);
 
 const board = new Board(boardEl, { onChange: () => persist() });
+
+// ---------- undo / redo for everything on a screen ----------
+// Every change someone makes (a tap, drag, typing, a setting) becomes one undo step: we copy the screen
+// when an interaction starts and, once things settle, keep that copy if the screen changed. Changes that
+// happen by themselves (weather refreshing, a slideshow moving on) don't count — widgets list those keys
+// as volatileKeys. Deleting a screen can be undone too.
+const UNDO_MAX = 40;
+const undoStack = [];
+const redoStack = [];
+const undoBtn = $('#undo-btn');
+const redoBtn = $('#redo-btn');
+/** A copy of a screen. Big data that's never changed in place (a whiteboard recording: undoShareKeys) is shared, not copied. */
+function snap(s) {
+  const refs = [];
+  const light = { ...s, widgets: s.widgets.map((w) => {
+    const keys = WIDGETS[w.type]?.undoShareKeys;
+    if (!keys) return w;
+    const st = { ...w.state };
+    for (const k of keys) { if (k in st) refs.push([w, k, st[k]]); delete st[k]; }
+    return { ...w, state: st };
+  }) };
+  const c = structuredClone(light);
+  for (const [w, k, v] of refs) c.widgets[s.widgets.indexOf(w)].state[k] = v;
+  return c;
+}
+const tokens = new WeakMap();
+let tokenN = 0;
+const token = (v) => (v && typeof v === 'object' ? (tokens.get(v) ?? (tokens.set(v, ++tokenN), tokenN)) : v);
+/** Text that changes only when something someone did changes the screen. */
+function comparable(s) {
+  return JSON.stringify({ ...s, updated: 0, widgets: s.widgets.map((w) => {
+    const def = WIDGETS[w.type];
+    if (!def?.volatileKeys && !def?.undoShareKeys) return w;
+    const st = { ...w.state };
+    for (const k of def.volatileKeys || []) delete st[k];
+    for (const k of def.undoShareKeys || []) st[k] = `#${token(st[k])}`;
+    return { ...w, state: st };
+  }) });
+}
+let pending = null;   // { id, before, key, timer, by: 'pointer' | 'key' }
+let pointersDown = 0;
+function beginInteraction(e) {
+  if (!screen || e.target?.closest?.('[data-no-undo]')) return;
+  const by = e.type === 'keydown' ? 'key' : 'pointer';
+  if (pending) {
+    // Typing keeps adding to the same step; each new tap or drag is a step of its own
+    // (unless another finger is still down — that's the same gesture).
+    if ((by === 'key' && pending.by === 'key') || pointersDown > 1) { clearTimeout(pending.timer); return; }
+    commitPending();
+  }
+  pending = { id: screen.id, before: snap(screen), key: comparable(screen), by };
+}
+function settleSoon(ms = 900) {
+  if (!pending) return;
+  clearTimeout(pending.timer);
+  pending.timer = setTimeout(() => { if (pointersDown > 0) settleSoon(ms); else commitPending(); }, ms);
+}
+function pushUndo(entry) {
+  undoStack.push(entry);
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  redoStack.length = 0;
+  syncUndoButtons();
+}
+function commitPending() {
+  const p = pending;
+  pending = null;
+  if (!p) return;
+  clearTimeout(p.timer);
+  if (!screen || p.id !== screen.id || comparable(screen) === p.key) return;
+  pushUndo({ id: p.id, before: p.before });
+}
+function syncUndoButtons() {
+  undoBtn.disabled = !undoStack.length;
+  redoBtn.disabled = !redoStack.length;
+}
+/** Put a screen back exactly as it was. */
+async function restoreInto(before) {
+  if (before.id !== screen?.id) {
+    const s = await db.getScreen(before.id);
+    if (!s) return false;
+    await openScreen(s);
+  }
+  for (const k of Object.keys(screen)) if (!(k in before)) delete screen[k];
+  Object.assign(screen, snap(before));
+  board.load(screen);
+  updatePauseBadge();
+  await applyBackground();
+  nameBtn.textContent = screen.name;
+  document.title = `${screen.name} · My Classroom Screen`;
+  persist();
+  return true;
+}
+async function step(from, to, word) {
+  commitPending();
+  const e = from.pop();
+  if (!e) { toast(`Nothing to ${word.toLowerCase()}`); syncUndoButtons(); return; }
+  if (e.kind === 'deleted') {            // bring a deleted screen back
+    deletedScreens.delete(e.screen.id);
+    await db.putScreen(snap(e.screen));
+    await openScreen(await db.getScreen(e.screen.id));
+    if (e.fresh) {
+      const blank = await db.getScreen(e.fresh.id);
+      if (blank && comparable({ ...blank, updated: 0 }) === e.fresh.key) { deletedScreens.add(blank.id); await db.deleteScreen(blank.id); }
+    }
+    to.push({ kind: 'restored', screen: e.screen });
+    toast(`${word}: “${e.screen.name}” is back.`);
+  } else if (e.kind === 'restored') {    // delete it again
+    await deleteScreen(e.screen, { quiet: true });
+    to.push({ kind: 'deleted', screen: e.screen });
+    toast(`${word}: “${e.screen.name}” deleted again.`);
+  } else {
+    const now = e.id === screen?.id ? snap(screen) : await db.getScreen(e.id);
+    if (!now) { syncUndoButtons(); return; }
+    if (await restoreInto(e.before)) to.push({ id: e.id, before: now });
+  }
+  renderDrawer();
+  syncUndoButtons();
+}
+const undo = () => step(undoStack, redoStack, 'Undo');
+const redo = () => step(redoStack, undoStack, 'Redo');
+undoBtn.addEventListener('click', undo);
+board.undo = undo;
+redoBtn.addEventListener('click', redo);
+document.addEventListener('pointerdown', (e) => { pointersDown++; beginInteraction(e); }, true);
+const pointerEnd = () => { pointersDown = Math.max(0, pointersDown - 1); settleSoon(); };
+document.addEventListener('pointerup', pointerEnd, true);
+document.addEventListener('pointercancel', pointerEnd, true);
+document.addEventListener('input', () => settleSoon(1200), true);
+document.addEventListener('change', () => settleSoon(), true);
+document.addEventListener('keydown', (e) => {
+  const typing = e.target.closest?.('input, textarea, select, [contenteditable="true"]');
+  const mod = e.ctrlKey || e.metaKey;
+  const k = e.key.toLowerCase();
+  if (mod && !typing && (k === 'z' || k === 'y')) {   // in a text box, leave Ctrl+Z to the text box
+    e.preventDefault();
+    if (k === 'y' || e.shiftKey) redo(); else undo();
+    return;
+  }
+  if (['Shift', 'Control', 'Meta', 'Alt', 'Tab'].includes(e.key)) return;
+  beginInteraction(e);
+  settleSoon(1200);
+}, true);
 board.onResume = () => resumeScreen();
 
 // ---------- class (labels recorded data, supplies names to widgets) ----------
@@ -76,6 +218,7 @@ function newScreenFrom(tpl, name) {
 }
 
 async function openScreen(s) {
+  commitPending();
   persist.flush();
   screen = s;
   board.load(screen);
@@ -156,8 +299,62 @@ async function applyBackground() {
 }
 
 
+/** Screens in the teacher's own order (dragged in the menu); screens never placed yet go last, newest first. */
 async function sortedScreens() {
-  return (await db.listScreens()).sort((a, b) => (b.updated || 0) - (a.updated || 0));
+  const key = (s) => (Number.isFinite(s.order) ? s.order : 1e15 - (s.updated || 0));
+  return (await db.listScreens()).sort((a, b) => key(a) - key(b));
+}
+/** Save a new order (array of screen ids). */
+async function saveScreenOrder(ids) {
+  persist.flush();
+  const all = await db.listScreens();
+  for (const s of all) {
+    const i = ids.indexOf(s.id);
+    if (i < 0) continue;
+    if (s.id === screen.id) { screen.order = i; persist.flush(); }
+    else if (s.order !== i) { s.order = i; await db.putScreen(s); }
+  }
+}
+/** Drag a screen up or down the list by its ⋮⋮ handle (mouse, pen or finger); arrow keys also work on the handle. */
+function makeReorderable(list) {
+  list.addEventListener('pointerdown', (e) => {
+    const grip = e.target.closest('.screen-grip');
+    if (!grip || e.button > 0) return;
+    e.preventDefault();
+    const li = grip.closest('li');
+    // Capture on the list, not the handle: moving the row in the page would drop the handle's capture.
+    list.setPointerCapture(e.pointerId);
+    li.classList.add('dragging');
+    const id = e.pointerId;
+    const move = (ev) => {
+      if (ev.pointerId !== id) return;
+      const items = [...list.children].filter((x) => x !== li);
+      const after = items.find((x) => { const r = x.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; });
+      if (after) { if (after !== li.nextSibling) list.insertBefore(li, after); }
+      else if (list.lastChild !== li) list.append(li);
+    };
+    const up = (ev) => {
+      if (ev.pointerId !== id) return;
+      list.removeEventListener('pointermove', move);
+      list.removeEventListener('pointerup', up);
+      list.removeEventListener('pointercancel', up);
+      li.classList.remove('dragging');
+      saveScreenOrder([...list.children].map((x) => x.dataset.id));
+    };
+    list.addEventListener('pointermove', move);
+    list.addEventListener('pointerup', up);
+    list.addEventListener('pointercancel', up);
+  });
+  list.addEventListener('keydown', (e) => {
+    const grip = e.target.closest('.screen-grip');
+    if (!grip || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault();
+    const li = grip.closest('li');
+    if (e.key === 'ArrowUp' && li.previousSibling) list.insertBefore(li, li.previousSibling);
+    if (e.key === 'ArrowDown' && li.nextSibling) list.insertBefore(li.nextSibling, li);
+    grip.focus();
+    saveScreenOrder([...list.children].map((x) => x.dataset.id));
+  });
 }
 
 // ---------- modal helper ----------
@@ -204,7 +401,7 @@ nameBtn.addEventListener('click', () => showScreenPicker());
 
 async function showScreenPicker() {
   persist.flush();
-  const screens = (await db.listScreens()).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+  const screens = await sortedScreens();
   const dlg = modal('Which screen?',
     h('div', { class: 'class-grid screen-grid' },
       ...screens.map((s) => {
@@ -235,7 +432,8 @@ async function renderDrawer() {
   const screens = await sortedScreens();
   const list = h('ul', { class: 'screen-list' },
     ...screens.map((s) =>
-      h('li', { class: s.id === screen.id ? 'current' : '' },
+      h('li', { class: s.id === screen.id ? 'current' : '', 'data-id': s.id },
+        screens.length > 1 ? h('button', { class: 'screen-grip', title: 'Drag to move this screen up or down', 'aria-label': `Move ${s.name} (drag, or use the up and down arrow keys)` }, '⋮⋮') : null,
         h('button', { class: 'screen-open', onclick: async () => { await openScreen((await db.getScreen(s.id)) || s); closeDrawer(); } },
           h('span', { class: 'sname' }, s.name),
           h('span', { class: 'smeta' }, `${s.widgets.length} widget${s.widgets.length === 1 ? '' : 's'}`),
@@ -247,6 +445,7 @@ async function renderDrawer() {
     ),
   );
 
+  makeReorderable(list);
   drawer.replaceChildren(
     h('div', { class: 'drawer-head' }, h('h2', {}, 'My screens'), h('button', { class: 'w-btn', 'aria-label': 'Close menu', onclick: closeDrawer }, '✕')),
     h('button', { class: 'btn primary wide', onclick: newScreenDialog }, '+ New screen'),
@@ -312,8 +511,14 @@ async function duplicateScreen(s) {
 }
 const assetIds = (s) => [s.background?.assetId, ...(s.background?.assetIds || []), ...s.widgets.flatMap((w) => Object.entries(w.state || {}).flatMap(([k, v]) => (k.endsWith('AssetId') && v ? [v] : k.endsWith('AssetIds') && Array.isArray(v) ? v : [])))].filter(Boolean);
 
-async function deleteScreen(s) {
-  if (!confirm(`Delete “${s.name}”? This can’t be undone.`)) return;
+async function deleteScreen(s, { quiet = false } = {}) {
+  commitPending();
+  const full = s.id === screen.id ? snap(screen) : (await db.getScreen(s.id)) || s;
+  const entry = { kind: 'deleted', screen: full };
+  if (!quiet) {
+    pushUndo(entry);
+    toast(`“${s.name}” deleted`, { action: 'Undo', onAction: undo });
+  }
   if (s.id === screen.id) persist.cancel();
   deletedScreens.add(s.id);
   await db.deleteScreen(s.id);
@@ -324,6 +529,7 @@ async function deleteScreen(s) {
       const fresh = newScreenFrom(TEMPLATES[0], 'My screen');
       await db.putScreen(fresh);
       await openScreen(fresh);
+      entry.fresh = { id: fresh.id, key: comparable(fresh) };   // undo removes this blank screen if it's untouched
     }
   }
   renderDrawer();

@@ -263,6 +263,7 @@ export default {
   size: [780, 540],
   hasSettings: true,
   heavyKeys: ['strokes', 'rec'],
+  undoShareKeys: ['rec'],   // recordings are replaced, never changed in place
   defaultState: () => ({ strokes: [], bg: 'white', paper: 'blank', gap: 0.06, straighten: false, rec: null, recAudioAssetId: null, recVoice: false, skipPauses: true, loop: false }),
 
   mount(ctx) {

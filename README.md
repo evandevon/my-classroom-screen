@@ -13,7 +13,7 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 | ⏳ Timer (ring, white→red circle, white→red rectangle, hourglass, bar or numbers) | 🔊 Noise meter (bouncy balls, level bar or emoji face) | 🔂 Interval timer (work/rest rounds with get-ready, 3-2-1 beeps, presets like Tabata; rings on time in a background tab) | | |
 | 🔔 Quiz buzzer (2–8 teams; first touch wins and only their sound plays; shows 2nd/3rd and how far behind; keyboard keys so Makey Makey / Arduino buttons work) | | |
 | ✏️ Whiteboard (pens, 3 highlighters, straight lines/arrows/dashed/dotted/number lines that snap together, move line ends and corners, 📐 Straighten toggle on the toolbar (hand-drawn lines that were meant to be straight become straight), eraser, undo (also undoes Clear), size circle under the mouse, grid/lined/chalkboard; several fingers draw at once; ⏺ record sessions with optional voice, play back at ½–4× with loop, save as an MP4 quickly even in a background tab) |
-| ⏱️ Stopwatch with laps | 🚦 Traffic light with your own labels | 🧮 Calculator (works safely without `eval`) |
+| ⏱️ Stopwatch with laps | 🚦 Traffic light with your own labels | 🧮 Calculator (works safely without `eval`) · 🗳️ Poll (a question with tappable emoji or word answers; results can stay hidden until revealed) |
 | 🕒 Clock — 8 styles: analogue/digital, teaching clock (past/to, time in words, set-a-time & quiz), Roman numerals, word clock, sundial with draggable sun, candle, water and incense clocks |
 | 🗓️ Activity timeline (coloured sessions with icons, now/next countdown, per-weekday plans, type-in quick entry) |
 | 📅 Calendar (tap a day to add events, repeats, “coming up” countdowns, NSW term & week numbers) |
@@ -47,6 +47,7 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 - **☰ → Classes & student lists:** make a class, then type names or paste a column from a spreadsheet. You can also import or export CSV to move lists to another computer.
 - **👥 button in the top bar:** choose the current class. It can also switch automatically when the Activity timeline's session name contains a class name.
 - The Name picker, Group maker, Tally (per student), Scoreboard ("a row for each student") and Stopwatch use the current class's names, or their own typed list.
+- **🚫 Keep apart:** in a class's list, choose pairs of students who shouldn't be in the same group. The Group maker keeps them apart (and tells you if it can't, e.g. with too few groups).
 - Class lists are never put into share links or screen files. Student names in widgets are taken out of share links unless you choose to include them.
 
 ## Recording data (stays on this device)
@@ -121,14 +122,22 @@ sw.js                 offline cache. Bump VERSION when files change
 
 To add a widget, copy an existing widget file. Export an object with `type`, `title`, `icon`, `group`, `size`, `defaultState()` and `mount(ctx)`, then add it to `js/widgets/index.js` and to the file list in `sw.js`. Put anything that holds student names in `privateKeys` so share links leave it out.
 
+## Undo, redo and screen order
+
+- **↶ ↷ in the top bar, or Ctrl+Z / Ctrl+Shift+Z (Ctrl+Y):** undo anything you did on a screen — adding, moving, resizing or removing widgets, settings, scores, votes, typing, backgrounds — and deleting a screen. Things that change by themselves (a running timer, weather updates, a slideshow) aren't undo steps. In a text box, Ctrl+Z undoes your typing as usual.
+- **Screen order:** in ☰, drag a screen by its ⋮⋮ handle (or focus the handle and use the arrow keys). The "Which screen?" picker uses the same order.
+
 ## Ideas for later
+
+- **Draw over everything:** an annotation layer across the whole screen, so you can circle or underline anything — a widget, a name, the background — not just inside a whiteboard.
+- **Think-Pair-Share** and other learning-structure widgets (see the list in the project notes).
 
 - **If background alarms still prove unreliable:** add an optional "keep tab awake" switch that plays an inaudible tone while a timer runs or an alarm is due. Browsers don't slow down or put to sleep a tab that is playing sound, but a speaker icon shows on the tab.
 
 - Web Serial widget: let an Arduino button or sensor start a timer, pick a name or drive a meter
 - Maths tools: number line, ten-frame, 120 chart
 - Timetable that highlights the current lesson, and an event countdown
-- Polls and exit tickets, brain-break spinner
+- Exit tickets, brain-break spinner
 
 ## Credits
 

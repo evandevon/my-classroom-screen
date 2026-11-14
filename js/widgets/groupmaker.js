@@ -1,7 +1,7 @@
-import { h, parseLines, shuffle } from '../util.js';
+import { h, parseLines, shuffle, toast } from '../util.js';
 import { play } from '../sound.js';
 import { panel, select, numberInput, textarea, field, PALETTE } from './_common.js';
-import { namesFor, sourceSelect, sourceName, onClassChange } from '../classes.js';
+import { namesFor, sourceSelect, sourceName, onClassChange, apartFor } from '../classes.js';
 
 export default {
   type: 'groupmaker',
@@ -30,12 +30,39 @@ export default {
     );
     ctx.view.append(h('div', { class: 'groupmaker' }, empty, grid, foot));
 
+    /** Random groups, as even in size as possible, never putting a "keep apart" pair together if it can be helped. */
+    function deal(names, count, apart) {
+      const clash = new Map(names.map((n) => [n, new Set()]));
+      for (const [a, b] of apart) if (clash.has(a) && clash.has(b)) { clash.get(a).add(b); clash.get(b).add(a); }
+      const caps = Array.from({ length: count }, (_, i) => Math.floor(names.length / count) + (i < names.length % count ? 1 : 0));
+      let best = null;
+      for (let attempt = 0; attempt < 400; attempt++) {
+        // students with the most "keep apart"s go first, the rest in random order
+        const order = shuffle(names).sort((a, b) => clash.get(b).size - clash.get(a).size);
+        const groups = Array.from({ length: count }, () => []);
+        const capsLeft = shuffle(caps);
+        let clashes = 0;
+        for (const n of order) {
+          const open = groups.map((g, i) => i).filter((i) => groups[i].length < capsLeft[i]);
+          const ok = open.filter((i) => !groups[i].some((m) => clash.get(n).has(m)));
+          const pool = ok.length ? ok : open;
+          if (!ok.length) clashes++;
+          const smallest = Math.min(...pool.map((i) => groups[i].length));
+          const pick = shuffle(pool.filter((i) => groups[i].length === smallest))[0];
+          groups[pick].push(n);
+        }
+        if (!best || clashes < best.clashes) best = { groups, clashes };
+        if (!clashes) break;
+      }
+      return best;
+    }
+
     function make() {
-      const names = shuffle(allNames());
+      const names = allNames();
       if (!names.length) return;
       const count = s.by === 'count' ? Math.min(s.n, names.length) : Math.max(1, Math.ceil(names.length / s.n));
-      const groups = Array.from({ length: count }, () => []);
-      names.forEach((n, i) => groups[i % count].push(n));
+      const { groups, clashes } = deal(names, count, apartFor(s.source));
+      if (clashes) toast(`Couldn’t keep everyone apart in ${count} group${count === 1 ? '' : 's'}: ${clashes} had to share with someone on their keep-apart list. Try more groups.`);
       s.groups = groups;
       play('pop');
       ctx.save();
@@ -72,6 +99,9 @@ export default {
             field('Make', select([['count', 'this many groups'], ['size', 'groups of this size']], s.by, (v) => { s.by = v; ctx.save(); })),
             field('Number', numberInput(s.n, (v) => { if (v >= 1) { s.n = v; ctx.save(); } }, { min: 1, max: 30 })),
           ),
+          apartFor(s.source).length
+            ? h('p', { class: 'hint' }, `🚫 Keeping ${apartFor(s.source).length} pair${apartFor(s.source).length === 1 ? '' : 's'} apart (set in ☰ → Classes & student lists).`)
+            : s.source !== 'own' ? h('p', { class: 'hint' }, '🚫 To keep certain students out of the same group, set “Keep apart” pairs in ☰ → Classes & student lists.') : null,
           h('p', { class: 'hint' }, 'Names stay on this device. They are left out of share links unless you choose to include them.'),
         );
       },

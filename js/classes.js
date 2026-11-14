@@ -80,6 +80,12 @@ export function namesFor(source) {
   const c = source === 'current' ? currentClass() : st.lists.find((l) => l.id === source);
   return c && c.students.length ? [...c.students] : null;
 }
+/** Pairs of students to keep apart when making groups, for a widget's "names from" choice. */
+export function apartFor(source) {
+  if (!source || source === 'own') return [];
+  const c = source === 'current' ? currentClass() : st.lists.find((l) => l.id === source);
+  return c?.apart ? c.apart.map((p) => [...p]) : [];
+}
 export function sourceName(source) {
   if (source === 'own') return 'your own list';
   const c = source === 'current' || !source ? currentClass() : st.lists.find((l) => l.id === source);
@@ -195,6 +201,35 @@ export function showClassManager(selectId) {
     const count = h('span', { class: 'hint' }, `${c.students.length} students`);
     names.addEventListener('input', () => { c.students = cleanNames(names.value); count.textContent = `${c.students.length} students`; save(); emit(); drawListOnly(); });
     const isCur = currentClass()?.id === c.id;
+    // --- keep apart: pairs of students the Group maker never puts in the same group
+    c.apart ||= [];
+    const apartBox = h('div', { class: 'cm-apart' });
+    const pickA = h('select', { 'aria-label': 'First student' });
+    const pickB = h('select', { 'aria-label': 'Second student' });
+    function drawApart() {
+      const opts = (sel) => {   // rebuild the choices, keeping whatever was already picked
+        const keep = sel.value;
+        sel.replaceChildren(h('option', { value: '' }, 'Choose…'), ...c.students.map((n) => h('option', { value: n }, n)));
+        if (c.students.includes(keep)) sel.value = keep;
+      };
+      opts(pickA); opts(pickB);
+      apartBox.replaceChildren(
+        ...(c.apart.length ? c.apart.map((pair, i) => {
+          const missing = pair.some((n) => !c.students.includes(n));
+          return h('span', { class: `chip cm-pair${missing ? ' missing' : ''}`, title: missing ? 'One of these names is no longer in the list' : '' },
+            `${pair[0]} ↔ ${pair[1]}`,
+            h('button', { class: 'cm-pair-x', 'aria-label': `Stop keeping ${pair[0]} and ${pair[1]} apart`, onclick: () => { c.apart.splice(i, 1); save(); drawApart(); } }, '✕'));
+        }) : [h('span', { class: 'hint' }, 'No one yet.')]),
+      );
+    }
+    const addPair = () => {
+      const a = pickA.value, b = pickB.value;
+      if (!a || !b || a === b) { toast('Choose two different students.'); return; }
+      if (c.apart.some(([x, y]) => (x === a && y === b) || (x === b && y === a))) { toast('Those two are already kept apart.'); return; }
+      c.apart.push([a, b]); save(); drawApart();
+    };
+    names.addEventListener('change', drawApart);
+    drawApart();
     setKids(editor,
       h('label', { class: 'field' }, h('span', {}, 'Class name'), nameIn),
       h('label', { class: 'field' }, h('span', {}, 'Students (one per line — you can paste a column from a spreadsheet)'), names),
@@ -209,6 +244,11 @@ export function showClassManager(selectId) {
           sel = st.lists[0]?.id || '';
           save(); emit(); drawList(); drawEditor();
         } }, '🗑 Delete class'),
+      ),
+      h('div', { class: 'field' },
+        h('span', {}, '🚫 Keep apart — the Group maker never puts these two in the same group'),
+        apartBox,
+        h('div', { class: 'row cm-apart-add' }, pickA, h('span', { 'aria-hidden': 'true' }, '↔'), pickB, h('button', { class: 'btn small', onclick: addPair }, '+ Keep apart')),
       ),
     );
   }

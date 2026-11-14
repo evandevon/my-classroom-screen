@@ -45,6 +45,7 @@ const weather = {
   size: [520, 380],
   hasSettings: true,
   cacheKeys: ['data', 'fetchedAt'],
+  volatileKeys: ['data', 'fetchedAt'],   // refreshed weather isn't something to undo
   defaultState: () => {
     const p = PLACES[guessPlace()] || PLACES.sydney;
     return { name: p[0], lat: p[1], lon: p[2], guessed: true, unit: 'C', show: 'auto', data: null, fetchedAt: 0 };
