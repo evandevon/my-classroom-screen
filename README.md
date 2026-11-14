@@ -122,6 +122,12 @@ sw.js                 offline cache. Bump VERSION when files change
 
 To add a widget, copy an existing widget file. Export an object with `type`, `title`, `icon`, `group`, `size`, `defaultState()` and `mount(ctx)`, then add it to `js/widgets/index.js` and to the file list in `sw.js`. Put anything that holds student names in `privateKeys` so share links leave it out.
 
+## Pasting pictures
+
+- **Copy a picture anywhere (right-click → Copy image, or a screenshot) and press Ctrl+V (⌘V on a Mac)** on the screen: it becomes an Image widget, sized to the picture's shape. Several pictures at once each get their own widget. A copied link to a picture (ending .jpg, .png, .gif…) works too.
+- **On a smartboard without a keyboard:** add an Image widget and tap **📋 Paste**.
+- Pasting while typing in a text box still pastes text as usual. Big pictures are made screen-sized; see-through PNGs keep their transparency. ↶ Undo removes a pasted picture.
+
 ## Undo, redo and screen order
 
 - **↶ ↷ in the top bar, or Ctrl+Z / Ctrl+Shift+Z (Ctrl+Y):** undo anything you did on a screen — adding, moving, resizing or removing widgets, settings, scores, votes, typing, backgrounds — and deleting a screen. Things that change by themselves (a running timer, weather updates, a slideshow) aren't undo steps. In a text box, Ctrl+Z undoes your typing as usual.

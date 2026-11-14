@@ -569,6 +569,72 @@ async function shrinkForScreen(file) {
     return (await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.88))) || file;
   } catch { return file; }
 }
+// ---------- paste a picture: Ctrl+V / ⌘V anywhere makes an Image widget ----------
+/** A pasted picture made screen-sized; see-through PNGs stay PNG so they keep their transparency. */
+async function shrinkPasted(file) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 2560 / Math.max(bmp.width, bmp.height));
+    const size = { w: bmp.width, h: bmp.height };
+    if (k === 1 && file.size < 2.5e6) { bmp.close?.(); return { blob: file, ...size }; }
+    const c = h('canvas', { width: Math.round(bmp.width * k), height: Math.round(bmp.height * k) });
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close?.();
+    const png = file.type === 'image/png' || file.type === 'image/gif';
+    const blob = await new Promise((r) => c.toBlob(r, png ? 'image/png' : 'image/jpeg', 0.88));
+    return { blob: blob || file, w: c.width, h: c.height };
+  } catch { return { blob: file, w: 4, h: 3 }; }
+}
+/** An Image widget sized to the picture's shape, centred (several pictures fan out a little). */
+function addPictureWidget(state, w, h2, i = 0) {
+  const r = board.rect;
+  const head = 44;   // the widget's title bar
+  const maxW = r.width * 0.45, maxH = r.height * 0.55 - head;
+  const k = Math.min(maxW / w, maxH / h2, 1.5);
+  const pw = Math.max(220, w * k), ph = Math.max(160, h2 * k + head);
+  const fw = pw / r.width, fh = ph / r.height;
+  board.addWidget('image', {
+    state: { ...WIDGETS.image.defaultState(), ...state },
+    x: Math.min(1 - fw, Math.max(0, (1 - fw) / 2 + i * 0.03)),
+    y: Math.min(1 - fh, Math.max(0, (1 - fh) / 2 + i * 0.04)),
+    w: fw,
+    h: fh,
+  });
+}
+async function pastePictures(files) {
+  if (screen.paused) { toast('This screen is paused — press “Carry on” first.'); return; }
+  beginInteraction({ type: 'paste' });   // one undo step, however the paste happened (keys or right-click menu)
+  for (const [i, file] of files.slice(0, 6).entries()) {
+    const { blob, w, h: hh } = await shrinkPasted(file);
+    const id = uid('asset');
+    await db.putAsset({ id, blob, name: file.name && file.name !== 'image.png' ? file.name : `pasted-picture.${blob.type === 'image/png' ? 'png' : 'jpg'}`, type: blob.type, created: Date.now() });
+    addPictureWidget({ imageAssetId: id }, w, hh, i);
+  }
+  settleSoon(300);
+  toast(files.length > 1 ? `${Math.min(files.length, 6)} pictures pasted` : 'Picture pasted');
+}
+const IMAGE_LINK = /^(https?:\/\/\S+\.(png|jpe?g|gif|webp|svg|avif)(\?\S*)?|data:image\/[a-z+]+;base64,\S+)$/i;
+document.addEventListener('paste', (e) => {
+  if (!screen || e.target.closest?.('dialog[open], .side-settings')) return;   // pasting into a menu or settings box: leave it alone
+  const typing = e.target.closest?.('input, textarea, select, [contenteditable="true"]');
+  const files = [...(e.clipboardData?.items || [])].filter((it) => it.kind === 'file' && it.type.startsWith('image/')).map((it) => it.getAsFile()).filter(Boolean);
+  const text = (e.clipboardData?.getData('text/plain') || '').trim();
+  if (files.length) {
+    // A picture can't go into a text box, so it becomes a widget even while typing — unless there's text to paste too.
+    if (typing && text) return;
+    e.preventDefault();
+    pastePictures(files);
+  } else if (!typing && IMAGE_LINK.test(text)) {
+    e.preventDefault();
+    beginInteraction({ type: 'paste' });
+    const img = new Image();
+    img.onload = () => { addPictureWidget({ url: text }, img.naturalWidth || 4, img.naturalHeight || 3); settleSoon(300); };
+    img.onerror = () => { addPictureWidget({ url: text }, 4, 3); settleSoon(300); };
+    img.src = text;
+    toast('Picture link pasted');
+  }
+});
+
 function chooseFiles({ folder = false, accept = 'image/*,video/*' } = {}) {
   return new Promise((resolve) => {
     const input = h('input', { type: 'file', accept, multiple: true, style: { display: 'none' } });
