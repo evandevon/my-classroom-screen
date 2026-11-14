@@ -171,6 +171,7 @@ export class Board {
     toast(`${title} removed`, {
       action: 'Undo',
       onAction: () => {
+        if (this.undo) { this.undo(); return; }   // the app's universal undo
         if (!this.lastRemoved) return;
         this.screen.widgets.push(this.lastRemoved);
         this.mount(this.lastRemoved);

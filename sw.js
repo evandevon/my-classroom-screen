@@ -1,6 +1,6 @@
 // Service worker: keeps the app working when school wifi drops.
 // Bump VERSION whenever files change so classrooms get the update.
-const VERSION = 'mcs-v48';
+const VERSION = 'mcs-v49';
 const FILES = [
   './',
   'index.html',
@@ -63,6 +63,7 @@ const FILES = [
   'js/widgets/videoloop.js',
   'js/widgets/interval.js',
   'js/widgets/buzzer.js',
+  'js/widgets/poll.js',
 ];
 
 self.addEventListener('install', (e) => {

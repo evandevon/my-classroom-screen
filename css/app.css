@@ -1605,3 +1605,29 @@ body.moving-bg #board { background: transparent !important; }
 .widget:is(.theme-glass, .theme-glass-dark) .cam-video { background: transparent; }
 .widget:is(.theme-glass, .theme-glass-dark) .cam-controls .btn:not(.primary):not(.on) { background: var(--btn); border-color: var(--line); color: var(--ink); }
 .widget:is(.theme-glass, .theme-glass-dark) .cam-res { color: var(--muted); }
+/* class editor: keep-apart pairs */
+.cm-apart { display: flex; flex-wrap: wrap; gap: 6px; }
+.cm-pair { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.cm-pair.missing { opacity: .55; text-decoration: line-through; }
+.cm-pair-x { border: 0; background: none; padding: 0 2px; font-size: 14px; cursor: pointer; color: inherit; }
+.cm-apart-add select { min-width: 0; flex: 1; }
+.topbar .pill:disabled { opacity: .35; cursor: default; }
+/* poll */
+.poll { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+.poll-q { margin: 0; text-align: center; font-weight: 900; font-size: calc(clamp(18px, 7cqmin, 46px) * var(--fs, 1)); line-height: 1.15; color: var(--ink); }
+.poll-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); grid-auto-rows: 1fr; gap: 8px; }
+@container (max-width: 420px) { .poll-grid { grid-template-columns: repeat(min(var(--cols, 4), 3), 1fr); } }
+.poll-opt { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 64px; border: 3px solid color-mix(in srgb, var(--c) 55%, transparent); border-radius: 18px; background: var(--btn, #fff); color: var(--ink); padding: 6px; cursor: pointer; touch-action: manipulation; }
+.poll-fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: color-mix(in srgb, var(--c) 30%, transparent); transition: height .35s ease; pointer-events: none; }
+.poll-label { position: relative; font-weight: 900; font-size: calc(clamp(15px, 5.5cqmin, 34px) * var(--fs, 1)); line-height: 1.1; text-align: center; overflow-wrap: anywhere; }
+.poll-label.emoji { font-size: calc(clamp(30px, 13cqmin, 84px) * var(--fs, 1)); }
+.poll-count { position: relative; font-weight: 900; font-size: calc(clamp(14px, 5cqmin, 30px) * var(--fs, 1)); color: color-mix(in srgb, var(--c) 75%, var(--ink)); min-height: 1.1em; font-variant-numeric: tabular-nums; }
+.poll-opt.voted { animation: poll-pop .35s ease; }
+@keyframes poll-pop { 40% { transform: scale(1.07); } }
+.poll-foot { display: flex; align-items: center; gap: 8px; justify-content: center; flex-wrap: wrap; padding-right: 26px; }
+.poll-total { font-weight: 800; color: var(--muted); }
+/* drag screens into order */
+.screen-grip { flex: none; width: 30px; min-height: 40px; border: 0; background: none; color: var(--muted); font-weight: 900; letter-spacing: -3px; cursor: grab; touch-action: none; border-radius: 10px; }
+.screen-grip:hover, .screen-grip:focus-visible { background: #0000000d; color: var(--ink); }
+.screen-list li.dragging { box-shadow: 0 8px 24px #0003; transform: scale(1.02); position: relative; z-index: 2; }
+.screen-list li.dragging .screen-grip { cursor: grabbing; }

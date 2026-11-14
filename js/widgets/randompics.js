@@ -60,6 +60,7 @@ export default {
   size: [520, 420],
   hasSettings: true,
   assetCompanions: { picAssetIds: ['names', 'folder', 'bag', 'current'] },
+  volatileKeys: ['current', 'bag'],   // the slideshow moving on isn't something to undo
   defaultState: () => ({ picAssetIds: [], names: [], folder: '', current: -1, bag: [], every: 0, fit: 'contain', caption: false, blur: false }),
 
   mount(ctx) {
