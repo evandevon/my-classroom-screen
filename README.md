@@ -48,7 +48,7 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 - **👥 button in the top bar:** choose the current class. It can also switch automatically when the Activity timeline's session name contains a class name.
 - The Name picker, Group maker, Tally (per student), Scoreboard ("a row for each student") and Stopwatch use the current class's names, or their own typed list.
 - **🚫 Keep apart:** in a class's list, choose pairs of students who shouldn't be in the same group. The Group maker keeps them apart (and tells you if it can't, e.g. with too few groups).
-- Class lists are never put into share links or screen files. Student names in widgets are taken out of share links unless you choose to include them.
+- **Sharing:** a screen's class lists (and keep-apart pairs) go with it in screen files, and in share links unless you untick “Include class lists and student names”. Only share with colleagues — it's up to you who gets them. On the other computer they're added to that teacher's classes (a class with the same name and students isn't doubled up).
 
 ## Recording data (stays on this device)
 
