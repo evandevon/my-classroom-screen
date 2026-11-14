@@ -5,7 +5,7 @@ import { themePicker, textSizeSlider } from './themes.js';
 import { db, assetURL, sweepAssets, assetIdsOfScreen } from './storage.js';
 import { WIDGETS, CATEGORIES } from './widgets/index.js';
 import { TEMPLATES, GRADIENTS, SOLIDS } from './templates.js';
-import { makeShareLink, readShareHash, buildProjectFile, readProjectFile, addImported, classIdsUsed, hasFiles, prepareImportedScreen } from './share.js';
+import { makeShareLink, readShareHash, buildProjectFile, readProjectFile, addImported, previewImported, classIdsUsed, hasFiles, prepareImportedScreen } from './share.js';
 import { h, uid, debounce, toast, pickFile, downloadBlob, enableMultiTouchTaps } from './util.js';
 enableMultiTouchTaps();
 import { showSoundHelp } from './help.js';
@@ -25,8 +25,9 @@ const nameBtn = $('#screen-name');
 let screen = null;
 
 const deletedScreens = new Set(); // never save these again (a late save would bring a deleted screen back)
+let previewing = null;   // looking at a screen from a file or link without adding it: { backId, parsed, raw, banner }
 const persist = debounce(async () => {
-  if (!screen || deletedScreens.has(screen.id)) return;
+  if (!screen || deletedScreens.has(screen.id) || previewing) return;   // a preview is never saved
   screen.updated = Date.now();
   try {
     await db.putScreen(screen);
@@ -79,7 +80,7 @@ function comparable(s) {
 let pending = null;   // { id, before, key, timer, by: 'pointer' | 'key' }
 let pointersDown = 0;
 function beginInteraction(e) {
-  if (!screen || e.target?.closest?.('[data-no-undo]')) return;
+  if (!screen || previewing || e.target?.closest?.('[data-no-undo]')) return;
   const by = e.type === 'keydown' ? 'key' : 'pointer';
   if (pending) {
     // Typing keeps adding to the same step; each new tap or drag is a step of its own
@@ -218,8 +219,11 @@ function newScreenFrom(tpl, name) {
 }
 
 async function openScreen(s) {
+  const leavingPreview = !!previewing;
+  if (previewing) { previewing.banner.remove(); previewing = null; document.body.classList.remove('previewing'); }
   commitPending();
-  persist.flush();
+  if (leavingPreview) persist.cancel();   // a preview is never saved
+  else persist.flush();
   screen = s;
   board.load(screen);
   updatePauseBadge();
@@ -845,52 +849,70 @@ function backgroundDialog() {
     now.textContent = what ? `Now showing: ${what}` : '';
   }
 
+  // Four tabs instead of one long list: ready-made, animated, colours, or your own.
+  const ownPicture = async () => {
+    const f = await pickFile('image/*');
+    if (!f) return;
+    const id = uid('asset');
+    await db.putAsset({ id, blob: f, name: f.name, type: f.type });
+    set({ type: 'image', assetId: id });
+  };
+  const PANELS = [
+    ['library', '📚 Library', [h('p', { class: 'hint' }, 'Pictures and gentle moving loops that come with the site. Hover (or tap) to preview.'), libGrid]],
+    ['anim', '✨ Animated', [h('div', { class: 'bg-anim-grid' }, ...animTiles), animControls]],
+    ['colour', '🎨 Colours', [
+      h('h3', {}, 'Gradients'),
+      h('div', { class: 'bg-grid' }, ...Object.entries(GRADIENTS).map(([k, v]) => h('button', { class: 'bg-swatch', style: { backgroundImage: v }, 'aria-label': k, title: k, onclick: () => set({ type: 'gradient', value: k }) }))),
+      h('h3', {}, 'Plain colours'),
+      h('div', { class: 'bg-grid' },
+        ...SOLIDS.map((c) => h('button', { class: 'bg-swatch', style: { background: c }, 'aria-label': c, onclick: () => set({ type: 'color', value: c }) })),
+        (() => {
+          const ci = h('input', { type: 'color', value: '#88ccee', 'aria-label': 'Custom colour', class: 'bg-swatch' });
+          ci.addEventListener('input', () => set({ type: 'color', value: ci.value }));
+          return ci;
+        })()),
+    ]],
+    ['own', '📁 Your own', [
+      h('h3', {}, 'From this computer'),
+      h('div', { class: 'row' },
+        h('button', { class: 'btn', onclick: ownPicture }, '🖼️ A picture'),
+        h('button', { class: 'btn', onclick: uploadVideo }, '🎬 A looping video'),
+      ),
+      h('p', { class: 'hint' }, 'They stay on this computer (big photos are shrunk to screen size). Short MP4 loops of 10–30 seconds work best; videos play muted.'),
+      h('h3', {}, 'A link — YouTube, Google Drive, or a video or picture on the web'),
+      h('div', { class: 'row stretch' }, urlIn, h('button', { class: 'btn', onclick: useLink }, 'Use link')),
+      h('p', { class: 'hint' }, 'Google Drive: share the file as “Anyone with the link”, then paste its link here.'),
+      h('h3', {}, 'A slideshow'),
+      h('div', { class: 'row' },
+        h('button', { class: 'btn', onclick: () => slideshowFrom(true) }, '📁 Choose a folder'),
+        h('button', { class: 'btn', onclick: () => slideshowFrom(false) }, 'Choose pictures'),
+      ),
+      slideControls,
+      progress,
+      h('p', { class: 'hint' }, 'Videos in the folder play through once each.'),
+    ]],
+  ];
+  const b0 = cur();
+  const startTab = b0.lib ? 'library' : b0.type === 'anim' ? 'anim' : ['gradient', 'color'].includes(b0.type) ? 'colour' : 'own';
+  const tabBtns = [];
+  const panels = PANELS.map(([id, label, kids]) => {
+    const panel = h('div', { class: 'bg-panel', role: 'tabpanel', 'aria-label': label }, ...kids);
+    const btn = h('button', { class: 'bg-tab', role: 'tab', onclick: () => show(id) }, label);
+    btn.dataset.id = id; panel.dataset.id = id;
+    tabBtns.push(btn);
+    return panel;
+  });
+  const tabBar = h('div', { class: 'bg-tabs', role: 'tablist' }, ...tabBtns);
+  function show(id) {
+    tabBtns.forEach((b) => { const on = b.dataset.id === id; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
+    panels.forEach((p) => (p.hidden = p.dataset.id !== id));
+  }
+  show(startTab);
   modal('Background',
     now,
     dimRow,
-    h('h3', {}, '📚 Library'),
-    libGrid,
-    h('h3', {}, '✨ Animated'),
-    h('div', { class: 'bg-anim-grid' }, ...animTiles),
-    animControls,
-    h('h3', {}, '🎬 Video or web link'),
-    h('div', { class: 'row stretch' }, urlIn, h('button', { class: 'btn', onclick: useLink }, 'Use link')),
-    h('div', { class: 'row' }, h('button', { class: 'btn', onclick: uploadVideo }, '⬆ Upload a looping video')),
-    h('p', { class: 'hint' }, 'Short MP4 loops work best (e.g. 10–30 seconds). Google Drive: share the file as “Anyone with the link”, then paste its link. Videos always play muted.'),
-    h('h3', {}, '🖼️ Slideshow'),
-    h('div', { class: 'row' },
-      h('button', { class: 'btn', onclick: () => slideshowFrom(true) }, '📁 Choose a folder'),
-      h('button', { class: 'btn', onclick: () => slideshowFrom(false) }, 'Choose pictures'),
-    ),
-    slideControls,
-    progress,
-    h('p', { class: 'hint' }, 'Pictures stay on this computer (big photos are shrunk to screen size). Videos in the folder play through once each.'),
-    h('h3', {}, 'Gradients'),
-    h('div', { class: 'bg-grid' },
-      ...Object.entries(GRADIENTS).map(([k, v]) => h('button', { class: 'bg-swatch', style: { backgroundImage: v }, 'aria-label': k, title: k, onclick: () => set({ type: 'gradient', value: k }) })),
-    ),
-    h('h3', {}, 'Colours'),
-    h('div', { class: 'bg-grid' },
-      ...SOLIDS.map((c) => h('button', { class: 'bg-swatch', style: { background: c }, 'aria-label': c, onclick: () => set({ type: 'color', value: c }) })),
-      (() => {
-        const ci = h('input', { type: 'color', value: '#88ccee', 'aria-label': 'Custom colour', class: 'bg-swatch' });
-        ci.addEventListener('input', () => set({ type: 'color', value: ci.value }));
-        return ci;
-      })(),
-    ),
-    h('h3', {}, 'Picture'),
-    h('div', { class: 'row' },
-      h('button', {
-        class: 'btn',
-        onclick: async () => {
-          const f = await pickFile('image/*');
-          if (!f) return;
-          const id = uid('asset');
-          await db.putAsset({ id, blob: f, name: f.name, type: f.type });
-          set({ type: 'image', assetId: id });
-        },
-      }, 'Upload picture'),
-    ),
+    tabBar,
+    ...panels,
   );
   syncControls();
 }
@@ -1044,34 +1066,71 @@ async function openImport(parsed, { blankToRemove = null } = {}) {
     const chosen = items.filter((it) => it.box.checked).map((it) => it.sc);
     if (!chosen.length) return;
     addBtn.disabled = true;
-    try {
-      const { screens: added, addedClasses } = await addImported(parsed, chosen);
-      const names = new Set((await db.listScreens()).map((x) => x.name));
-      const top = Math.max(-1, ...(await db.listScreens()).map((x) => (Number.isFinite(x.order) ? x.order : -1)));
-      added.forEach((sc, i) => {
-        let name = sc.name || 'Shared screen';
-        for (let n = 2; names.has(name); n++) name = `${sc.name || 'Shared screen'} (${n})`;
-        sc.name = name; names.add(name);
-        sc.order = top + 1 + i;   // new screens go at the end of your list
-      });
-      for (const sc of added) await db.putScreen(sc);
-      // A first-time visitor's empty starter screen isn't needed once they have the shared one.
-      if (blankToRemove && !undoStack.length && !redoStack.length) {   // they haven't done anything on it yet
-        if (screen?.id === blankToRemove.id) persist.cancel();
-        deletedScreens.add(blankToRemove.id);
-        await db.deleteScreen(blankToRemove.id);
-      }
-      dlg.close();
-      await openScreen(added[0]);
-      renderDrawer();
-      toast(`Added ${added.length === 1 ? `“${added[0].name}”` : plural(added.length, 'screen')}. Your other screens are unchanged.${addedClasses.length ? ` Class list${addedClasses.length === 1 ? '' : 's'} added: ${addedClasses.join(', ')}.` : ''}`, { ms: 7000 });
-    } catch (e) {
-      console.error(e);
-      addBtn.disabled = false;
-      toast('Those screens couldn’t be added — the file may be damaged.');
-    }
+    if (await addChosen(parsed, chosen, blankToRemove)) dlg.close();
+    else addBtn.disabled = false;
   });
+  // 👁 Preview: have a look first, without adding anything
+  rows.forEach((row, i) => row.append(h('button', { class: 'btn small imp-preview', title: 'Have a look without adding it', onclick: (e) => { e.preventDefault(); dlg.close(); startPreview(parsed, items[i].sc, blankToRemove); } }, '👁 Preview')));
   sync();
+}
+
+/** Add screens from a file or link alongside the teacher's own, and show the first one. */
+async function addChosen(parsed, chosen, blankToRemove = null) {
+  try {
+    const { screens: added, addedClasses } = await addImported(parsed, chosen);
+    const names = new Set((await db.listScreens()).map((x) => x.name));
+    const top = Math.max(-1, ...(await db.listScreens()).map((x) => (Number.isFinite(x.order) ? x.order : -1)));
+    added.forEach((sc, i) => {
+      let name = sc.name || 'Shared screen';
+      for (let n = 2; names.has(name); n++) name = `${sc.name || 'Shared screen'} (${n})`;
+      sc.name = name; names.add(name);
+      sc.order = top + 1 + i;   // new screens go at the end of your list
+    });
+    for (const sc of added) await db.putScreen(sc);
+    // A first-time visitor's empty starter screen isn't needed once they have the shared one.
+    if (blankToRemove && !undoStack.length && !redoStack.length) {   // they haven't done anything on it yet
+      if (screen?.id === blankToRemove.id) persist.cancel();
+      deletedScreens.add(blankToRemove.id);
+      await db.deleteScreen(blankToRemove.id);
+    }
+    await openScreen(added[0]);
+    renderDrawer();
+    toast(`Added ${added.length === 1 ? `“${added[0].name}”` : plural(added.length, 'screen')}. Your other screens are unchanged.${addedClasses.length ? ` Class list${addedClasses.length === 1 ? '' : 's'} added: ${addedClasses.join(', ')}.` : ''}`, { ms: 7000 });
+    return true;
+  } catch (e) {
+    console.error(e);
+    toast('Those screens couldn’t be added — the file may be damaged.');
+    return false;
+  }
+}
+
+/**
+ * Look at a screen from a file or link without adding it. Nothing is saved, nothing of yours changes;
+ * a banner offers "Add to my screens" or "Close preview" (back to your own screen).
+ */
+async function startPreview(parsed, raw, blankToRemove = null) {
+  persist.flush();
+  commitPending();
+  const backId = previewing ? previewing.backId : screen?.id;
+  const shown = await previewImported(parsed, raw);
+  const from = parsed.kind === 'link' ? 'a share link' : parsed.name ? `“${parsed.name.replace(/\.(classroom|zip|json)$/i, '')}”` : 'a file';
+  const close = async () => { const back = backId && (await db.getScreen(backId)); await openScreen(back || (await sortedScreens())[0]); };
+  const others = parsed.screens.length > 1;
+  const banner = h('div', { class: 'preview-banner', role: 'status' },
+    h('span', {}, h('b', {}, `👁 Previewing “${raw.name || 'screen'}”`), ` from ${from} — nothing is saved, and your screens aren’t changed.`),
+    h('button', { class: 'btn primary small', onclick: async () => { if (await addChosen(parsed, [raw], blankToRemove)) { /* opening the added screen ends the preview */ } } }, '➕ Add to my screens'),
+    others ? h('button', { class: 'btn small', onclick: async () => { await close(); openImport(parsed, { blankToRemove }); } }, '↩ Other screens in the file') : null,
+    h('button', { class: 'btn small', onclick: close }, '✕ Close preview'));
+  if (previewing) previewing.banner.remove();
+  previewing = { backId, parsed, raw, banner };
+  document.body.classList.add('previewing');
+  document.body.append(banner);
+  screen = shown;
+  board.load(screen);
+  updatePauseBadge();
+  await applyBackground();
+  nameBtn.textContent = `👁 ${shown.name}`;
+  document.title = `Preview: ${shown.name} · My Classroom Screen`;
 }
 
 /** Save screens to a .classroom file: tick which ones (this screen is ticked to start with). */
@@ -1243,6 +1302,7 @@ async function init() {
   const sweep = () => {
     persist.flush();
     const keep = board.lastRemoved ? [...assetIdsOfScreen({ widgets: [board.lastRemoved] })] : [];
+    if (previewing && screen) keep.push(...assetIdsOfScreen(screen));
     setTimeout(() => sweepAssets(keep).catch((e) => console.warn('tidy-up', e)), 1500); // after the save lands
   };
   setTimeout(sweep, 15000);

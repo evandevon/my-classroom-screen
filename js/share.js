@@ -203,8 +203,8 @@ export const hasFiles = (screen, parsed) => [...assetIdsIn(screen)].some((id) =>
  * Add the chosen screens from a file or link, with only the pictures, clips, sounds and class lists
  * those screens use. Returns the screens as stored on this computer and the class lists that were added.
  */
-export async function addImported(parsed, chosen) {
-  const need = new Set(chosen.flatMap((sc) => [...assetIdsIn(sc)]));
+async function storeAssets(parsed, screens) {
+  const need = new Set(screens.flatMap((sc) => [...assetIdsIn(sc)]));
   const idMap = {};
   for (const [oldId, a] of Object.entries(parsed.assets || {})) {
     if (!need.has(oldId)) continue;
@@ -216,9 +216,23 @@ export async function addImported(parsed, chosen) {
     idMap[oldId] = id;
     await db.putAsset({ id, name: a.name, type: a.type, blob, created: Date.now() });
   }
+  return idMap;
+}
+
+export async function addImported(parsed, chosen) {
+  const idMap = await storeAssets(parsed, chosen);
   const used = new Set(chosen.flatMap((sc) => [...classIdsUsed(sc, parsed.currentClass)]));
   const { idMap: classMap, added } = await addSharedClasses((parsed.classes || []).filter((c) => used.has(c.id)), used.has(parsed.currentClass) ? parsed.currentClass : '');
   return { screens: chosen.map((sc) => prepareImportedScreen(sc, idMap, classMap)), addedClasses: added };
+}
+
+/**
+ * A look at one screen from a file or link without adding it: its pictures and sounds are made
+ * available (and tidied away later if it isn't added); class lists aren't added.
+ */
+export async function previewImported(parsed, sc) {
+  const idMap = await storeAssets(parsed, [sc]);
+  return prepareImportedScreen(sc, idMap, {});
 }
 
 /** Everything in a file, added in one go (kept for older callers). */
