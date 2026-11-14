@@ -283,7 +283,7 @@ export default {
     let tool = 'pen';            // pen · hl (highlighter) · line · move · eraser
     let hlColor = HIGHLIGHTERS[0][0];
     let lineStyle = 'line';
-    let snapHint = null;         // [x, y] of a line end something is snapping to
+    const snapHints = new Map(); // pointerId → [x, y] of the line end it's snapping to (one per finger)
     for (const st of s.strokes) st.i ||= newId();
     // Undo history for this session: add (plus any lines the eraser removed), clear, edit (lines moved), swap (straightened).
     const hist = [];
@@ -320,6 +320,8 @@ export default {
     const lineBtn = h('button', { class: 'wb-tool wb-linebtn', title: 'Straight lines and arrows (tap again for styles)', 'aria-label': 'Line tool', 'aria-haspopup': 'menu',
       onclick: () => { if (tool !== 'line') { tool = 'line'; linePop.hidden = false; } else linePop.hidden = !linePop.hidden; sync(); } });
     const moveBtn = toolBtn('✥', 'Move lines: drag an end, a corner or the middle of a line', () => { tool = tool === 'move' ? 'pen' : 'move'; sync(); });
+    const straightBtn = h('button', { class: 'wb-tool wb-straight', 'aria-pressed': 'false',
+      onclick: () => { s.straighten = !s.straighten; ctx.save(); sync(); toast(s.straighten ? 'Straighten is on: nearly straight lines you draw become straight.' : 'Straighten is off.'); } }, '📐');
     const eraser = toolBtn('🧽', 'Eraser (rubs out pen and highlighter; touching a line removes the whole line)', () => { tool = tool === 'eraser' ? 'pen' : 'eraser'; sync(); });
     // Background: each tap goes Blank → Lines → Grid; a slider sets the spacing.
     const paperBtn = h('button', { class: 'wb-tool wb-paperbtn', onclick: () => {
@@ -340,6 +342,7 @@ export default {
       ...sizeBtns,
       sep(),
       lineBtn,
+      straightBtn,
       moveBtn,
       eraser,
       sep(),
@@ -377,10 +380,12 @@ export default {
     pScrub.addEventListener('input', () => pb && seek((pScrub.value / 1000) * pb.dur));
 
     const surface = h('div', { class: 'wb-surface' }, paperCanvas, canvas, overlay, sizeCur, badge);
-    ctx.view.append(h('div', { class: 'wb' }, surface, linePop, bar, player));
-    // Close the line-style menu when tapping anywhere else.
+    const root = h('div', { class: 'wb' }, surface, linePop, bar, player);
+    ctx.view.append(root);
+    // Close the line-style menu when tapping elsewhere on THIS whiteboard (other children using
+    // other whiteboards at the same time mustn't close it).
     const closePop = (e) => { if (!linePop.hidden && !linePop.contains(e.target) && !lineBtn.contains(e.target)) { linePop.hidden = true; } };
-    document.addEventListener('pointerdown', closePop, true);
+    root.addEventListener('pointerdown', closePop, true);
 
     function sync() {
       penBtns.forEach((b) => b.classList.toggle('on', (tool === 'pen' || tool === 'line') && b.dataset.c === color));
@@ -391,6 +396,10 @@ export default {
       [...linePop.children].forEach((b) => { b.classList.toggle('on', b.dataset.ls === lineStyle); b.setAttribute('aria-checked', String(b.dataset.ls === lineStyle)); });
       if (tool !== 'line') linePop.hidden = true;
       moveBtn.classList.toggle('on', tool === 'move');
+      straightBtn.classList.toggle('on', !!s.straighten);
+      straightBtn.setAttribute('aria-pressed', String(!!s.straighten));
+      straightBtn.title = s.straighten ? 'Straighten: ON — nearly straight pen lines become straight (tap to turn off)' : 'Straighten: off — tap so nearly straight pen lines become straight';
+      straightBtn.setAttribute('aria-label', straightBtn.title);
       eraser.classList.toggle('on', tool === 'eraser');
       surface.dataset.bg = s.bg;
       surface.dataset.tool = tool;
@@ -464,8 +473,9 @@ export default {
           }
         }
       }
-      if (snapHint) {
-        og.beginPath(); og.arc(snapHint[0] * W, snapHint[1] * H, 13 * d, 0, Math.PI * 2);
+      for (const q of snapHints.values()) {
+        if (!q) continue;
+        og.beginPath(); og.arc(q[0] * W, q[1] * H, 13 * d, 0, Math.PI * 2);
         og.lineWidth = 3 * d; og.strokeStyle = 'rgba(59,111,216,.85)'; og.stroke();
       }
     }
@@ -591,7 +601,7 @@ export default {
       if (a.mode === 'end') {
         const moving = (st, k) => a.ends.some((e) => e.st === st && e.k === k);
         let q = nearestEnd(x, y, moving);
-        snapHint = q;
+        snapHints.set(a.pid, q);
         if (!q) {
           q = [x, y];
           if (a.ends.length === 1) { const { st, k } = a.ends[0]; const o = k === 0 ? 2 : 0; q = angleSnap(st.p[o], st.p[o + 1], x, y); }
@@ -599,7 +609,7 @@ export default {
         for (const { st, k } of a.ends) { st.p[k] = q[0]; st.p[k + 1] = q[1]; }
       } else {
         let dx = x - a.from[0], dy = y - a.from[1];
-        snapHint = null;
+        snapHints.delete(a.pid);
         // if either end lands near another line's end, join them
         let best = null;
         for (const k of [0, 2]) {
@@ -607,29 +617,57 @@ export default {
           const q = nearestEnd(ex, ey, (st) => st === a.st);
           if (q) { const d = Math.hypot(q[0] - ex, q[1] - ey); if (!best || d < best.d) best = { d, q, ex, ey }; }
         }
-        if (best) { dx += best.q[0] - best.ex; dy += best.q[1] - best.ey; snapHint = best.q; }
+        if (best) { dx += best.q[0] - best.ex; dy += best.q[1] - best.ey; snapHints.set(a.pid, best.q); }
         a.st.p = [a.orig[0] + dx, a.orig[1] + dy, a.orig[2] + dx, a.orig[3] + dy];
       }
       draw();
     }
 
-    /** "Straighten my lines": a nearly straight pen line becomes a real straight line. */
+    /**
+     * Straighten: a pen line that was meant to be straight becomes a real straight line.
+     * Forgiving on purpose (a wobbly hand, a little hook when the pen lands or lifts), but a clear
+     * curve or a wave stays as drawn. ↶ Undo brings back the original.
+     */
     function tryStraighten(st) {
-      const p = st.p, W = canvas.width, H = canvas.height;
-      if (p.length < 8) return;
-      const x0 = p[0] * W, y0 = p[1] * H, x1 = p[p.length - 2] * W, y1 = p[p.length - 1] * H;
-      const L = Math.hypot(x1 - x0, y1 - y0);
-      if (L < 40 * dpr()) return;
-      let path = 0, maxd = 0;
-      for (let i = 2; i < p.length; i += 2) {
-        path += Math.hypot((p[i] - p[i - 2]) * W, (p[i + 1] - p[i - 1]) * H);
-        maxd = Math.max(maxd, Math.abs((x1 - x0) * (y0 - p[i + 1] * H) - (x0 - p[i] * W) * (y1 - y0)) / L);
-      }
-      if (maxd > Math.max(6 * dpr(), L * 0.05) || path > L * 1.12) return;
-      let a0 = nearestEnd(p[0], p[1]) || [p[0], p[1]];
-      const e1 = [p[p.length - 2], p[p.length - 1]];
-      const a1 = nearestEnd(e1[0], e1[1]) || angleSnap(a0[0], a0[1], e1[0], e1[1]);
-      if (a0[0] === a1[0] && a0[1] === a1[1]) a0 = [p[0], p[1]];
+      const p = st.p, W = canvas.width, H = canvas.height, n = p.length / 2;
+      if (n < 3) return;
+      const xs = [], ys = [];
+      for (let i = 0; i < n; i++) { xs.push(p[i * 2] * W); ys.push(p[i * 2 + 1] * H); }
+      // along-the-stroke distance, so the ends can be trimmed by length rather than by point count
+      const along = [0];
+      for (let i = 1; i < n; i++) along.push(along[i - 1] + Math.hypot(xs[i] - xs[i - 1], ys[i] - ys[i - 1]));
+      const total = along[n - 1];
+      if (total < 30 * dpr()) return;
+      const trim = Math.min(total * 0.08, 25 * dpr());
+      const core = [];
+      for (let i = 0; i < n; i++) if (along[i] >= trim && along[i] <= total - trim) core.push(i);
+      if (core.length < 2) return;
+      // best-fit line through the middle of the stroke (principal direction)
+      let mx = 0, my = 0;
+      for (const i of core) { mx += xs[i]; my += ys[i]; }
+      mx /= core.length; my /= core.length;
+      let sxx = 0, syy = 0, sxy = 0;
+      for (const i of core) { const dx = xs[i] - mx, dy = ys[i] - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+      const ang = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+      const ux = Math.cos(ang), uy = Math.sin(ang);
+      let tMin = Infinity, tMax = -Infinity, maxd = 0, sq = 0;
+      for (let i = 0; i < n; i++) { const t = (xs[i] - mx) * ux + (ys[i] - my) * uy; tMin = Math.min(tMin, t); tMax = Math.max(tMax, t); }
+      const L = tMax - tMin;
+      // How far it bends: measured from the straight line between the two ends (hooks trimmed off),
+      // which shows a curve clearly; a wobbly hand only adds small bumps either side.
+      const ia = core[0], ib = core[core.length - 1];
+      const cx = xs[ib] - xs[ia], cy = ys[ib] - ys[ia], cl = Math.hypot(cx, cy) || 1;
+      for (const i of core) { const d = Math.abs(cx * (ys[i] - ys[ia]) - cy * (xs[i] - xs[ia])) / cl; maxd = Math.max(maxd, d); sq += d * d; }
+      const rms = Math.sqrt(sq / core.length);
+      // it must head one way (not double back), and stay close to straight
+      if (L < 30 * dpr() || total > L * 1.35) return;
+      if (maxd > Math.max(14 * dpr(), L * 0.09) || rms > Math.max(6 * dpr(), L * 0.045)) return;
+      // the ends: the first and last points, moved onto the fitted line
+      const onLine = (i) => { const t = (xs[i] - mx) * ux + (ys[i] - my) * uy; return [(mx + ux * t) / W, (my + uy * t) / H]; };
+      const e0 = onLine(0), e1 = onLine(n - 1);
+      let a0 = nearestEnd(e0[0], e0[1]) || nearestEnd(p[0], p[1]) || e0;
+      const a1 = nearestEnd(e1[0], e1[1]) || nearestEnd(p[p.length - 2], p[p.length - 1]) || angleSnap(a0[0], a0[1], e1[0], e1[1]);
+      if (a0[0] === a1[0] && a0[1] === a1[1]) a0 = e0;
       const line = { i: newId(), t: 'line', c: st.c, s: st.s, ls: 'line', p: [a0[0], a0[1], a1[0], a1[1]] };
       const i = s.strokes.indexOf(st);
       if (i < 0) return;
@@ -672,7 +710,7 @@ export default {
         const grab = grabAt(x, y);
         if (!grab) return;
         const sts = grab.mode === 'end' ? [...new Set(grab.ends.map((en) => en.st))] : [grab.st];
-        active.set(e.pointerId, { kind: 'move', ...grab, before: new Map(sts.map((st) => [st, [...st.p]])) });
+        active.set(e.pointerId, { kind: 'move', pid: e.pointerId, ...grab, before: new Map(sts.map((st) => [st, [...st.p]])) });
         return;
       }
       if (!erasing && tool === 'line') {
@@ -680,7 +718,7 @@ export default {
         const st = { i: newId(), t: 'line', c: color, s: size, ls: lineStyle, p: [a0[0], a0[1], a0[0], a0[1]] };
         s.strokes.push(st);
         active.set(e.pointerId, { kind: 'line', st });
-        snapHint = null;
+        snapHints.delete(e.pointerId);
         draw();
         return;
       }
@@ -707,7 +745,7 @@ export default {
       if (a.kind === 'line') {
         const [x, y] = pt(e);
         const sn = nearestEnd(x, y, (st) => st === a.st);
-        snapHint = sn;
+        snapHints.set(e.pointerId, sn);
         const q = sn || angleSnap(a.st.p[0], a.st.p[1], x, y);
         a.st.p[2] = q[0]; a.st.p[3] = q[1];
         draw();
@@ -727,13 +765,12 @@ export default {
       const a = active.get(e.pointerId);
       if (!a) return;
       active.delete(e.pointerId);
+      snapHints.delete(e.pointerId);
       if (a.kind === 'line') {
-        snapHint = null;
         const W = canvas.width, H = canvas.height, p = a.st.p;
         if (Math.hypot((p[2] - p[0]) * W, (p[3] - p[1]) * H) < 6 * dpr()) s.strokes = s.strokes.filter((x) => x !== a.st);   // just a tap
         else { pushHist({ k: 'add', st: a.st, dels: [] }); logOp({ k: 's', st: { ...a.st, p: [...p] }, ts: [0] }); }
       } else if (a.kind === 'move') {
-        snapHint = null;
         const items = [...a.before].map(([st, before]) => ({ st, before, after: [...st.p] })).filter((it) => it.before.some((v, i) => v !== it.after[i]));
         if (items.length) { pushHist({ k: 'edit', items }); items.forEach((it) => logMove(it.st)); }
       } else if (s.straighten && !a.st.e && !a.st.h) tryStraighten(a.st);
@@ -1006,7 +1043,6 @@ export default {
     return {
       resize: drawNow,
       destroy() {
-        document.removeEventListener('pointerdown', closePop, true);
         if (rec) stopRec();
         if (pb) closePlayer();
       },
@@ -1015,7 +1051,6 @@ export default {
           field('Board', select([['white', 'White'], ['black', 'Chalkboard'], ['clear', 'See-through']], s.bg, (v) => { s.bg = v; sync(); drawPaper(true); ctx.save(); })),
           field('Background', select([['blank', 'Blank'], ['lines', 'Lines'], ['grid', 'Grid'], ['dots', 'Dots']], s.paper, (v) => { s.paper = v; sync(); drawPaper(true); ctx.save(); })),
           field('Spacing', h('input', { type: 'range', min: 2.5, max: 15, step: 0.5, value: s.gap * 100, oninput: (e) => { s.gap = Number(e.target.value) / 100; sync(); drawPaper(true); ctx.save(); } })),
-          checkbox('Straighten my lines (a nearly straight pen line becomes a straight line; ↶ Undo brings back the wobbly one)', !!s.straighten, (v) => { s.straighten = v; ctx.save(); }),
           h('button', { class: 'btn', onclick: download }, '⬇ Save drawing as picture'),
           h('h4', {}, '⏺ Recording'),
           checkbox('Record my voice too (microphone)', s.recVoice, (v) => { s.recVoice = v; ctx.save(); }),
