@@ -1,5 +1,6 @@
-# Rebuilds the background library (backgrounds/index.json + preview pictures)
-# whenever pictures or videos are added to, changed in, or removed from backgrounds/.
+# Rebuilds the libraries when files are added to, changed in, or removed from
+#   backgrounds/  → backgrounds/index.json + preview pictures (Background menu)
+#   sounds/       → sounds/index.json (sound library in the Audio widget)
 name: Background library
 
 on:
@@ -10,6 +11,9 @@ on:
       - '!backgrounds/index.json'
       - '!backgrounds/thumbs/**'
       - 'tools/build_backgrounds.py'
+      - 'sounds/**'
+      - '!sounds/index.json'
+      - 'tools/build_sounds.py'
   workflow_dispatch:
 
 permissions:
@@ -28,17 +32,20 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - name: Build previews and list
-        run: python3 tools/build_backgrounds.py
+        run: |
+          python3 tools/build_backgrounds.py
+          python3 tools/build_sounds.py
       - name: Save changes
         run: |
           git add backgrounds/index.json backgrounds/thumbs
+          [ -f sounds/index.json ] && git add sounds/index.json
           if git diff --cached --quiet; then
             echo "Background library already up to date."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Update background library"
+          git commit -m "Update background and sound libraries"
           git push
       - name: Republish the site
         # Pushes made by this job may not trigger a Pages build on their own.
