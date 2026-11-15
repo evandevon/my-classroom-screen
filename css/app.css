@@ -1659,3 +1659,5 @@ body.previewing #board { outline: 4px dashed #f2c46d; outline-offset: -4px; }
 .prog-class { margin-right: auto; color: var(--muted); font-weight: 700; font-size: calc(13px * var(--fs, 1)); }
 .prog-count { display: flex; align-items: center; gap: 6px; font-weight: 800; }
 .prog-count .btn { min-width: 40px; font-size: 20px; font-weight: 900; }
+.cm-dups { margin: 0; padding: 8px 10px; border-radius: 10px; background: #fff4d6; color: #6b4e00; font-size: 14px; line-height: 1.35; }
+.cm-dups[hidden] { display: none; }

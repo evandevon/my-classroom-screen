@@ -21,16 +21,48 @@ function emit() {
 }
 const save = () => db.setMeta('classLists', st.lists);
 
-const cleanNames = (text) =>
+const tidyNames = (text) =>
   String(text || '')
     .split(/\r?\n/)
     .map((l) => l.replace(/\t+/g, ' ').replace(/\s+/g, ' ').trim())
     .filter(Boolean);
 
+/**
+ * No two students in a class may have the same name (widgets like Progress keep ticks by name,
+ * so two "Sam"s would share ticks). A repeated name is saved as "Sam (2)", "Sam (3)"…
+ * Capital letters don't make a name different ("sam" repeats "Sam").
+ */
+export function uniqueNames(list) {
+  const taken = new Set();
+  const out = [];
+  for (const n of list) {
+    let name = n;
+    for (let k = 2; taken.has(name.toLowerCase()); k++) name = `${n} (${k})`;
+    taken.add(name.toLowerCase());
+    out.push(name);
+  }
+  return out;
+}
+/** Names typed more than once (as typed, first spelling). */
+function repeatedNames(list) {
+  const seen = new Map();
+  const reps = new Set();
+  for (const n of list) { const k = n.toLowerCase(); if (seen.has(k)) reps.add(seen.get(k)); else seen.set(k, n); }
+  return [...reps];
+}
+const cleanNames = (text) => uniqueNames(tidyNames(text));
+
 export async function initClasses(getScreen) {
   st.getScreen = getScreen;
   st.lists = await db.getMeta('classLists', []);
   st.currentId = await db.getMeta('currentClassId', '');
+  // Lists saved before names had to be different: make repeats "Name (2)".
+  let fixed = false;
+  for (const c of st.lists) {
+    const u = uniqueNames(c.students || []);
+    if (u.some((n, i) => n !== c.students[i])) { c.students = u; fixed = true; }
+  }
+  if (fixed) await save();
   st.auto = await db.getMeta('classAuto', true);
   // Older versions only stored a typed class name: turn it into a class.
   const legacy = await db.getMeta('classLabel', '');
@@ -246,7 +278,17 @@ export function showClassManager(selectId) {
     const names = h('textarea', { rows: 14, 'aria-label': 'Student names, one per line', placeholder: 'Ava\nBen\nCharlie\n…' });
     names.value = c.students.join('\n');
     const count = h('span', { class: 'hint' }, `${c.students.length} students`);
-    names.addEventListener('input', () => { c.students = cleanNames(names.value); count.textContent = `${c.students.length} students`; save(); emit(); drawListOnly(); });
+    const dupNote = h('p', { class: 'cm-dups', role: 'status', hidden: true });
+    function showDups() {
+      const reps = repeatedNames(tidyNames(names.value));
+      dupNote.hidden = !reps.length;
+      if (!reps.length) return;
+      const q = reps.map((n) => `“${n}”`).join(', ');
+      dupNote.textContent = `⚠ More than one student is called ${q}. Each name must be different, or widgets like Progress mix them up — add a surname initial (e.g. ${reps[0]} B). Until then the repeat is saved as “${reps[0]} (2)”.`;
+    }
+    names.addEventListener('input', () => { c.students = cleanNames(names.value); count.textContent = `${c.students.length} students`; showDups(); save(); emit(); drawListOnly(); });
+    // When you leave the box, show the names as they were saved (with any "(2)").
+    names.addEventListener('change', () => { names.value = c.students.join('\n'); showDups(); });
     const isCur = currentClass()?.id === c.id;
     // --- keep apart: pairs of students the Group maker never puts in the same group
     c.apart ||= [];
@@ -279,7 +321,8 @@ export function showClassManager(selectId) {
     drawApart();
     setKids(editor,
       h('label', { class: 'field' }, h('span', {}, 'Class name'), nameIn),
-      h('label', { class: 'field' }, h('span', {}, 'Students (one per line — you can paste a column from a spreadsheet)'), names),
+      h('label', { class: 'field' }, h('span', {}, 'Students (one per line, each name different — you can paste a column from a spreadsheet)'), names),
+      dupNote,
       h('div', { class: 'row' },
         count,
         h('button', { class: 'btn small', onclick: () => { c.students.sort((a, b) => a.localeCompare(b)); names.value = c.students.join('\n'); save(); emit(); } }, 'Sort A–Z'),
@@ -334,17 +377,27 @@ export function showClassManager(selectId) {
     let added = 0;
     if (/^class\s*,/i.test(lines[0] || '')) {
       // "Class,Student" rows (like our own export)
+      const byClass = new Map();
       for (const l of lines.slice(1)) {
         const [cn, sn] = splitCSV(l);
         if (!cn) continue;
+        if (!byClass.has(cn)) byClass.set(cn, []);
+        if (sn) byClass.get(cn).push(sn);
+      }
+      for (const [cn, list] of byClass) {
         let c = st.lists.find((x) => x.name === cn);
         if (!c) { c = { id: uid('class'), name: cn, students: [] }; st.lists.push(c); }
-        if (sn && !c.students.includes(sn)) { c.students.push(sn); added++; }
+        // Two "Sam"s in the file become "Sam" and "Sam (2)"; names the class already has aren't added again.
+        const have = new Set(c.students.map((n) => n.toLowerCase()));
+        const fresh = uniqueNames(list).filter((n) => !have.has(n.toLowerCase()));
+        c.students = uniqueNames([...c.students, ...fresh]);
+        added += fresh.length;
       }
     } else {
       // One name per line (first column): becomes a new class named after the file.
       const c = { id: uid('class'), name: f.name.replace(/\.[^.]+$/, ''), students: [] };
-      for (const l of lines) { const n = splitCSV(l)[0]; if (n && !c.students.includes(n)) { c.students.push(n); added++; } }
+      c.students = uniqueNames(lines.map((l) => splitCSV(l)[0]).filter(Boolean));
+      added = c.students.length;
       st.lists.push(c);
       sel = c.id;
     }
