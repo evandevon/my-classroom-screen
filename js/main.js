@@ -10,8 +10,7 @@ import { h, uid, debounce, toast, pickFile, downloadBlob, enableMultiTouchTaps }
 enableMultiTouchTaps();
 import { showSoundHelp } from './help.js';
 import { ANIMS, renderMoving, classifyLink, MOVING_TYPES, loadLibrary, libURL, freshLibraryBackground } from './background.js';
-import { setLogContext } from './datalog.js';
-import { showDataScreen } from './datascreen.js';
+import { checkOldRecords } from './oldrecords.js';
 import { initClasses, currentClassName, fromTimeline, onClassChange, showClassPicker, showClassManager } from './classes.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -182,15 +181,14 @@ document.addEventListener('keydown', (e) => {
 }, true);
 board.onResume = () => resumeScreen();
 
-// ---------- class (labels recorded data, supplies names to widgets) ----------
+// ---------- class (supplies names to widgets) ----------
 const classPill = $('#class-pill');
 function updateClassPill() {
   const c = currentClassName();
   classPill.querySelector('span').textContent = c || 'Choose class';
   classPill.classList.toggle('unset', !c);
-  classPill.title = c ? `Class: ${c}${fromTimeline() ? ' (from the Activity timeline)' : ''} — tap to change` : 'Choose a class (labels recorded data and gives widgets the class list)';
+  classPill.title = c ? `Class: ${c}${fromTimeline() ? ' (from the Activity timeline)' : ''} — tap to change` : 'Choose a class (gives widgets the class list)';
 }
-setLogContext({ getClass: currentClassName, getScreen: () => screen });
 onClassChange(updateClassPill);
 classPill.addEventListener('click', showClassPicker);
 
@@ -471,10 +469,9 @@ async function renderDrawer() {
       menuBtn('📂', 'Open a file', () => { closeDrawer(); importDialog(); }),
     ),
     h('p', { class: 'hint menu-note' }, 'A link is quick for sharing one screen, but leaves out pictures, clips and sounds from this computer. A file keeps everything — use it for backups, a new computer or sharing a set of screens.'),
-    h('h3', {}, 'Classes & data'),
+    h('h3', {}, 'Classes'),
     h('div', { class: 'menu-grid' },
       menuBtn('👥', 'Classes & student lists', () => { closeDrawer(); showClassManager(); }),
-      menuBtn('📊', 'Data you’ve recorded', () => { closeDrawer(); showDataScreen(); }),
     ),
     h('h3', {}, 'Options'),
     h('div', { class: 'stack' },
@@ -1298,6 +1295,8 @@ async function init() {
   }
   await openScreen(target);
   if (sharedLink) openImport(sharedLink, { blankToRemove: starter });
+  // Records from the removed Data feature: offer to download and delete them (once nothing else is open).
+  setTimeout(() => !document.querySelector('dialog[open]') && checkOldRecords(), 2500);
   // Tidy up files nothing uses any more (deleted widgets / screens), now and every half hour.
   const sweep = () => {
     persist.flush();

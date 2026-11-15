@@ -52,90 +52,9 @@ Your screens **save themselves** in this browser on this computer — there's no
 
 - **☰ → Classes & student lists:** make a class, then type names or paste a column from a spreadsheet. You can also import or export CSV to move lists to another computer.
 - **👥 button in the top bar:** choose the current class. It can also switch automatically when the Activity timeline's session name contains a class name.
-- The Name picker, Group maker, Tally (per student), Scoreboard ("a row for each student") and Stopwatch use the current class's names, or their own typed list.
+- The Name picker, Group maker, Tally (per student), and Scoreboard ("a row for each student") use the current class's names, or their own typed list.
 - **🚫 Keep apart:** in a class's list, choose pairs of students who shouldn't be in the same group. The Group maker keeps them apart (and tells you if it can't, e.g. with too few groups).
 - **Sharing:** a screen's class lists (and keep-apart pairs) go with it in screen files, and in share links unless you untick “Include class lists and student names”. Only share with colleagues — it's up to you who gets them. On the other computer they're added to that teacher's classes (a class with the same name and students isn't doubled up; a different class with the same name is added as “Name (2)”).
-
-## Recording data (stays on this device)
-
-- Use the **Tally** widget, or turn on **📊 Record** in the settings of the Scoreboard, Stopwatch (e.g. time off-task), Noise meter, Traffic light or Name picker. A red **● REC** shows while recording.
-- **☰ → 📊 Data** lets you filter by date, class, widget or student, see totals, **download a CSV** for Excel or Sheets, copy rows, and delete records. You can also have old records deleted automatically.
-- Records stay only in this browser on this device. They are never put into share links or screen files. They're for your own teaching notes; official records still belong in your school's system.
-
-## Backgrounds
-
-Menu → *Background* has four tabs, and opens on the one your screen is using:
-
-- **📚 Library**: ready-made pictures and moving loops that come with the site, shown as preview tiles (hover with a mouse to see a moving one play). To add more, drop pictures (jpg, png, webp, gif) or short looping videos (mp4, webm) into the `backgrounds/` folder on GitHub. The *Background library* GitHub Action then makes the previews and the list (`backgrounds/index.json`) automatically. Library backgrounds also work in share links, because they live on the site.
-- **✨ Animated** (drawn live, no downloads): aurora, calm waves, bubbles, snow, rain, night sky, fireflies, clouds, autumn leaves, confetti — with a speed slider. They pause when the screen is paused or the tab is hidden, and stay still if the computer asks for reduced motion.
-- **🎨 Colours**: plain colours and gradients.
-- **📁 Your own**: a picture or looping video from the computer, a link, or a slideshow.
-  - **Video or web link**: upload a looping video, or paste a link to a video file, a picture or animated GIF, a YouTube video (plays muted and looping), or a Google Drive file shared as “Anyone with the link”.
-  - **Slideshow**: choose a folder of pictures (and short videos) from the computer; fade or slow-zoom, every 5 s–5 min, shuffled.
-- **Darken** slider for any moving background, so widgets stand out.
-- Uploaded pictures, videos and slideshows stay on the computer and go in `.classroom` files, not share links.
-
-Audio widget → **🎧 Sound library**: sounds that come with the site, for quiet background sound in class. Library sounds loop with no gap and fade gently in and out. To add more, drop sound files (mp3, m4a, ogg, wav) into the `sounds/` folder on GitHub; the same GitHub Action adds them to the list (`sounds/index.json`) automatically. Short seamless loops work best.
-
-
-## Widget settings
-
-Tapping ⚙ opens the widget's settings in a panel at the side of the screen (on the left if the widget is on the right), so you can watch the widget change as you adjust it. Tap anywhere outside the panel, press Esc, or tap Done to close it. On phones the panel comes up from the bottom.
-
-## Widget colour themes
-
-Every widget can be **Light, Dark, Transparent · white, Transparent · dark, Blue or Yellow**; the transparent ones have an **Edge** tick box for a white or dark outline. (Green, Pink and Purple are no longer offered, but widgets already using them keep their colour.) Any widget can also have a **drop shadow** on words and pictures (handy for the transparent themes over a photo background). Menu → *Widget theme* changes every widget on the screen (and new ones); each widget's ⚙ settings has its own theme at the bottom. Settings panels always stay light so they're easy to read. Each widget's ⚙ also has a **Text size** slider (50–250%), and *Widget theme & text size* in the menu sets it for every widget.
-
-## Phones and tablets
-
-Tablets use the same free layout as the smartboard. On phones (and short landscape screens) widgets stack in a scrolling column — two side by side in landscape — in the same reading order as the big layout. Nothing about the saved layout changes, so a screen set up on a phone still looks right on the smartboard and vice versa. Moving and resizing are switched off in this view.
-
-## Smartboard tips
-
-- **Multi-touch:** several children can use different widgets at the same time (e.g. a calculator each, or dragging two widgets at once). Every finger is tracked separately.
-
-- Press **F** or tap ⛶ for full screen.
-- ☰ → *Hide widget title bars* gives a clean display. Tap a widget to show its controls again.
-- ☰ → *Large buttons* makes the controls bigger.
-- 🔒 locks a widget so it can't be moved by accident.
-- ▾ above the widget bar hides the bar.
-- Tap the screen once after opening the page. Browsers only allow sound after a tap, and alarms need it.
-- Alarms and timers keep ringing when another tab is in front. Their sounds are booked ahead on the audio clock, and a background worker keeps the countdown running. See ☰ → *Keep alarms ringing* to stop the browser putting the tab to sleep.
-- After the first visit, the site works offline, so it keeps running when the school wifi drops. Videos still need internet.
-
-## Turning on GitHub Pages
-
-1. In the repository on GitHub, go to **Settings → Pages**.
-2. Under *Build and deployment*, set **Source: Deploy from a branch**, **Branch: `main`**, folder **`/ (root)`**, then **Save**.
-3. After a minute the site will be live at `https://evandevon.github.io/my-classroom-screen/`.
-
-## For developers
-
-Plain HTML, CSS and JavaScript modules. There is no build step. Open `index.html` through any static server (e.g. `python3 -m http.server`) and edit the files directly.
-
-```
-index.html            page shell
-css/app.css           all styles
-js/main.js            app: screens, menu, dock, sharing dialogs
-js/board.js           drag / resize / z-order (Pointer Events: mouse, pen and touch)
-js/storage.js         IndexedDB (screens, uploaded assets, settings)
-js/share.js           share links (deflate + base64url in the #hash) and project files
-js/zip.js             tiny zip reader/writer for .classroom files
-js/templates.js       starter screens and backgrounds
-js/sound.js           sound effects made with Web Audio (no audio files)
-js/widgets/*.js       one file per widget; register new ones in js/widgets/index.js
-js/vendor/qrcode.js   QR generator by Kazuhiko Arase (MIT)
-sw.js                 offline cache. Bump VERSION when files change
-```
-
-To add a widget, copy an existing widget file. Export an object with `type`, `title`, `icon`, `group`, `size`, `defaultState()` and `mount(ctx)`, then add it to `js/widgets/index.js` and to the file list in `sw.js`. Put anything that holds student names in `privateKeys` so share links leave it out.
-
-## Pasting and dropping pictures, videos and sounds
-
-- **Copy a picture anywhere (right-click → Copy image, or a screenshot) and press Ctrl+V (⌘V on a Mac)** on the screen: it becomes an Image widget, sized to the picture's shape. Several pictures at once each get their own widget. A copied link to a picture (ending .jpg, .png, .gif…) works too.
-- **Drag files onto the screen** from a folder (or a picture straight from a web page): pictures become Image widgets, short videos become Video loops and sound files become Audio widgets, right where you drop them. Dropping onto an existing Image widget fills that widget instead.
-- **On a smartboard without a keyboard:** add an Image widget and tap **📋 Paste**.
-- Pasting while typing in a text box still pastes text as usual. Big pictures are made screen-sized; see-through PNGs keep their transparency. ↶ Undo removes a pasted picture.
 
 ## Undo, redo and screen order
 
@@ -146,6 +65,7 @@ To add a widget, copy an existing widget file. Export an object with `type`, `ti
 
 - **Draw over everything:** an annotation layer across the whole screen, so you can circle or underline anything — a widget, a name, the background — not just inside a whiteboard.
 - **Think-Pair-Share** and other learning-structure widgets (see the list in the project notes).
+- **Recording data** (tallies, points, timings and noise levels saved to a log with a CSV download) was removed in mcs-v55. [docs/removed-recording-data.md](docs/removed-recording-data.md) explains how it worked, where to find the code, and what to do differently if it comes back. If a browser still has old records, it offers once to download them and delete them.
 
 - **If background alarms still prove unreliable:** add an optional "keep tab awake" switch that plays an inaudible tone while a timer runs or an alarm is due. Browsers don't slow down or put to sleep a tab that is playing sound, but a speaker icon shows on the tab.
 

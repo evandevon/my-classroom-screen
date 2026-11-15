@@ -1,6 +1,6 @@
 // Class lists: named classes with student names, kept only on this device.
-// The current class labels recorded data and supplies names to the Name picker, Group maker,
-// Tally, Scoreboard and Stopwatch (each can also use its own typed list).
+// The current class supplies names to the Name picker, Group maker, Tally and other widgets
+// (each can also use its own typed list).
 
 import { db } from './storage.js';
 import { h, uid, toast, downloadBlob, pickFile, setKids } from './util.js';

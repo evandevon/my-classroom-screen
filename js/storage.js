@@ -1,5 +1,5 @@
 // IndexedDB persistence: screens (layouts), assets (uploaded images/audio), meta (settings),
-// events (the activity log used for data collection — never leaves this device).
+// events (the old activity log from the removed recording feature — see js/oldrecords.js).
 
 const DB_NAME = 'my-classroom-screen';
 const DB_VERSION = 2;
@@ -65,8 +65,7 @@ export const db = {
   },
   setMeta: (key, value) => tx('meta', 'readwrite', (s) => s.put({ key, value })),
 
-  // Activity log
-  addEvent: (ev) => tx('events', 'readwrite', (s) => s.put(ev)),
+  // Old activity log (recording data was removed; kept so old records can be downloaded and deleted)
   allEvents: () => tx('events', 'readonly', (s) => s.getAll()),
   deleteEvents: async (ids) => {
     const dbh = await open();
