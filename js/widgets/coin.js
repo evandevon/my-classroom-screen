@@ -1,6 +1,5 @@
 import { h, setKids } from '../util.js';
 import { play } from '../sound.js';
-import { logEvent, recBadge, RECORD_HINT } from '../datalog.js';
 import { panel, checkbox, field, textInput } from './_common.js';
 
 // Coin flip: flip 1–10 coins, keep a heads/tails tally with percentages for chance experiments.
@@ -12,7 +11,7 @@ export default {
   group: 'extras',
   size: [420, 360],
   hasSettings: true,
-  defaultState: () => ({ count: 1, faces: [], heads: 0, tails: 0, recent: [], headLabel: 'Heads', tailLabel: 'Tails', record: false }),
+  defaultState: () => ({ count: 1, faces: [], heads: 0, tails: 0, recent: [], headLabel: 'Heads', tailLabel: 'Tails' }),
 
   mount(ctx) {
     const s = ctx.state;
@@ -20,7 +19,6 @@ export default {
     const result = h('div', { class: 'coin-result', 'aria-live': 'polite' });
     const stats = h('div', { class: 'coin-stats' });
     const countEl = h('span', { class: 'dice-count' });
-    const badge = recBadge();
     ctx.view.append(h('div', { class: 'coin' }, tray, result, stats,
       h('div', { class: 'dice-foot' },
         h('button', { class: 'btn small', 'aria-label': 'Fewer coins', onclick: () => setCount(s.count - 1) }, '−'),
@@ -30,7 +28,7 @@ export default {
         h('button', { class: 'btn small', title: 'Flip 100 times at once', onclick: () => flipMany(100) }, '×100'),
         h('button', { class: 'btn small', onclick: () => { s.heads = s.tails = 0; s.recent = []; s.faces = []; ctx.save(); render(); } }, '↺'),
       ),
-    ), badge);
+    ));
 
     let flipping = false;
     function setCount(n) {
@@ -55,10 +53,6 @@ export default {
         s.faces = out;
         for (const f of out) f === 'H' ? s.heads++ : s.tails++;
         s.recent = [...out, ...s.recent].slice(0, 30);
-        if (s.record) {
-          const hN = out.filter((f) => f === 'H').length;
-          logEvent({ widget: 'coin', widgetId: ctx.rec.id, kind: 'flip', label: s.count === 1 ? (out[0] === 'H' ? s.headLabel : s.tailLabel) : `${hN} ${s.headLabel}, ${s.count - hN} ${s.tailLabel}`, value: s.count, unit: 'count' });
-        }
         play('ding');
         flipping = false;
         ctx.save();
@@ -73,7 +67,6 @@ export default {
       s.heads += hN;
       s.tails += n - hN;
       s.faces = [];
-      if (s.record) logEvent({ widget: 'coin', widgetId: ctx.rec.id, kind: 'flip', label: `${n} flips: ${hN} ${s.headLabel}, ${n - hN} ${s.tailLabel}`, value: n, unit: 'count' });
       play('ding');
       result.textContent = `${n} flips: ${hN} ${s.headLabel.toLowerCase()}, ${n - hN} ${s.tailLabel.toLowerCase()}`;
       ctx.save();
@@ -91,7 +84,6 @@ export default {
       tray.replaceChildren(...Array.from({ length: s.count }, (_, i) => coinEl(s.faces[i] || 'H')));
       tray.style.setProperty('--n', s.count);
       countEl.textContent = `${s.count} coin${s.count === 1 ? '' : 's'}`;
-      badge.hidden = !s.record;
       if (!keepResult) {
         const hN = s.faces.filter((f) => f === 'H').length;
         result.textContent = !s.faces.length ? 'Tap to flip!' : s.count === 1 ? (s.faces[0] === 'H' ? s.headLabel : s.tailLabel) : `${hN} ${s.headLabel.toLowerCase()}, ${s.count - hN} ${s.tailLabel.toLowerCase()}`;
@@ -117,8 +109,6 @@ export default {
             field('Tails side', textInput(s.tailLabel, (v) => { s.tailLabel = v || 'Tails'; ctx.save(); })),
           ),
           h('p', { class: 'hint' }, 'Rename the sides for quick choices, e.g. “Boys first / Girls first” or “Team A / Team B”. Try ×100 to see the results even out near 50%.'),
-          checkbox('📊 Record each flip in the Data log', s.record, (v) => { s.record = v; ctx.save(); }),
-          h('p', { class: 'hint' }, RECORD_HINT),
         );
       },
       closeSettings: () => render(),

@@ -1,6 +1,5 @@
 import { h } from '../util.js';
 import { play } from '../sound.js';
-import { logEvent, recBadge, RECORD_HINT } from '../datalog.js';
 import { namesFor, sourceName } from '../classes.js';
 import { panel, numberInput, textInput, field, swatches, checkbox, PALETTE } from './_common.js';
 
@@ -20,7 +19,6 @@ export default {
     return changed;
   },
   defaultState: () => ({
-    record: false,
     step: 1,
     teams: [
       { name: 'Team 1', score: 0, color: PALETTE[4] },
@@ -31,13 +29,11 @@ export default {
   mount(ctx) {
     const s = ctx.state;
     const board = h('div', { class: 'scores' });
-    const badge = recBadge();
-    ctx.view.append(board, badge);
+    ctx.view.append(board);
 
     function bump(t, d) {
       t.score += d;
       play(d > 0 ? 'ding' : 'pop');
-      if (s.record) logEvent({ widget: 'scoreboard', widgetId: ctx.rec.id, kind: 'points', label: 'Points', who: t.name, value: d, unit: 'points' });
       ctx.save();
       render(t);
     }
@@ -45,7 +41,6 @@ export default {
     function render(changed) {
       const top = Math.max(...s.teams.map((t) => t.score));
       board.style.setProperty('--n', s.teams.length);
-      badge.hidden = !s.record;
       board.replaceChildren(
         ...s.teams.map((t) =>
           h('div', { class: `team${t.score === top && top > 0 ? ' leading' : ''}`, style: { '--c': t.color } },
@@ -90,8 +85,6 @@ export default {
             h('button', { class: 'btn', onclick: () => { if (s.teams.length < 30) { s.teams.push({ name: `Team ${s.teams.length + 1}`, score: 0, color: PALETTE[s.teams.length % PALETTE.length] }); drawTeams(); render(); ctx.save(); } } }, '+ Add team'),
             h('button', { class: 'btn', onclick: () => { s.teams.forEach((t) => (t.score = 0)); render(); ctx.save(); } }, 'Reset scores'),
           ),
-          checkbox('📊 Record every point in the Data log', s.record, (v) => { s.record = v; render(); ctx.save(); }),
-          h('p', { class: 'hint' }, RECORD_HINT),
           field('Points per tap', numberInput(s.step, (v) => { if (v > 0) { s.step = v; render(); ctx.save(); } }, { min: 1, max: 100 })),
         );
       },

@@ -1,6 +1,5 @@
 import { h, parseLines, setKids } from '../util.js';
 import { play, soundSelect } from '../sound.js';
-import { logEvent, recBadge, RECORD_HINT } from '../datalog.js';
 import { panel, checkbox, field, textarea, select } from './_common.js';
 
 // Spinner: equal or unequal sections ("Red ×3"), with a running tally — great for chance and
@@ -37,7 +36,7 @@ export default {
   group: 'extras',
   size: [460, 480],
   hasSettings: true,
-  defaultState: () => ({ text: PRESETS.colours.text, tally: {}, last: '', showTally: true, sound: 'ding', record: false }),
+  defaultState: () => ({ text: PRESETS.colours.text, tally: {}, last: '', showTally: true, sound: 'ding' }),
 
   mount(ctx) {
     const s = ctx.state;
@@ -45,14 +44,13 @@ export default {
     const g = canvas.getContext('2d');
     const result = h('div', { class: 'spin-result', 'aria-live': 'polite' });
     const tallyEl = h('div', { class: 'spin-tally' });
-    const badge = recBadge();
     const stage = h('button', { class: 'spin-stage', title: 'Tap to spin', onclick: spin }, canvas, h('div', { class: 'wheel-pointer' }, '▼'));
     ctx.view.append(h('div', { class: 'spinner' }, stage, result, tallyEl,
       h('div', { class: 'spin-foot' },
         h('button', { class: 'btn primary big', onclick: spin }, 'Spin'),
         h('button', { class: 'btn small', onclick: () => { s.tally = {}; s.last = ''; ctx.save(); render(); } }, '↺ Clear tally'),
       ),
-    ), badge);
+    ));
 
     let angle = 0;
     let spinning = false;
@@ -98,7 +96,6 @@ export default {
       s.last = sec.name;
       s.tally[sec.name] = (s.tally[sec.name] || 0) + 1;
       play(s.sound);
-      if (s.record) logEvent({ widget: 'spinner', widgetId: ctx.rec.id, kind: 'spin', label: sec.name, value: 1, unit: 'count' });
       ctx.save();
       render();
       result.classList.remove('pop');
@@ -162,7 +159,6 @@ export default {
       size();
       draw(secs);
       result.textContent = s.last || 'Tap to spin!';
-      badge.hidden = !s.record;
       const total = Object.values(s.tally).reduce((a, b) => a + b, 0);
       tallyEl.hidden = !s.showTally || !total;
       if (!tallyEl.hidden) {
@@ -202,8 +198,6 @@ export default {
           h('p', { class: 'hint' }, 'Colour names like Red, Blue or Green colour their section to match.'),
           checkbox('Show the tally (results compared with what we’d expect)', s.showTally, (v) => { s.showTally = v; ctx.save(); }),
           field('Sound', soundSelect(s.sound, (v) => { s.sound = v; ctx.save(); })),
-          checkbox('📊 Record each spin in the Data log', s.record, (v) => { s.record = v; ctx.save(); }),
-          h('p', { class: 'hint' }, RECORD_HINT),
         );
       },
       closeSettings: render,
