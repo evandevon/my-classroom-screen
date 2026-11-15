@@ -1316,6 +1316,10 @@ body.clean .widget:not(.active):not(.settings-open) .w-head :is(.w-title, .w-btn
 
 /* ---------- whiteboard background (lines / grid drawn on a canvas behind the ink) ---------- */
 .wb-paper { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.wb-pics { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.wb:focus { outline: none; }
+.wb-picdel { position: absolute; z-index: 3; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #3b6fd8; background: #fff; font-size: 18px; box-shadow: 0 2px 8px #0003; cursor: pointer; }
+.wb-picdel[hidden] { display: none; }
 .wb-paperbtn { font-size: calc(20px * var(--fs, 1)); font-weight: 900; }
 .wb-gap { width: 90px; flex: 0 1 90px; min-width: 50px; accent-color: #1982c4; }
 .wb-gap[hidden] { display: none; }

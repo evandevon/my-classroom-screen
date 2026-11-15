@@ -212,6 +212,41 @@ function frameAt(rec, ops, T) {
   return list;
 }
 
+/** Pictures on the board at time T of a recording (P ops hold the whole list after each change). */
+function picsAt(rec, ops, T) {
+  let cur = rec.basePics || [];
+  for (const op of ops) { if (op.t > T) break; if (op.k === 'P') cur = op.pics; }
+  return cur;
+}
+
+/** Pictures sit on their own layer under the ink, so you draw over them and the eraser leaves them alone. */
+function drawPics(g, list, W, H, cache) {
+  g.clearRect(0, 0, W, H);
+  for (const p of list) {
+    const c = cache.get(p.a);
+    if (c?.img) g.drawImage(c.img, p.x * W, p.y * H, p.w * W, p.h * H);
+    else {   // still loading, or the file isn't on this computer
+      g.save(); g.setLineDash([8, 6]); g.strokeStyle = '#8a94a6'; g.lineWidth = 2;
+      g.strokeRect(p.x * W, p.y * H, p.w * W, p.h * H); g.restore();
+    }
+  }
+}
+
+/** A pasted or dropped picture, made no bigger than the board needs (PNGs stay PNG for see-through parts). */
+async function shrinkPic(file) {
+  const bmp = await createImageBitmap(file);
+  const size = { w: bmp.width, h: bmp.height };
+  const k = Math.min(1, 2048 / Math.max(bmp.width, bmp.height));
+  if (k === 1 && file.size < 2e6) { bmp.close?.(); return { blob: file, ...size }; }
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  bmp.close?.();
+  const png = file.type === 'image/png' || file.type === 'image/gif';
+  const blob = await new Promise((res) => c.toBlob(res, png ? 'image/png' : 'image/jpeg', 0.88));
+  return { blob: blob || file, w: c.width, h: c.height };
+}
+
 /** Optionally squeeze long gaps (thinking time) so playback keeps moving. */
 function timeline(rec, skipPauses) {
   if (!skipPauses) return { ops: rec.ops, dur: rec.dur };
@@ -263,8 +298,9 @@ export default {
   size: [780, 540],
   hasSettings: true,
   heavyKeys: ['strokes', 'rec'],
+  assetCompanions: { picAssetIds: ['pics'] },   // a share link can't carry the pictures, so it leaves them out
   undoShareKeys: ['rec'],   // recordings are replaced, never changed in place
-  defaultState: () => ({ strokes: [], bg: 'white', paper: 'blank', gap: 0.06, straighten: false, rec: null, recAudioAssetId: null, recVoice: false, skipPauses: true, loop: false }),
+  defaultState: () => ({ strokes: [], bg: 'white', paper: 'blank', gap: 0.06, straighten: false, pics: [], picAssetIds: [], rec: null, recAudioAssetId: null, recVoice: false, skipPauses: true, loop: false }),
 
   mount(ctx) {
     const s = ctx.state;
@@ -272,7 +308,13 @@ export default {
     if (['grid', 'lines', 'dots'].includes(s.bg)) { s.paper = s.bg; s.bg = 'white'; }
     s.paper ||= 'blank';
     s.gap ||= 0.06;
+    s.pics ||= [];
     const paperCanvas = h('canvas', { class: 'wb-paper', 'aria-hidden': 'true' });
+    const picsCanvas = h('canvas', { class: 'wb-pics', 'aria-hidden': 'true' });   // pictures, under the ink
+    const picg = picsCanvas.getContext('2d');
+    let picsKey = '';
+    const picCache = new Map();   // asset id → { img, ready: Promise }
+    let selPic = null;            // the picture the move tool last touched (gets the 🗑 button)
     const pg = paperCanvas.getContext('2d');
     let paperKey = '';
     const canvas = h('canvas', { class: 'wb-canvas' });
@@ -328,18 +370,19 @@ export default {
       linePop.style.top = `${Math.round(Math.max(4, Math.min(b.top - r.top - 8, r.height - linePop.offsetHeight - 4)))}px`;
     }
     const penTool = toolBtn('✏️', 'Pen: draw freehand', () => { tool = 'pen'; sync(); }, 'wb-pentool');
-    const moveBtn = toolBtn('✥', 'Move lines: drag an end, a corner or the middle of a line', () => { tool = tool === 'move' ? 'pen' : 'move'; sync(); });
+    const moveBtn = toolBtn('✥', 'Move lines and pictures: drag a line’s end or middle; drag a picture, or its corner to resize it', () => { tool = tool === 'move' ? 'pen' : 'move'; sync(); });
     const straightBtn = h('button', { class: 'wb-tool wb-straight', 'aria-pressed': 'false',
-      onclick: () => { s.straighten = !s.straighten; ctx.save(); sync(); toast(s.straighten ? 'Straighten is on: nearly straight lines you draw become straight.' : 'Straighten is off.'); } }, '📐');
+      onclick: () => { s.straighten = !s.straighten; save(); sync(); toast(s.straighten ? 'Straighten is on: nearly straight lines you draw become straight.' : 'Straighten is off.'); } }, '📐');
+    const picBtn = toolBtn('🖼', 'Add a picture to draw on (or paste one with Ctrl+V, or drop one here)', () => choosePics());
     const eraser = toolBtn('🧽', 'Eraser (rubs out pen and highlighter; touching a line removes the whole line)', () => { tool = tool === 'eraser' ? 'pen' : 'eraser'; sync(); });
     // Background: each tap goes Blank → Lines → Grid; a slider sets the spacing.
     const paperBtn = h('button', { class: 'wb-tool wb-paperbtn', onclick: () => {
       const i = PAPERS.findIndex(([k]) => k === s.paper);
       s.paper = PAPERS[(i + 1) % PAPERS.length][0];
-      ctx.save(); sync(); drawPaper(true);
+      save(); sync(); drawPaper(true);
     } });
     const gapRange = h('input', { type: 'range', class: 'wb-gap', min: 2.5, max: 15, step: 0.5, 'aria-label': 'Line spacing', title: 'Spacing' });
-    gapRange.addEventListener('input', () => { s.gap = Number(gapRange.value) / 100; drawPaper(true); ctx.save(); });
+    gapRange.addEventListener('input', () => { s.gap = Number(gapRange.value) / 100; drawPaper(true); save(); });
     const recBtn = h('button', { class: 'wb-tool wb-rec', title: 'Record this whiteboard session', 'aria-label': 'Record', onclick: () => (rec ? stopRec() : startRec()) }, h('span', { class: 'wb-rec-dot' }), h('span', { class: 'wb-rec-t' }));
     const playBtn = toolBtn('▶', 'Play back the recording (🔁 Loop is in the player)', () => openPlayer(), 'wb-play');
     const sep = () => h('span', { class: 'wb-sep' });
@@ -352,6 +395,7 @@ export default {
       straightBtn,
       moveBtn,
       eraser,
+      picBtn,
     );
     const bar = h('div', { class: 'wb-bar wb-bottom', role: 'toolbar', 'aria-label': 'Colour, size and board' },
       ...penBtns,
@@ -370,13 +414,14 @@ export default {
     );
     const badge = h('div', { class: 'wb-recbadge', hidden: true });
     const sizeCur = h('div', { class: 'wb-sizecur', hidden: true, 'aria-hidden': 'true' });
+    const picDel = h('button', { class: 'wb-picdel', hidden: true, title: 'Remove this picture', 'aria-label': 'Remove this picture', onclick: () => removePic(selPic) }, '🗑');
 
     // Player controls (shown instead of the pens while playing back).
     const pPlay = h('button', { class: 'wb-tool', 'aria-label': 'Play or pause' });
     const pScrub = h('input', { type: 'range', min: 0, max: 1000, value: 0, class: 'wb-scrub', 'aria-label': 'Position' });
     const pTime = h('span', { class: 'wb-ptime' });
     const pSpeed = h('button', { class: 'wb-tool wb-speed', title: 'Speed' });
-    const pLoop = h('button', { class: 'wb-tool wb-loop', title: 'Loop: play again and again', 'aria-label': 'Loop', onclick: () => { s.loop = !s.loop; ctx.save(); drawPlayer(); } }, '🔁', h('span', {}, ' Loop'));
+    const pLoop = h('button', { class: 'wb-tool wb-loop', title: 'Loop: play again and again', 'aria-label': 'Loop', onclick: () => { s.loop = !s.loop; save(); drawPlayer(); } }, '🔁', h('span', {}, ' Loop'));
     const player = h('div', { class: 'wb-bar wb-player', hidden: true },
       pPlay,
       toolBtn('⏮', 'Back to the start', () => seek(0)),
@@ -391,8 +436,8 @@ export default {
     pSpeed.addEventListener('click', () => { if (!pb) return; pb.speed = pb.speed === 1 ? 2 : pb.speed === 2 ? 4 : pb.speed === 4 ? 0.5 : 1; if (pb.audio) pb.audio.playbackRate = pb.speed; drawPlayer(); });
     pScrub.addEventListener('input', () => pb && seek((pScrub.value / 1000) * pb.dur));
 
-    const surface = h('div', { class: 'wb-surface' }, paperCanvas, canvas, overlay, sizeCur, badge);
-    const root = h('div', { class: 'wb' }, surface, side, bar, player, linePop);
+    const surface = h('div', { class: 'wb-surface' }, paperCanvas, picsCanvas, canvas, overlay, picDel, sizeCur, badge);
+    const root = h('div', { class: 'wb', tabindex: '-1' }, surface, side, bar, player, linePop);
     ctx.view.append(root);
     // Close the line-style menu when tapping elsewhere on THIS whiteboard (other children using
     // other whiteboards at the same time mustn't close it).
@@ -458,6 +503,7 @@ export default {
     function drawNow() {
       fit();
       drawPaper();
+      drawPicLayer(pb ? picsAt(s.rec, pb.ops, pb.T) : s.pics);
       if (pb) renderBoard(g, frameAt(s.rec, pb.ops, pb.T), canvas.width, canvas.height, ink);
       else {
         const live = new Set([...active.values()].map((a) => a.st));
@@ -465,14 +511,56 @@ export default {
       }
       drawOverlay();
     }
+    /** Load a picture's file once; draws again when it arrives. */
+    function loadPic(id) {
+      if (!picCache.has(id)) {
+        const c = { img: null };
+        c.ready = assetURL(id).then((url) => url && new Promise((res) => {
+          const img = new Image();
+          img.onload = () => { c.img = img; picsKey = ''; draw(); res(); };
+          img.onerror = () => res();
+          img.src = url;
+        })).catch(() => {});
+        picCache.set(id, c);
+      }
+      return picCache.get(id).ready;
+    }
+    function drawPicLayer(list) {
+      const W = canvas.width, H = canvas.height;
+      if (picsCanvas.width !== W || picsCanvas.height !== H) { picsCanvas.width = W; picsCanvas.height = H; picsKey = ''; }
+      const key = `${W}x${H}|${list.map((p) => `${p.a}@${p.x},${p.y},${p.w},${p.h}`).join(';')}`;
+      if (key === picsKey) return;
+      picsKey = key;
+      list.forEach((p) => loadPic(p.a));
+      drawPics(picg, list, W, H, picCache);
+    }
     const dpr = () => window.devicePixelRatio || 1;
     /** Handles on every line end (move tool) and a ring where a line end is snapping. */
     function drawOverlay() {
       const W = overlay.width, H = overlay.height;
       og.clearRect(0, 0, W, H);
+      picDel.hidden = true;
       if (pb) return;
       const d = dpr();
       if (tool === 'move') {
+        for (const p of s.pics) {
+          const x0 = p.x * W, y0 = p.y * H, w = p.w * W, hh = p.h * H, on = p === selPic;
+          og.save();
+          if (!on) og.setLineDash([6 * d, 5 * d]);
+          og.lineWidth = (on ? 2.5 : 1.5) * d; og.strokeStyle = on ? '#3b6fd8' : 'rgba(59,111,216,.7)';
+          og.strokeRect(x0, y0, w, hh);
+          og.restore();
+          for (const [cx, cy] of [[x0, y0], [x0 + w, y0], [x0, y0 + hh], [x0 + w, y0 + hh]]) {
+            og.fillStyle = '#fff'; og.fillRect(cx - 7 * d, cy - 7 * d, 14 * d, 14 * d);
+            og.lineWidth = 2.5 * d; og.strokeStyle = '#3b6fd8'; og.strokeRect(cx - 7 * d, cy - 7 * d, 14 * d, 14 * d);
+          }
+        }
+        if (selPic && s.pics.includes(selPic)) {
+          picDel.hidden = false;
+          const cw = canvas.clientWidth, ch = canvas.clientHeight;
+          picDel.style.left = `${Math.max(4, Math.min(cw - 44, (selPic.x + selPic.w) * cw - 48))}px`;
+          picDel.style.top = `${Math.max(4, Math.min(ch - 44, selPic.y * ch + 12))}px`;
+        }
         const seen = new Set();
         for (const st of s.strokes) {
           if (!isLine(st)) continue;
@@ -497,6 +585,22 @@ export default {
     const logOp = (op) => rec && rec.ops.push({ t: Date.now() - rec.t0, ...op });
     const logList = () => logOp({ k: 'L', ids: s.strokes.map((st) => st.i) });
     const logMove = (st) => logOp({ k: 'm', id: st.i, p: [...st.p] });
+    const copyPics = (list) => list.map((p) => ({ ...p }));
+    const logPics = () => logOp({ k: 'P', pics: copyPics(s.pics) });
+    /** Save, keeping a note of every picture file this board (its undo steps and recording) still uses. */
+    function save() {
+      const ids = new Set(s.pics.map((p) => p.a));
+      for (const p of s.rec?.basePics || []) ids.add(p.a);
+      for (const op of s.rec?.ops || []) if (op.k === 'P') op.pics.forEach((p) => ids.add(p.a));
+      for (const e of [...hist, ...fut]) if (e.k === 'pics') [...e.before, ...e.after].forEach((p) => ids.add(p.a));
+      s.picAssetIds = [...ids];
+      ctx.save();
+    }
+    /** One undo step for a change to the pictures (pass the list as it was before). */
+    function picsChanged(before) {
+      pushHist({ k: 'pics', before, after: copyPics(s.pics) });
+      logPics();
+    }
     function pushHist(e) { hist.push(e); fut.length = 0; }
     function apply(e, back) {
       if (e.k === 'add') {
@@ -517,6 +621,10 @@ export default {
         const i = s.strokes.indexOf(a);
         if (i >= 0) s.strokes[i] = b;
         logList();
+      } else if (e.k === 'pics') {
+        s.pics = copyPics(back ? e.before : e.after);
+        selPic = null;
+        logPics();
       } else if (e.k === 'edit') {
         for (const it of e.items) { it.st.p = [...(back ? it.before : it.after)]; logMove(it.st); }
       }
@@ -526,21 +634,90 @@ export default {
       if (e) { apply(e, true); fut.push(e); }
       else if (s.strokes.length) { const st = s.strokes.pop(); fut.push({ k: 'add', st, dels: [] }); logList(); }   // drawn before this session
       else return;
-      draw(); ctx.save();
+      draw(); save();
     }
     function redoStep() {
       const e = fut.pop();
       if (!e) return;
       apply(e, false); hist.push(e);
-      draw(); ctx.save();
+      draw(); save();
     }
+    /** Clears the drawing first; a second tap (nothing left but pictures) removes the pictures too. */
     function clearAll() {
-      if (!s.strokes.length) return;
-      pushHist({ k: 'clear', prev: s.strokes.slice() });
-      s.strokes = [];
-      logList(); draw(); ctx.save();
-      toast('Board cleared. Press ↶ Undo to bring it back.');
+      if (s.strokes.length) {
+        pushHist({ k: 'clear', prev: s.strokes.slice() });
+        s.strokes = [];
+        logList(); draw(); save();
+        toast(s.pics.length ? 'Drawing cleared — the pictures stay (tap 🗑 again to remove them too). ↶ Undo brings it back.' : 'Board cleared. Press ↶ Undo to bring it back.');
+      } else if (s.pics.length) {
+        const before = copyPics(s.pics);
+        s.pics = [];
+        selPic = null;
+        picsChanged(before);
+        draw(); save();
+        toast('Pictures removed. Press ↶ Undo to bring them back.');
+      }
     }
+    function removePic(p) {
+      if (!p || !s.pics.includes(p)) return;
+      ctx.beginUndo?.();
+      const before = copyPics(s.pics);
+      s.pics = s.pics.filter((x) => x !== p);
+      selPic = null;
+      picsChanged(before);
+      draw(); save();
+      ctx.settleUndo?.();
+    }
+
+    // ---------- adding pictures: the 🖼 button, pasting (Ctrl+V) or dropping a file ----------
+    async function addPics(files, at = null) {
+      files = files.filter((f) => f.type.startsWith('image/')).slice(0, 6);
+      if (!files.length || pb) return;
+      ctx.beginUndo?.();
+      const before = copyPics(s.pics);
+      const W = canvas.width || 1, H = canvas.height || 1;
+      for (const [n, file] of files.entries()) {
+        let pic;
+        try { pic = await shrinkPic(file); } catch { toast(`“${file.name || 'That picture'}” couldn’t be opened.`); continue; }
+        const id = uid('asset');
+        await db.putAsset({ id, blob: pic.blob, name: file.name || 'whiteboard-picture.png', type: pic.blob.type, created: Date.now() });
+        // as big as fits in about two-thirds of the board, keeping its shape
+        const k = Math.min((W * 0.66) / pic.w, (H * 0.66) / pic.h, 2 * dpr());
+        const fw = (pic.w * k) / W, fh = (pic.h * k) / H;
+        const cx = (at ? at[0] : 0.5) + n * 0.04, cy = (at ? at[1] : 0.5) + n * 0.04;
+        const p = { i: newId(), a: id, x: Math.max(0, Math.min(1 - fw, cx - fw / 2)), y: Math.max(0, Math.min(1 - fh, cy - fh / 2)), w: fw, h: fh };
+        s.pics.push(p);
+        selPic = p;
+      }
+      if (s.pics.length === before.length) return;
+      picsChanged(before);
+      tool = 'move';
+      sync(); save();
+      ctx.settleUndo?.();
+      toast('Picture added. Drag it to move it, or a corner to resize it — then choose a pen to draw on it.');
+    }
+    function choosePics() {
+      const input = h('input', { type: 'file', accept: 'image/*', multiple: true, style: { display: 'none' } });
+      input.addEventListener('change', () => { addPics([...input.files]); input.remove(); });
+      input.addEventListener('cancel', () => input.remove());
+      document.body.append(input);
+      input.click();
+    }
+    // Tapping the whiteboard makes it the place Ctrl+V pastes into (tap the empty screen to paste a separate Image widget).
+    root.addEventListener('pointerdown', (e) => { if (!e.target.closest('input, button, select, textarea')) root.focus({ preventScroll: true }); }, true);
+    root.addEventListener('paste', (e) => {
+      const files = [...(e.clipboardData?.items || [])].filter((it) => it.kind === 'file' && it.type.startsWith('image/')).map((it) => it.getAsFile()).filter(Boolean);
+      if (!files.length || pb) return;
+      e.preventDefault();
+      addPics(files);
+    });
+    surface.addEventListener('dragover', (e) => { if (!pb && [...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+    surface.addEventListener('drop', (e) => {
+      const files = [...(e.dataTransfer?.files || [])].filter((f) => f.type.startsWith('image/'));
+      if (!files.length || pb) return;
+      e.preventDefault();
+      addPics(files, pt(e));
+    });
 
     // ---------- geometry helpers (canvas pixels) ----------
     const SNAP = 18;   // CSS px
@@ -608,7 +785,44 @@ export default {
         const st = s.strokes[j];
         if (isLine(st) && distToLine(st, x, y) <= Math.max(R * 0.8, lineWidthPx(st) / 2 + 6 * dpr())) return { mode: 'body', st, from: [x, y], orig: [...st.p] };
       }
+      return grabPic(x, y);
+    }
+    /** A picture's corner (resize) or the picture itself (move); the top picture wins. */
+    function grabPic(x, y) {
+      const W = canvas.width, H = canvas.height, R = 18 * dpr();
+      for (let j = s.pics.length - 1; j >= 0; j--) {
+        const p = s.pics[j];
+        const corners = [[p.x, p.y], [p.x + p.w, p.y], [p.x, p.y + p.h], [p.x + p.w, p.y + p.h]];
+        for (let c = 0; c < 4; c++) {
+          if (Math.hypot((corners[c][0] - x) * W, (corners[c][1] - y) * H) > R) continue;
+          const anchor = corners[3 - c];   // the opposite corner stays put
+          return { mode: 'picsize', pic: p, anchor, ratio: (p.w * W) / (p.h * H), orig: { ...p } };
+        }
+      }
+      for (let j = s.pics.length - 1; j >= 0; j--) {
+        const p = s.pics[j];
+        if (x >= p.x && x <= p.x + p.w && y >= p.y && y <= p.y + p.h) return { mode: 'picmove', pic: p, from: [x, y], orig: { ...p } };
+      }
       return null;
+    }
+    function picDrag(a, x, y) {
+      const p = a.pic, W = canvas.width, H = canvas.height;
+      if (a.mode === 'picmove') {
+        // keep at least a corner of it on the board
+        p.x = Math.max(-p.w + 0.05, Math.min(0.95, a.orig.x + x - a.from[0]));
+        p.y = Math.max(-p.h + 0.05, Math.min(0.95, a.orig.y + y - a.from[1]));
+      } else {
+        const [ax, ay] = a.anchor;
+        const dx = (x - ax) * W, dy = (y - ay) * H;
+        // keep its shape: follow whichever way the finger has moved further
+        let w = Math.max(Math.abs(dx), Math.abs(dy) * a.ratio);
+        w = Math.max(40 * dpr(), w);
+        const hh = w / a.ratio;
+        p.w = w / W; p.h = hh / H;
+        p.x = dx < 0 ? ax - p.w : ax;
+        p.y = dy < 0 ? ay - p.h : ay;
+      }
+      draw();
     }
     function moveDrag(a, x, y) {
       if (a.mode === 'end') {
@@ -721,7 +935,13 @@ export default {
       const erasing = tool === 'eraser' || e.buttons === 32; // stylus eraser end
       if (!erasing && tool === 'move') {
         const grab = grabAt(x, y);
-        if (!grab) return;
+        if (!grab) { if (selPic) { selPic = null; draw(); } return; }
+        if (grab.pic) {
+          selPic = grab.pic;
+          active.set(e.pointerId, { kind: 'pic', ...grab, before: copyPics(s.pics) });
+          draw();
+          return;
+        }
         const sts = grab.mode === 'end' ? [...new Set(grab.ends.map((en) => en.st))] : [grab.st];
         active.set(e.pointerId, { kind: 'move', pid: e.pointerId, ...grab, before: new Map(sts.map((st) => [st, [...st.p]])) });
         return;
@@ -765,6 +985,7 @@ export default {
         return;
       }
       if (a.kind === 'move') { const [x, y] = pt(e); moveDrag(a, x, y); return; }
+      if (a.kind === 'pic') { const [x, y] = pt(e); picDrag(a, x, y); return; }
       const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
       for (const ev of evs) {
         const q = pt(ev);
@@ -783,12 +1004,15 @@ export default {
         const W = canvas.width, H = canvas.height, p = a.st.p;
         if (Math.hypot((p[2] - p[0]) * W, (p[3] - p[1]) * H) < 6 * dpr()) s.strokes = s.strokes.filter((x) => x !== a.st);   // just a tap
         else { pushHist({ k: 'add', st: a.st, dels: [] }); logOp({ k: 's', st: { ...a.st, p: [...p] }, ts: [0] }); }
+      } else if (a.kind === 'pic') {
+        const o = a.orig, p = a.pic;
+        if (o.x !== p.x || o.y !== p.y || o.w !== p.w || o.h !== p.h) picsChanged(a.before);
       } else if (a.kind === 'move') {
         const items = [...a.before].map(([st, before]) => ({ st, before, after: [...st.p] })).filter((it) => it.before.some((v, i) => v !== it.after[i]));
         if (items.length) { pushHist({ k: 'edit', items }); items.forEach((it) => logMove(it.st)); }
       } else if (s.straighten && !a.st.e && !a.st.h) tryStraighten(a.st);
       draw();
-      ctx.save();
+      save();
     };
     canvas.addEventListener('pointerup', end);
     canvas.addEventListener('pointercancel', end);
@@ -798,7 +1022,7 @@ export default {
     async function startRec() {
       if (pb) closePlayer();
       if (s.rec && !confirm('Record a new session? This replaces the last recording.')) return;
-      const r = { t0: 0, base: s.strokes.map((st) => ({ ...st, p: [...st.p] })), ops: [], chunks: [], media: null, mic: null };
+      const r = { t0: 0, base: s.strokes.map((st) => ({ ...st, p: [...st.p] })), basePics: copyPics(s.pics), ops: [], chunks: [], media: null, mic: null };
       if (s.recVoice) {
         const fmtA = typeof MediaRecorder !== 'undefined' && ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((m) => MediaRecorder.isTypeSupported(m));
         try {
@@ -847,9 +1071,9 @@ export default {
           await db.putAsset({ id: audioId, blob, name: `whiteboard-voice.${blob.type.includes('mp4') ? 'm4a' : 'webm'}`, type: blob.type });
         }
       }
-      s.rec = { base: r.base, ops, dur };
+      s.rec = { base: r.base, basePics: r.basePics, ops, dur };
       s.recAudioAssetId = audioId;
-      ctx.save();
+      save();
       recBtn.classList.remove('on');
       recBtn.title = 'Record this whiteboard session';
       recBtn.setAttribute('aria-label', 'Record');
@@ -968,8 +1192,12 @@ export default {
       inkC.height = H;
       const ig = inkC.getContext('2d');
       const cache = new Ink();
+      const allPics = [...(s.rec.basePics || []), ...src.ops.filter((op) => op.k === 'P').flatMap((op) => op.pics)];
+      await Promise.all(allPics.map((p) => loadPic(p.a)));
       const paint = (T) => {
         paintPaper(o, s.bg, s.paper, s.gap, W, H);
+        const pics = picsAt(s.rec, src.ops, T);
+        for (const p of pics) { const c = picCache.get(p.a); if (c?.img) o.drawImage(c.img, p.x * W, p.y * H, p.w * W, p.h * H); }
         renderBoard(ig, frameAt(s.rec, src.ops, T), W, H, cache);
         o.drawImage(inkC, 0, 0);
       };
@@ -1063,18 +1291,18 @@ export default {
       },
       openSettings() {
         panel(ctx, 'Whiteboard',
-          field('Board', select([['white', 'White'], ['black', 'Chalkboard'], ['clear', 'See-through']], s.bg, (v) => { s.bg = v; sync(); drawPaper(true); ctx.save(); })),
-          field('Background', select([['blank', 'Blank'], ['lines', 'Lines'], ['grid', 'Grid'], ['dots', 'Dots']], s.paper, (v) => { s.paper = v; sync(); drawPaper(true); ctx.save(); })),
-          field('Spacing', h('input', { type: 'range', min: 2.5, max: 15, step: 0.5, value: s.gap * 100, oninput: (e) => { s.gap = Number(e.target.value) / 100; sync(); drawPaper(true); ctx.save(); } })),
+          field('Board', select([['white', 'White'], ['black', 'Chalkboard'], ['clear', 'See-through']], s.bg, (v) => { s.bg = v; sync(); drawPaper(true); save(); })),
+          field('Background', select([['blank', 'Blank'], ['lines', 'Lines'], ['grid', 'Grid'], ['dots', 'Dots']], s.paper, (v) => { s.paper = v; sync(); drawPaper(true); save(); })),
+          field('Spacing', h('input', { type: 'range', min: 2.5, max: 15, step: 0.5, value: s.gap * 100, oninput: (e) => { s.gap = Number(e.target.value) / 100; sync(); drawPaper(true); save(); } })),
           h('button', { class: 'btn', onclick: download }, '⬇ Save drawing as picture'),
           h('h4', {}, '⏺ Recording'),
-          checkbox('Record my voice too (microphone)', s.recVoice, (v) => { s.recVoice = v; ctx.save(); }),
-          checkbox('Loop playback (play again and again)', s.loop, (v) => { s.loop = v; ctx.save(); }),
-          checkbox('Skip long pauses when playing back (drawing-only recordings)', s.skipPauses, (v) => { s.skipPauses = v; ctx.save(); }),
+          checkbox('Record my voice too (microphone)', s.recVoice, (v) => { s.recVoice = v; save(); }),
+          checkbox('Loop playback (play again and again)', s.loop, (v) => { s.loop = v; save(); }),
+          checkbox('Skip long pauses when playing back (drawing-only recordings)', s.skipPauses, (v) => { s.skipPauses = v; save(); }),
           s.rec ? h('p', {}, `Last recording: ${fmt(s.rec.dur)}${s.recAudioAssetId ? ' with voice' : ''}.`) : h('p', { class: 'hint' }, 'Press ⏺ on the toolbar to start recording, and again to stop. Then ▶ plays it back.'),
           s.rec ? h('div', { class: 'row' },
             h('button', { class: 'btn', onclick: () => { ctx.closeSettings(); exportVideo(); } }, '🎞️ Save recording as a video'),
-            h('button', { class: 'btn danger', onclick: () => { if (confirm('Delete the recording?')) { s.rec = null; s.recAudioAssetId = null; ctx.save(); ctx.closeSettings(); sync(); } } }, '🗑 Delete recording'),
+            h('button', { class: 'btn danger', onclick: () => { if (confirm('Delete the recording?')) { s.rec = null; s.recAudioAssetId = null; save(); ctx.closeSettings(); sync(); } } }, '🗑 Delete recording'),
           ) : null,
           h('p', { class: 'hint' }, 'Recordings stay in this browser. Saving as a video is usually much quicker than the recording, and you can switch to another tab while it works.'),
         );
@@ -1088,6 +1316,7 @@ export default {
       out.height = canvas.height;
       const o = out.getContext('2d');
       paintPaper(o, s.bg, s.paper, s.gap, out.width, out.height);
+      o.drawImage(picsCanvas, 0, 0);
       o.drawImage(canvas, 0, 0);
       const a = h('a', { href: out.toDataURL('image/png'), download: 'whiteboard.png' });
       a.click();
