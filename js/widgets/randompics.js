@@ -195,10 +195,10 @@ export default {
             h('button', { class: 'btn primary', onclick: () => { ctx.closeSettings(); pickFolder(); } }, '📁 Choose a folder'),
             h('button', { class: 'btn', onclick: () => { ctx.closeSettings(); pickFiles(); } }, 'Choose pictures'),
           ),
-          field('Change picture by itself', select([[0, 'No — only when tapped'], [10, 'Every 10 seconds'], [30, 'Every 30 seconds'], [60, 'Every minute'], [300, 'Every 5 minutes']], s.every, (v) => { s.every = Number(v); ctx.save(); startTimer(); })),
-          field('Fit', select([['contain', 'Show the whole picture'], ['cover', 'Fill the box (crop edges)']], s.fit, (v) => { s.fit = v; ctx.save(); show(); })),
           checkbox('Show the file name as a caption', s.caption, (v) => { s.caption = v; ctx.save(); show(); }),
+          field('Change picture by itself', select([[0, 'No — only when tapped'], [10, 'Every 10 seconds'], [30, 'Every 30 seconds'], [60, 'Every minute'], [300, 'Every 5 minutes']], s.every, (v) => { s.every = Number(v); ctx.save(); startTimer(); })),
           checkbox('Mystery mode: start blurry, tap to reveal', s.blur, (v) => { s.blur = v; ctx.save(); }),
+          field('Fit', select([['contain', 'Show the whole picture'], ['cover', 'Fill the box (crop edges)']], s.fit, (v) => { s.fit = v; ctx.save(); show(); })),
           h('p', { class: 'hint' }, 'Big photos are shrunk to screen size to save space. They stay in this browser only and aren’t put in share links; “Download screen” includes them.'),
           s.picAssetIds.length ? h('button', { class: 'btn small danger', onclick: () => {
             if (!confirm('Remove all the pictures from this widget?')) return;

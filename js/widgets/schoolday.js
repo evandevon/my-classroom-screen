@@ -429,10 +429,10 @@ export default {
         usesAll ? null : field('Start from a ready-made plan', tplSel),
         usesAll ? null : quickBox,
         checkbox('Keep sessions back-to-back when I change a time', s.keepTogether !== false, (v) => { s.keepTogether = v; ctx.save(); }),
-        field('Layout', select([['auto', 'Automatic'], ['across', 'Across (left to right)'], ['down', 'Down (top to bottom)']], s.layout, (v) => { s.layout = v; changed(); })),
-        checkbox('Show start times', s.showTimes, (v) => { s.showTimes = v; changed(); }),
         checkbox('Play a sound when each session starts', s.chime, (v) => { s.chime = v; ctx.save(); }),
         s.chime ? field('Sound', soundSelect(s.chimeSound, (v) => { s.chimeSound = v; ctx.save(); })) : null,
+        field('Layout', select([['auto', 'Automatic'], ['across', 'Across (left to right)'], ['down', 'Down (top to bottom)']], s.layout, (v) => { s.layout = v; changed(); })),
+        checkbox('Show start times', s.showTimes, (v) => { s.showTimes = v; changed(); }),
       );
     }
 

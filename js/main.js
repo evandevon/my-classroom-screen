@@ -11,6 +11,9 @@ enableMultiTouchTaps();
 import { showSoundHelp } from './help.js';
 import { ANIMS, renderMoving, classifyLink, MOVING_TYPES, loadLibrary, libURL, freshLibraryBackground } from './background.js';
 import { checkOldRecords } from './oldrecords.js';
+import { screenshotDialog } from './screenshot.js';
+import { startupNotes, showWelcome, showWhatsNew, showWaysToHelp } from './welcome.js';
+import { initBackup, noteChange, maybeAskOnce, backupState, chooseFolder, resumeFolder, forgetFolder, writeBackup } from './backup.js';
 import { initClasses, currentClassName, fromTimeline, onClassChange, showClassPicker, showClassManager } from './classes.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -30,6 +33,7 @@ const persist = debounce(async () => {
   screen.updated = Date.now();
   try {
     await db.putScreen(screen);
+    noteChange();   // keeps the backup folder's copy up to date (if one is chosen)
   } catch (e) {
     console.error(e);
     toast('Could not save — is storage full or blocked?');
@@ -462,6 +466,7 @@ async function renderDrawer() {
       screen.paused
         ? menuBtn('▶', 'Carry on', () => { resumeScreen(); closeDrawer(); })
         : menuBtn('⏸', 'Pause screen', () => { pauseScreen(); closeDrawer(); }),
+      menuBtn('📸', 'Save a picture (JPG or PDF)', () => { closeDrawer(); screenshotDialog(screen.name); }),
       menuBtn('🧹', 'Clear widgets', () => { if (screen.paused) { toast('Carry on with the paused screen first.'); return; } if (confirm('Remove all widgets from this screen?')) board.clearAll(); }),
     ),
     h('h3', {}, 'Save & share'),
@@ -470,6 +475,7 @@ async function renderDrawer() {
       menuBtn('🔗', 'Share a link', () => { closeDrawer(); shareDialog(); }),
       menuBtn('💾', 'Save to a file', () => { closeDrawer(); exportDialog(); }),
       menuBtn('📂', 'Open a file', () => { closeDrawer(); importDialog(); }),
+      backupMenuBtn(),
     ),
     h('p', { class: 'hint menu-note' }, 'A link is quick for sharing one screen, but leaves out pictures, clips and sounds from this computer. A file keeps everything — use it for backups, a new computer or sharing a set of screens.'),
     h('h3', {}, 'Classes'),
@@ -484,10 +490,42 @@ async function renderDrawer() {
     ),
     h('h3', {}, 'Help'),
     h('div', { class: 'menu-grid' },
+      menuBtn('👋', 'Welcome & quick overview', () => { closeDrawer(); showWelcome(); }),
+      menuBtn('✨', 'What’s new', () => { closeDrawer(); showWhatsNew(); }),
       menuBtn('🔔', 'Keep alarms ringing (stop tabs sleeping)', showSoundHelp),
+      menuBtn('💛', 'Ways to help', () => { closeDrawer(); showWaysToHelp(); }),
     ),
     h('p', { class: 'hint' }, 'Everything is saved automatically in this browser. Use ☰ → “Save to a file” now and then as a backup.'),
+    h('p', { class: 'hint menu-made' }, 'Made by a NSW teacher, free for everyone. ', h('button', { class: 'linkish', onclick: () => { closeDrawer(); showWaysToHelp(); } }, '💛 Ways to help')),
   );
+}
+/** ☰ → keep a copy in a folder (Chrome/Edge): choose one, carry on after a new visit, or manage it. */
+function backupMenuBtn() {
+  const b = backupState();
+  if (!b.supported) return null;
+  if (!b.folder) return menuBtn('🗂', 'Keep a copy in a folder', () => { closeDrawer(); chooseFolder(); });
+  if (b.paused) return menuBtn('⏸', `Backup paused — tap to carry on (“${b.folder}”)`, () => resumeFolder());
+  return menuBtn('🗂', `Copying to “${b.folder}”`, () => { closeDrawer(); backupDialog(); });
+}
+async function backupDialog() {
+  const b = backupState();
+  const last = await db.getMeta('backupLast', 0);
+  const ago = last ? new Date(last).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'not yet';
+  const dlg = h('dialog', { class: 'modal' },
+    h('div', { class: 'modal-head' }, h('h2', {}, '🗂 Your backup folder'), h('button', { class: 'w-btn', 'aria-label': 'Close', onclick: () => dlg.close() }, '✕')),
+    h('div', { class: 'modal-body' },
+      h('p', {}, `A copy of all your screens and class lists is kept in “${b.folder}”, about a minute after each change. Last saved: ${ago}.`),
+      h('p', { class: 'hint' }, 'The last four weeks are kept as separate files too. To use a copy, open it with ☰ → Open a file. It’s a backup, not syncing: if two computers use the same folder, the one that saves last replaces the other’s copy.'),
+      h('div', { class: 'row' },
+        h('button', { class: 'btn primary', onclick: async () => { if (await writeBackup()) toast('💾 Saved.'); dlg.close(); } }, 'Save now'),
+        h('button', { class: 'btn', onclick: () => { dlg.close(); chooseFolder(); } }, 'Change folder'),
+        h('button', { class: 'btn danger', onclick: async () => { await forgetFolder(); dlg.close(); toast('Stopped. The copies already in the folder stay there.'); } }, 'Stop'),
+      ),
+    ),
+  );
+  dlg.addEventListener('close', () => setTimeout(() => dlg.remove(), 300));
+  document.body.append(dlg);
+  dlg.showModal();
 }
 const menuBtn = (icon, label, onclick) => h('button', { class: 'menu-btn', onclick }, h('span', { class: 'mi' }, icon), label);
 function toggle(label, checked, onChange) {
@@ -1298,8 +1336,11 @@ async function init() {
   }
   await openScreen(target);
   if (sharedLink) openImport(sharedLink, { blankToRemove: starter });
+  setTimeout(() => startupNotes({ firstRun: !!starter }).catch(console.error), 800);   // welcome / what's new / end of term
   // Records from the removed Data feature: offer to download and delete them (once nothing else is open).
   setTimeout(() => !document.querySelector('dialog[open]') && checkOldRecords(), 2500);
+  await initBackup(() => { if (drawer.classList.contains('open')) renderDrawer(); });
+  setTimeout(() => maybeAskOnce(), 20000);   // asks once, quietly, on a second day of use
   // Tidy up files nothing uses any more (deleted widgets / screens), now and every half hour.
   const sweep = () => {
     persist.flush();

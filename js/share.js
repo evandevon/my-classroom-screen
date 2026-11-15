@@ -149,7 +149,7 @@ This file is a normal zip. Rename it to .zip to look inside:
  * A ".classroom" file: a zip holding classroom.json (screens) plus each stored file as itself
  * (no base64 bloat, so clips and photos stay their real size).
  */
-export async function buildProjectFile(screens) {
+export async function buildProjectFile(screens, { allClasses = false } = {}) {
   const assets = {};
   const files = [];
   for (const s of screens) {
@@ -164,7 +164,7 @@ export async function buildProjectFile(screens) {
       files.push({ name: file, data: a.blob, compress: !/^(image\/(jpeg|png|gif|webp)|video|audio)/.test(type) });
     }
   }
-  const { classes, current } = classesForScreens(screens);   // the class lists these screens use go with them
+  const { classes, current } = classesForScreens(screens, allClasses);   // the class lists these screens use go with them
   const json = JSON.stringify({ format: FORMAT, version: VERSION, exported: new Date().toISOString(), screens, assets, ...(classes.length ? { classes, currentClass: current } : {}) }, null, 1);
   return makeZip([{ name: 'classroom.json', data: json, compress: true }, { name: 'README.txt', data: README }, ...files], 'application/x-classroom+zip');
 }

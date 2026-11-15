@@ -120,8 +120,8 @@ export default {
         panel(ctx, 'Dice',
           field('Number of sides (faces)', quick),
           field('Or type any number from 2 up', numberInput(s.sides, (v) => { if (v >= 2) setSides(v); }, { min: 2, max: 1000 })),
-          checkbox('Show dots for numbers up to 9', s.dots, (v) => { s.dots = v; render(); ctx.save(); }),
           checkbox('Show total', s.total, (v) => { s.total = v; render(); ctx.save(); }),
+          checkbox('Show dots for numbers up to 9', s.dots, (v) => { s.dots = v; render(); ctx.save(); }),
         );
       },
     };

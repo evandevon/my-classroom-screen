@@ -203,9 +203,9 @@ export default {
             h('button', { class: 'btn', onclick: () => { s.names = shuffle(parseLines(s.names)).join('\n'); ctx.save(); ctx.closeSettings(); } }, 'Shuffle order'),
             h('button', { class: 'btn', onclick: () => { s.names = parseLines(s.names).sort((a, b) => a.localeCompare(b)).join('\n'); ctx.save(); ctx.closeSettings(); } }, 'Sort A–Z'),
           ) : null,
-          field('Style', select([['wheel', 'Spinning wheel'], ['card', 'Flash card']], s.mode, (v) => { s.mode = v; ctx.save(); })),
           checkbox('Don’t pick the same person twice (until everyone has had a turn)', s.removePicked, (v) => { s.removePicked = v; ctx.save(); }),
           field('Sound', soundSelect(s.sound, (v) => { s.sound = v; ctx.save(); })),
+          field('Style', select([['wheel', 'Spinning wheel'], ['card', 'Flash card']], s.mode, (v) => { s.mode = v; ctx.save(); })),
           h('p', { class: 'hint' }, 'Names stay on this device. They are left out of share links unless you choose to include them.'),
         );
       },

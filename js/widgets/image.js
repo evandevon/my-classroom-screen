@@ -84,8 +84,8 @@ export default {
         panel(ctx, 'Image settings',
           h('button', { class: 'btn primary', onclick: upload }, 'Upload image from this device'),
           field('…or image web address', textInput(s.url, (v) => { s.url = v.trim(); s.imageAssetId = null; render(); ctx.save(); }, { placeholder: 'https://…' })),
-          field('Fit', select([['contain', 'Show whole image'], ['cover', 'Fill the box (crop)']], s.fit, (v) => { s.fit = v; render(); ctx.save(); })),
           field('Caption', textInput(s.caption, (v) => { s.caption = v; render(); ctx.save(); })),
+          field('Fit', select([['contain', 'Show whole image'], ['cover', 'Fill the box (crop)']], s.fit, (v) => { s.fit = v; render(); ctx.save(); })),
         );
       },
     };
