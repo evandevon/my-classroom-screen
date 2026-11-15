@@ -539,8 +539,8 @@ async function renderDrawer() {
     backupLine(await backupStatus()),
     h('div', { class: 'menu-grid' },
       menuBtn('🔗', 'Share a link', () => { closeDrawer(); shareDialog(); }),
-      menuBtn('💾', 'Save to a file', () => { closeDrawer(); exportDialog(); }),
-      menuBtn('📂', 'Open a file', () => { closeDrawer(); importDialog(); }),
+      menuBtn('💾', 'Save to a file', () => { closeDrawer(); exportDialog(); }, 'Choose some screens to save as a .classroom file — to send to a colleague or take to another computer. Pictures, sounds and (if you tick it) their class lists go too.'),
+      menuBtn('📂', 'Add screens from a file', () => { closeDrawer(); importDialog(); }, 'Open a .classroom file and choose which of its screens to add. Your own screens stay as they are.'),
     ),
     h('p', { class: 'hint menu-note' }, 'A link is quick for sharing one screen, but leaves out pictures, clips and sounds from this computer. A file keeps everything — use it for backups, a new computer or sharing a set of screens.'),
     h('h3', {}, 'Classes'),
@@ -568,10 +568,10 @@ async function renderDrawer() {
 function backupLine(b) {
   return h('div', { class: `menu-backup${b.stale ? ' stale' : ''}` },
     h('span', {}, b.stale ? (b.last ? `⚠ Last backed up to a file ${b.when}.` : '⚠ Not backed up to a file yet.') : `✓ Last backed up to a file ${b.when}.`),
-    h('button', { class: `btn small${b.stale ? ' primary' : ''}`, onclick: () => { closeDrawer(); downloadBackup(); } }, '⬇ Back up everything'),
+    h('button', { class: `btn small${b.stale ? ' primary' : ''}`, title: 'Saves every screen and every class list into one .classroom file in your Downloads, in one click. Keep it somewhere safe (like OneDrive) — if this browser is ever cleared, add the screens back from it.', onclick: () => { closeDrawer(); downloadBackup(); } }, '⬇ Back up everything'),
   );
 }
-const menuBtn = (icon, label, onclick) => h('button', { class: 'menu-btn', onclick }, h('span', { class: 'mi' }, icon), label);
+const menuBtn = (icon, label, onclick, tip) => h('button', { class: 'menu-btn', onclick, title: tip || null }, h('span', { class: 'mi' }, icon), label);
 function toggle(label, checked, onChange) {
   const c = h('input', { type: 'checkbox', onchange: (e) => onChange(e.target.checked) });
   c.checked = checked;
@@ -1027,7 +1027,7 @@ function shareDialog() {
       lines.push(h('p', {}, h('b', {}, '⚠️ Your files won’t be in this link. '), `Pictures, video clips and sounds you added from this computer stay on this computer, so people opening the link will see empty widgets: ${which.join(', ')}.`));
     }
     if (other.length) lines.push(h('p', {}, h('b', {}, files.length ? 'Also missing: ' : '⚠️ Not in this link: '), `${other.join(', ')}.`));
-    if (lines.length) lines.push(h('p', {}, 'To share everything, save it to a file and send that instead (they open it with ☰ → “Open a file”, or drag it onto their screen).'));
+    if (lines.length) lines.push(h('p', {}, 'To share everything, save it to a file and send that instead (they open it with ☰ → “Add screens from a file”, or drag it onto their screen).'));
     warn.replaceChildren(...lines);
     warn.hidden = !lines.length;
     fileBtn.className = lines.length ? 'btn primary' : 'btn';
@@ -1237,7 +1237,7 @@ async function exportDialog(preselect = null) {
   };
   allBox.addEventListener('change', () => { items.forEach((it) => (it.box.checked = allBox.checked)); sync(); });
   const dlg = modal('Save to a file',
-    h('p', {}, 'Saves a .classroom file to your Downloads with everything inside — pictures, clips, sounds, recordings and the class lists these screens use. Open it on any computer with ☰ → “Open a file”, or drag it onto the screen.'),
+    h('p', {}, 'Saves a .classroom file to your Downloads with everything inside — pictures, clips, sounds, recordings and the class lists these screens use. Open it on any computer with ☰ → “Add screens from a file”, or drag it onto the screen.'),
     items.length > 1 ? h('label', { class: 'check imp-all' }, allBox, h('span', {}, 'All screens')) : null,
     h('div', { class: 'imp-list' }, ...items.map((it) => {
       it.box.addEventListener('change', sync);
