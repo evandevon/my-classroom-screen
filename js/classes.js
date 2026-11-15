@@ -3,6 +3,7 @@
 // (each can also use its own typed list).
 
 import { db } from './storage.js';
+import { notifyClasses } from './tabs.js';
 import { h, uid, toast, downloadBlob, pickFile, setKids } from './util.js';
 import { currentSession } from './widgets/schoolday.js';
 
@@ -19,7 +20,15 @@ function emit() {
     try { fn(); } catch (e) { console.error(e); }
   }
 }
-const save = () => db.setMeta('classLists', st.lists);
+// Other tabs reload the lists when they change here (see tabs.js), so an older tab never saves over newer lists.
+const save = () => db.setMeta('classLists', st.lists).then(() => notifyClasses());
+
+/** Another tab changed the class lists: read them again (this tab keeps its own current class). */
+export async function reloadClassLists() {
+  st.lists = await db.getMeta('classLists', []);
+  if (st.currentId && !st.lists.some((c) => c.id === st.currentId)) st.currentId = '';
+  emit();
+}
 
 const tidyNames = (text) =>
   String(text || '')

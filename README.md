@@ -123,6 +123,7 @@ js/oldrecords.js      one-time offer to download and delete records from the rem
 js/screenshot.js      ☰ → Save a picture (tab capture → JPG, or a one-page PDF written by hand)
 js/backup.js          backup file of everything, last-backed-up status, persistent storage, ask once
 js/welcome.js         welcome, what's new, end of term, ways to help
+js/tabs.js            tabs tell each other which screen they show (BroadcastChannel)
 js/config.js          coffee / feedback links, coffee goal, thank-you list, What's new entries
 js/widgets/*.js       one file per widget; register new ones in js/widgets/index.js
 js/vendor/qrcode.js   QR generator by Kazuhiko Arase (MIT)
@@ -145,6 +146,13 @@ To add a widget, copy an existing widget file. Export an object with `type`, `ti
 - On the second day someone uses the site (with a few widgets made and no backup yet), a small card asks **once** whether to save a backup file. The end-of-term note also offers one, since laptops are often reset over the holidays.
 - **First visit:** a short 👋 welcome. **After an update:** a once-off ✨ What's new note for people already using the site. **Last week of term:** a once-a-term 🎉 thank-you. Each shows ways to help, and they can all be opened again from ☰ → Help.
 - **Owner settings** are in `js/config.js`: the coffee link, a feedback form link, an optional coffee goal (*3 of 10 coffees towards…*) and a thank-you list. Anything left empty doesn't show. Add a new entry to `WHATS_NEW` there for each update worth announcing.
+
+## More than one tab
+
+- Each tab can show a different screen. Opening the site in a new tab still goes straight to your last screen, unless another tab is already showing it; then this tab starts on a free screen and asks **Which screen in this tab?** (or + New screen).
+- If two tabs show the same screen, both say so (whichever saves last wins). When the other tab changes it, this one offers **Load the changes**.
+- Class lists changed in one tab update in the others straight away, so an older tab never saves over newer lists. Each tab keeps its own current class.
+- For two completely separate sets of screens, use two browser profiles (e.g. *School* and *Home*) — each has its own storage.
 
 ## Undo, redo and screen order
 
