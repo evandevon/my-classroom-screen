@@ -1,5 +1,5 @@
 import { h } from '../util.js';
-import { panel, field } from './_common.js';
+import { panel, field, textInput } from './_common.js';
 import { namesFor, sourceName, onClassChange, currentClass, classLists, showClassPicker } from '../classes.js';
 
 // Progress: a row for each student in the class with tick boxes, so children can walk up and
@@ -45,12 +45,19 @@ export default {
   size: [860, 580],
   hasSettings: true,
   privateKeys: ['ticks'],
-  defaultState: () => ({ source: 'current', count: 3, ticks: {} }),   // ticks: classId → name → [true, false…]
+  defaultState: () => ({ source: 'current', count: 3, heading: '', ticks: {} }),   // ticks: classId → name → [true, false…]
 
   mount(ctx) {
     const s = ctx.state;
+    s.heading ??= '';   // widgets made before headings existed
     const wrap = h('div', { class: 'prog' });
     ctx.view.append(wrap);
+    // Optional heading (e.g. "Science report: plan · draft · edit"). Hidden when empty, so the boxes get the room.
+    const heading = h('div', { class: 'prog-heading', contenteditable: 'true', spellcheck: 'true', 'aria-label': 'Heading' });
+    heading.textContent = s.heading || '';
+    heading.addEventListener('input', () => { s.heading = heading.textContent; ctx.save(); });
+    heading.addEventListener('blur', () => { if (!s.heading.trim()) { s.heading = ''; ctx.save(); render(); } });
+    heading.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); heading.blur(); } });
 
     const classId = () => (s.source === 'current' || !s.source ? currentClass()?.id : s.source);
     const ticksFor = (name) => s.ticks[classId()]?.[name] || [];
@@ -97,7 +104,7 @@ export default {
         h('button', { class: 'btn small', onclick: reset, title: 'Untick everyone' }, '↺ Reset'),
       );
       const grid = h('div', { class: 'prog-grid' });
-      wrap.replaceChildren(grid, foot);
+      wrap.replaceChildren(...(s.heading.trim() ? [heading] : []), grid, foot);
       // fit the rows to the space left above the footer
       const W = grid.clientWidth, H = grid.clientHeight;
       const { cols, box } = layout(W, H, names.length, n, nameRatio(names));
@@ -136,6 +143,7 @@ export default {
           sel.append(o);
         }
         panel(ctx, 'Progress',
+          field('Heading (optional — what the ticks are for)', textInput(s.heading, (v) => { s.heading = v; heading.textContent = v; ctx.save(); render(); }, { placeholder: 'e.g. Science report: plan, draft, edit, publish' })),
           field('Rows for', sel),
           h('p', { class: 'hint' }, 'Each student’s ticks are kept with their class, so you can use this screen with every class. Use + and − at the bottom for more or fewer tick boxes.'),
         );
