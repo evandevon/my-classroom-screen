@@ -14,7 +14,8 @@ import { checkOldRecords } from './oldrecords.js';
 import { screenshotDialog } from './screenshot.js';
 import { startupNotes, showWelcome, showWhatsNew, showWaysToHelp } from './welcome.js';
 import { initBackup, maybeAskOnce, backupStatus, downloadBackup, markBackedUp } from './backup.js';
-import { initClasses, currentClassName, fromTimeline, onClassChange, showClassPicker, showClassManager } from './classes.js';
+import { initTabs, announce, notifySaved, askOthers, openElsewhere } from './tabs.js';
+import { initClasses, reloadClassLists, currentClassName, fromTimeline, onClassChange, showClassPicker, showClassManager } from './classes.js';
 
 const $ = (sel) => document.querySelector(sel);
 const boardEl = $('#board');
@@ -27,12 +28,16 @@ const nameBtn = $('#screen-name');
 let screen = null;
 
 const deletedScreens = new Set(); // never save these again (a late save would bring a deleted screen back)
-let previewing = null;   // looking at a screen from a file or link without adding it: { backId, parsed, raw, banner }
+let previewing = null;
+let lastSentKey = '';   // what this screen looked like when it was opened or last announced to other tabs   // looking at a screen from a file or link without adding it: { backId, parsed, raw, banner }
 const persist = debounce(async () => {
   if (!screen || deletedScreens.has(screen.id) || previewing) return;   // a preview is never saved
   screen.updated = Date.now();
   try {
     await db.putScreen(screen);
+    // Another tab showing this screen is offered the changes — only real ones (leaving a tab saves too).
+    const key = comparable(screen);
+    if (key !== lastSentKey) { lastSentKey = key; notifySaved(screen.id); }
   } catch (e) {
     console.error(e);
     toast('Could not save — is storage full or blocked?');
@@ -246,6 +251,57 @@ async function openScreen(s) {
   document.title = `${screen.name} · My Classroom Screen`;
   db.setMeta('lastScreen', screen.id);
   updateClassPill();
+  lastSentKey = comparable(screen);
+  announce(screen.id);
+  updateTabBanner();
+}
+
+// ---------- the same screen open in two tabs ----------
+// Tabs can show different screens. If two show the same one, whichever saves last wins, so say so.
+const tabBanner = h('div', { class: 'tab-banner', role: 'status', hidden: true });
+document.body.append(tabBanner);
+let changedElsewhere = false;
+function updateTabBanner({ changed = false } = {}) {
+  if (changed) changedElsewhere = true;
+  const shared = !!screen && !previewing && openElsewhere().has(screen.id);
+  if (!shared && !changedElsewhere) { tabBanner.hidden = true; return; }
+  tabBanner.hidden = false;
+  tabBanner.replaceChildren(...[
+    h('span', {}, changedElsewhere
+      ? '✏️ This screen was just changed in another tab.'
+      : '👀 This screen is also open in another tab — whichever saves last wins.'),
+    changedElsewhere
+      ? h('button', { class: 'btn small primary', onclick: async () => {
+        changedElsewhere = false;
+        persist.cancel();   // don't save this tab's older copy over the newer one
+        const fresh = await db.getScreen(screen.id);
+        if (fresh) await openScreen(fresh);
+        toast('Loaded the changes from the other tab.');
+      } }, 'Load the changes')
+      : null,
+    h('button', { class: 'btn small', onclick: () => { changedElsewhere = false; openDrawer(); } }, 'Show a different screen'),
+    h('button', { class: 'w-btn', 'aria-label': 'Hide this message', onclick: () => { changedElsewhere = false; tabBanner.hidden = true; } }, '✕'),
+  ].filter(Boolean));
+}
+
+/** A new tab whose usual screen is already open in another tab: pick one for this tab (or make one). */
+function tabChooser(busy, screens) {
+  const dlg = h('dialog', { class: 'modal tab-chooser' },
+    h('div', { class: 'modal-head' }, h('h2', {}, 'Which screen in this tab?'), h('button', { class: 'w-btn', 'aria-label': 'Close', onclick: () => dlg.close() }, '✕')),
+    h('div', { class: 'modal-body' },
+      h('p', { class: 'hint' }, 'The site is already open in another tab. Pick a different screen here, so the two don’t overwrite each other.'),
+      h('div', { class: 'tc-list' },
+        ...screens.map((sc) => h('button', {
+          class: `tc-item${sc.id === screen.id ? ' on' : ''}`,
+          onclick: async () => { dlg.close(); if (sc.id !== screen.id) await openScreen((await db.getScreen(sc.id)) || sc); },
+        }, h('b', {}, sc.name), h('small', {}, busy.has(sc.id) ? 'open in another tab' : sc.id === screen.id ? 'showing now' : `${sc.widgets.length} widget${sc.widgets.length === 1 ? '' : 's'}`))),
+      ),
+      h('button', { class: 'btn primary', onclick: () => { dlg.close(); newScreenDialog(); } }, '+ New screen'),
+    ),
+  );
+  dlg.addEventListener('close', () => setTimeout(() => dlg.remove(), 300));
+  document.body.append(dlg);
+  dlg.showModal();
 }
 
 // ---------- widget theme for the whole screen ----------
@@ -1306,6 +1362,9 @@ async function init() {
 
   let screens = await sortedScreens();
   let target = null;
+  initTabs({ onScreens: () => updateTabBanner(), onSaved: () => updateTabBanner({ changed: true }), onClasses: reloadClassLists });
+  const busy = await askOthers();   // screens other tabs are showing
+  let chooseInThisTab = false;
 
   // Opened from a share link? Ask first (the same window as opening a file).
   let sharedLink = null;
@@ -1322,9 +1381,15 @@ async function init() {
     }
     const lastId = await db.getMeta('lastScreen');
     target = screens.find((s) => s.id === lastId) || screens[0];
+    // Another tab already showing that screen? Start this tab on a free one and let the teacher choose.
+    if (busy.has(target.id) && !sharedLink) {
+      chooseInThisTab = true;
+      target = screens.find((s) => !busy.has(s.id)) || target;
+    }
   }
   await openScreen(target);
   if (sharedLink) openImport(sharedLink, { blankToRemove: starter });
+  if (chooseInThisTab) tabChooser(busy, await sortedScreens());
   setTimeout(() => startupNotes({ firstRun: !!starter }).catch(console.error), 800);   // welcome / what's new / end of term
   // Records from the removed Data feature: offer to download and delete them (once nothing else is open).
   setTimeout(() => !document.querySelector('dialog[open]') && checkOldRecords(), 2500);

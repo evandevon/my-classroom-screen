@@ -1703,3 +1703,13 @@ body.capturing .widget { outline: none !important; }
 .menu-backup.stale { background: #fff4d6; color: #6b4e00; }
 .term-backup { display: grid; gap: 8px; justify-items: start; padding: 10px 12px; border-radius: 12px; background: #fff4d6; }
 .term-backup p { margin: 0; }
+
+/* the same screen open in two tabs */
+.tab-banner { position: fixed; bottom: 112px; left: 50%; transform: translateX(-50%); z-index: 100001; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: min(760px, calc(100vw - 24px)); padding: 8px 10px 8px 16px; border-radius: 14px; background: #fff4d6; color: #6b4e00; box-shadow: 0 6px 20px #0002; font-weight: 600; }
+.tab-banner[hidden] { display: none; }
+body.capturing .tab-banner { visibility: hidden; }
+body.dock-hidden .tab-banner { bottom: 56px; }
+.tc-list { display: grid; gap: 6px; margin: 8px 0 12px; max-height: 50vh; overflow: auto; }
+.tc-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 48px; padding: 8px 14px; border: 2px solid var(--line); border-radius: 12px; background: #fff; text-align: left; color: var(--ink); cursor: pointer; }
+.tc-item.on { border-color: var(--accent); }
+.tc-item small { color: var(--muted); }
