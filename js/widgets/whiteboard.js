@@ -1291,10 +1291,6 @@ export default {
       },
       openSettings() {
         panel(ctx, 'Whiteboard',
-          field('Board', select([['white', 'White'], ['black', 'Chalkboard'], ['clear', 'See-through']], s.bg, (v) => { s.bg = v; sync(); drawPaper(true); save(); })),
-          field('Background', select([['blank', 'Blank'], ['lines', 'Lines'], ['grid', 'Grid'], ['dots', 'Dots']], s.paper, (v) => { s.paper = v; sync(); drawPaper(true); save(); })),
-          field('Spacing', h('input', { type: 'range', min: 2.5, max: 15, step: 0.5, value: s.gap * 100, oninput: (e) => { s.gap = Number(e.target.value) / 100; sync(); drawPaper(true); save(); } })),
-          h('button', { class: 'btn', onclick: download }, '⬇ Save drawing as picture'),
           h('h4', {}, '⏺ Recording'),
           checkbox('Record my voice too (microphone)', s.recVoice, (v) => { s.recVoice = v; save(); }),
           checkbox('Loop playback (play again and again)', s.loop, (v) => { s.loop = v; save(); }),
@@ -1305,6 +1301,11 @@ export default {
             h('button', { class: 'btn danger', onclick: () => { if (confirm('Delete the recording?')) { s.rec = null; s.recAudioAssetId = null; save(); ctx.closeSettings(); sync(); } } }, '🗑 Delete recording'),
           ) : null,
           h('p', { class: 'hint' }, 'Recordings stay in this browser. Saving as a video is usually much quicker than the recording, and you can switch to another tab while it works.'),
+          h('h4', {}, '🎨 The board'),
+          field('Board', select([['white', 'White'], ['black', 'Chalkboard'], ['clear', 'See-through']], s.bg, (v) => { s.bg = v; sync(); drawPaper(true); save(); })),
+          field('Background', select([['blank', 'Blank'], ['lines', 'Lines'], ['grid', 'Grid'], ['dots', 'Dots']], s.paper, (v) => { s.paper = v; sync(); drawPaper(true); save(); })),
+          field('Spacing', h('input', { type: 'range', min: 2.5, max: 15, step: 0.5, value: s.gap * 100, oninput: (e) => { s.gap = Number(e.target.value) / 100; sync(); drawPaper(true); save(); } })),
+          h('button', { class: 'btn', onclick: download }, '⬇ Save drawing as picture'),
         );
       },
       closeSettings: sync,

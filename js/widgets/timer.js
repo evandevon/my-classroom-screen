@@ -294,13 +294,13 @@ export default {
             field('Minutes', numberInput(mins, (v) => { m = v; setDuration(m * 60 + sec); }, { min: 0, max: 600 })),
             field('Seconds', numberInput(secs, (v) => { sec = v; setDuration(m * 60 + sec); }, { min: 0, max: 59 })),
           ),
-          field('Look', styleGrid),
           field('Label', textInput(s.label, (v) => { s.label = v; render(); ctx.save(); }, { placeholder: 'e.g. Pack up' })),
-          field('End sound', soundSelect(s.sound, (v) => { s.sound = v; if (s.running) book(); ctx.save(); })),
           field('Quick buttons (minutes, comma separated)', textInput(s.presets.map((p) => +(p / 60).toFixed(2)).join(', '), (v) => {
             const list = v.split(/[,\s]+/).map(Number).filter((n) => n > 0).slice(0, 6);
             if (list.length) { s.presets = list.map((n) => Math.round(n * 60)); renderPresets(); ctx.save(); }
           })),
+          field('End sound', soundSelect(s.sound, (v) => { s.sound = v; if (s.running) book(); ctx.save(); })),
+          field('Look', styleGrid),
         );
       },
     };

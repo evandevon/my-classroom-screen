@@ -279,8 +279,8 @@ const weather = {
             } }, '📍 Use this device’s location'),
             status,
           ),
-          field('Temperature', select([['C', '°C'], ['F', '°F']], s.unit, (v) => { s.unit = v; ctx.save(); render(); })),
           isToday ? null : field('Show', select([['auto', 'Fit to the widget size'], ['now', 'Just the weather now'], ['full', 'Everything']], s.show, (v) => { s.show = v; ctx.save(); render(); })),
+          field('Temperature', select([['C', '°C'], ['F', '°F']], s.unit, (v) => { s.unit = v; ctx.save(); render(); })),
           h('p', { class: 'hint' }, 'Updates every 15 minutes. Only the place’s rough position (about 1 km) is sent to Open-Meteo, a free weather service. UV advice follows the usual sun-safety steps: slip, slop, slap, seek, slide.'),
         );
       },

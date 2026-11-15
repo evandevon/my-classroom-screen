@@ -198,13 +198,13 @@ export default {
       resize: () => !analyser && draw(false),
       openSettings() {
         panel(ctx, 'Noise meter settings',
-          field('Look', select([['balls', 'Bouncy balls'], ['bar', 'Level bar'], ['face', 'Emoji face']], s.style, (v) => { s.style = v; ctx.save(); draw(false); })),
           field('Microphone sensitivity', (() => {
             const r = h('input', { type: 'range', min: 1, max: 10, value: s.sensitivity });
             r.addEventListener('input', () => { s.sensitivity = Number(r.value); ctx.save(); });
             return r;
           })()),
           field('Too-loud sound', soundSelect(s.alarm, (v) => { s.alarm = v; ctx.save(); })),
+          field('Look', select([['balls', 'Bouncy balls'], ['bar', 'Level bar'], ['face', 'Emoji face']], s.style, (v) => { s.style = v; ctx.save(); draw(false); })),
           h('p', { class: 'hint' }, 'Tip: start listening, then drag the “Too loud at” slider to just above your normal working noise.'),
         );
       },

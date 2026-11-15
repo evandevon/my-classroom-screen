@@ -110,10 +110,10 @@ export default {
           })),
           h('p', { class: 'hint' }, 'Colour, name and keyboard key for each team:'),
           rows,
-          field('Buzz sound', select([['team', 'A different sound for each team'], ['buzzA', 'Same buzz for everyone'], ['ding', 'Ding'], ['fanfare', 'Fanfare'], ['none', 'No sound']], s.sound, (v) => { s.sound = v; ctx.save(); })),
           checkbox('Show who buzzed 2nd, 3rd… and how far behind', s.showOrder, (v) => { s.showOrder = v; ctx.save(); draw(); }),
           checkbox('Keyboard keys buzz too (Enter = ready again)', s.keys, (v) => { s.keys = v; ctx.save(); draw(); }),
           field('Get ready again by itself', select([[0, 'No — tap ↺ Ready'], [5, 'After 5 seconds'], [10, 'After 10 seconds']], s.autoReset, (v) => { s.autoReset = Number(v); ctx.save(); })),
+          field('Buzz sound', select([['team', 'A different sound for each team'], ['buzzA', 'Same buzz for everyone'], ['ding', 'Ding'], ['fanfare', 'Fanfare'], ['none', 'No sound']], s.sound, (v) => { s.sound = v; ctx.save(); })),
           h('p', { class: 'hint' }, 'Buzzers react the moment a finger touches, so the fastest finger wins even when several press at once. Any button that types a key (Makey Makey, Arduino, a spare keyboard) can be a buzzer.'),
         );
       },

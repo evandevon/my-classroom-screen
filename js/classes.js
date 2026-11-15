@@ -82,8 +82,8 @@ export async function initClasses(getScreen) {
 export const classLists = () => st.lists;
 
 /** The classes a set of screens use (for sharing): copies of { id, name, students, apart }, and which one is current. */
-export function classesForScreens(screens) {
-  const ids = new Set();
+export function classesForScreens(screens, all = false) {
+  const ids = new Set(all ? st.lists.map((c) => c.id) : []);
   for (const sc of screens) for (const w of sc.widgets || []) {
     const src = w.state?.source;
     if (src === 'current') { const c = currentClass(); if (c) ids.add(c.id); }
@@ -92,7 +92,7 @@ export function classesForScreens(screens) {
   const cur = currentClass();
   return {
     classes: st.lists.filter((c) => ids.has(c.id)).map((c) => ({ id: c.id, name: c.name, students: [...c.students], apart: (c.apart || []).map((p) => [...p]) })),
-    current: cur && ids.has(cur.id) ? cur.id : '',
+    current: cur && ids.has(cur.id) ? cur.id : '',   // (all = true: every class list, for a full backup)
   };
 }
 
