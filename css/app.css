@@ -1643,3 +1643,19 @@ body.previewing #board { outline: 4px dashed #f2c46d; outline-offset: -4px; }
 .embed-status .btn:not(.primary) { background: #ffffff1f; color: #fff; border-color: #ffffff33; }
 .embed-bar-gap { flex: 1; }
 .widget:is(.theme-glass, .theme-glass-dark) .embed-bar { background: transparent; }
+
+/* progress (a row of tick boxes for each student) */
+.prog { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 6px; }
+.prog-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); grid-template-rows: repeat(var(--rows, 1), minmax(0, 1fr)); grid-auto-flow: column; column-gap: 14px; row-gap: 4px; }
+.prog-row { display: flex; align-items: center; gap: calc(var(--box) * .5); min-width: 0; padding: 0 6px; border-radius: calc(var(--box) * .25); }
+.prog-row.done { background: color-mix(in srgb, #2a9d8f 18%, transparent); }
+.prog-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; font-size: max(10px, calc(var(--box) * .5 * var(--fs, 1))); }
+.prog-row.done .prog-name::after { content: ' ★'; color: #e9a800; }
+.prog-ticks { display: flex; gap: calc(var(--box) * .18); flex: none; }
+.prog-box { width: var(--box); height: var(--box); padding: 0; border: 2px solid color-mix(in srgb, var(--ink, #1d1d1f) 35%, transparent); border-radius: calc(var(--box) * .22); background: color-mix(in srgb, var(--ink, #1d1d1f) 4%, transparent); color: #fff; font-weight: 900; font-size: calc(var(--box) * .62); line-height: 1; cursor: pointer; touch-action: manipulation; }
+.prog-box.on { background: #2a9d8f; border-color: #2a9d8f; }
+.prog-box:active { transform: scale(.92); }
+.prog-foot { display: flex; align-items: center; gap: 8px; flex: none; }
+.prog-class { margin-right: auto; color: var(--muted); font-weight: 700; font-size: calc(13px * var(--fs, 1)); }
+.prog-count { display: flex; align-items: center; gap: 6px; font-weight: 800; }
+.prog-count .btn { min-width: 40px; font-size: 20px; font-weight: 900; }
