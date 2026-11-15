@@ -1661,3 +1661,5 @@ body.previewing #board { outline: 4px dashed #f2c46d; outline-offset: -4px; }
 .prog-count .btn { min-width: 40px; font-size: 20px; font-weight: 900; }
 .cm-dups { margin: 0; padding: 8px 10px; border-radius: 10px; background: #fff4d6; color: #6b4e00; font-size: 14px; line-height: 1.35; }
 .cm-dups[hidden] { display: none; }
+.prog-heading { flex: none; font-weight: 900; font-size: calc(max(18px, 5.5cqmin) * var(--fs, 1)); line-height: 1.2; padding: 2px 4px; outline: none; border-radius: 6px; overflow-wrap: anywhere; }
+.prog-heading:focus { background: color-mix(in srgb, var(--ink, #1d1d1f) 6%, transparent); }

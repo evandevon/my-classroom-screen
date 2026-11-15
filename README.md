@@ -21,7 +21,7 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 | 📝 Text (bold, lists, sizes, colours) | 🎡 Name picker (spinning wheel or flash card, no repeats) | 🏆 Scoreboard (2–8 teams) |
 | ✅ List / checklist | 👥 Group maker (by number of groups or group size) |
 | | 🔢 Tally (count interruptions, great answers… for the class or each student) | 🔳 QR code (works offline) |
-| 🖼️ Image (upload or link) | ✅ Progress (a row of tick boxes for each student in the class, so children can mark how far through a task they are; + / − for more or fewer boxes; rows spread into columns to fit; ticks kept per class) | ➡️ Now / Next visual schedule |
+| 🖼️ Image (upload or link) | ✅ Progress (an optional heading for what it's for, then a row of tick boxes for each student in the class, so children can mark how far through a task they are; + / − for more or fewer boxes; rows spread into columns to fit; ticks kept per class) | ➡️ Now / Next visual schedule |
 | 📷 Webcam / document camera (flip, rotate, zoom, freeze, full-resolution photos and ⏺ recorded clips — each opens in its own widget with a ⬇ download button) | | |
 | 🔁 Video loop (each webcam recording loops in its own widget — Step 1, Step 2… — with half/quarter speed and download; or loop any video file) | | |
 | 🎴 Random picture (choose a folder of pictures from the computer; no repeats, auto-change, captions, blurry “mystery” reveal — pictures stay in this browser) | | |
