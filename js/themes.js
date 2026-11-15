@@ -46,39 +46,28 @@ export function textSizeSlider(value = 1, onChange) {
 }
 
 /**
- * Six theme tiles, an "edge box" switch for the transparent ones and the drop-shadow switch.
+ * Theme tiles (the outlined transparent ones are tiles of their own) and the drop-shadow switch.
  * onChange({ theme?, shadow? }). A retired theme a widget already uses is shown too, so it can stay.
  */
 export function themePicker({ theme = 'light', shadow = false }, onChange) {
-  const cur = THEMES.find((t) => t.id === theme) || THEMES[0];
-  let base = cur.base || cur.id;
-  let boxed = !!cur.boxed;
-  const offered = THEMES.filter((t) => !t.boxed && (!t.retired || t.id === base));
-  const idFor = () => (boxed && (base === 'glass' || base === 'glass-dark') ? `${base}-box` : base);
-  const edge = h('input', { type: 'checkbox' });
-  edge.checked = boxed;
-  const edgeRow = h('label', { class: 'check' }, edge, h('span', {}, 'Edge box — a thin outline, to set some transparent widgets apart'));
+  let cur = (THEMES.find((t) => t.id === theme) || THEMES[0]).id;
+  const offered = THEMES.filter((t) => !t.retired || t.id === cur);
   const tiles = offered.map((t) => h('button', {
-    class: `theme-tile${t.id === base ? ' on' : ''}`,
-    'aria-pressed': String(t.id === base),
+    class: `theme-tile${t.id === cur ? ' on' : ''}`,
+    'aria-pressed': String(t.id === cur),
     title: t.label,
     onclick: () => {
-      base = t.id;
-      tiles.forEach((x, i) => { const on = offered[i].id === base; x.classList.toggle('on', on); x.setAttribute('aria-pressed', String(on)); });
-      sync();
-      onChange({ theme: idFor() });
+      cur = t.id;
+      tiles.forEach((x, i) => { const on = offered[i].id === cur; x.classList.toggle('on', on); x.setAttribute('aria-pressed', String(on)); });
+      onChange({ theme: cur });
     },
   },
-    h('span', { class: `theme-swatch ts-${t.id}`, style: { '--sw': t.swatch } }, h('b', { style: { color: t.ink || (t.id === 'dark' ? '#fff' : '#1d1d1f') } }, 'Aa')),
+    h('span', { class: `theme-swatch ts-${t.base || t.id}${t.boxed ? ' ts-boxed' : ''}`, style: { '--sw': t.swatch } }, h('b', { style: { color: t.ink || (t.id === 'dark' ? '#fff' : '#1d1d1f') } }, 'Aa')),
     h('small', {}, t.retired ? `${t.label} (older)` : t.label),
   ));
-  const sync = () => { edgeRow.hidden = !(base === 'glass' || base === 'glass-dark'); };
-  edge.addEventListener('change', () => { boxed = edge.checked; onChange({ theme: idFor() }); });
   const sh = h('input', { type: 'checkbox', checked: shadow, onchange: () => onChange({ shadow: sh.checked }) });
-  sync();
   return h('div', { class: 'theme-picker' },
     h('div', { class: 'theme-tiles' }, ...tiles),
-    edgeRow,
     h('label', { class: 'check' }, sh, h('span', {}, 'Drop shadow on words and pictures (helps them stand out on busy backgrounds)')),
   );
 }
