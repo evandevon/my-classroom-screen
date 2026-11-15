@@ -1699,3 +1699,7 @@ body.capturing .widget { outline: none !important; }
 .goto-btn.unset { background: color-mix(in srgb, var(--ink, #1d1d1f) 8%, transparent); color: inherit; font-size: calc(max(14px, 9cqmin) * var(--fs, 1)); }
 .goto-icon { font-size: 1.2em; }
 .goto-label { overflow-wrap: anywhere; text-align: left; }
+.menu-backup { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 0 0 8px; padding: 8px 10px; border-radius: 12px; background: #eef7f1; color: #1d5b3a; font-size: 14px; font-weight: 600; }
+.menu-backup.stale { background: #fff4d6; color: #6b4e00; }
+.term-backup { display: grid; gap: 8px; justify-items: start; padding: 10px 12px; border-radius: 12px; background: #fff4d6; }
+.term-backup p { margin: 0; }
