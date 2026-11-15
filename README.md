@@ -21,7 +21,7 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 | 📝 Text (bold, lists, sizes, colours) | 🎡 Name picker (spinning wheel or flash card, no repeats) | 🏆 Scoreboard (2–8 teams) |
 | ✅ List / checklist | 👥 Group maker (by number of groups or group size) |
 | | 🔢 Tally (count interruptions, great answers… for the class or each student) | 🔳 QR code (works offline) |
-| 🖼️ Image (upload or link) | | ➡️ Now / Next visual schedule |
+| 🖼️ Image (upload or link) | ✅ Progress (a row of tick boxes for each student in the class, so children can mark how far through a task they are; + / − for more or fewer boxes; rows spread into columns to fit; ticks kept per class) | ➡️ Now / Next visual schedule |
 | 📷 Webcam / document camera (flip, rotate, zoom, freeze, full-resolution photos and ⏺ recorded clips — each opens in its own widget with a ⬇ download button) | | |
 | 🔁 Video loop (each webcam recording loops in its own widget — Step 1, Step 2… — with half/quarter speed and download; or loop any video file) | | |
 | 🎴 Random picture (choose a folder of pictures from the computer; no repeats, auto-change, captions, blurry “mystery” reveal — pictures stay in this browser) | | |
@@ -52,7 +52,7 @@ Your screens **save themselves** in this browser on this computer — there's no
 
 - **☰ → Classes & student lists:** make a class, then type names or paste a column from a spreadsheet. You can also import or export CSV to move lists to another computer.
 - **👥 button in the top bar:** choose the current class. It can also switch automatically when the Activity timeline's session name contains a class name.
-- The Name picker, Group maker, Tally (per student), and Scoreboard ("a row for each student") use the current class's names, or their own typed list.
+- The Name picker, Group maker, Tally (per student), and Scoreboard ("a row for each student") use the current class's names, or their own typed list. Progress always uses a class list, and keeps each class's ticks separately.
 - **🚫 Keep apart:** in a class's list, choose pairs of students who shouldn't be in the same group. The Group maker keeps them apart (and tells you if it can't, e.g. with too few groups).
 - **Sharing:** a screen's class lists (and keep-apart pairs) go with it in screen files, and in share links unless you untick “Include class lists and student names”. Only share with colleagues — it's up to you who gets them. On the other computer they're added to that teacher's classes (a class with the same name and students isn't doubled up; a different class with the same name is added as “Name (2)”).
 

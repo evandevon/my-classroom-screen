@@ -16,6 +16,7 @@ import worksymbols from './worksymbols.js';
 import namepicker from './namepicker.js';
 import groupmaker from './groupmaker.js';
 import tally from './tally.js';
+import progress from './progress.js';
 import whiteboard from './whiteboard.js';
 import calculator from './calculator.js';
 import dice from './dice.js';
@@ -36,7 +37,7 @@ import poll from './poll.js';
 
 const ALL = [
   timer, stopwatch, clock, alarm, schoolday, calendar, text, list, image, embed, audio,
-  noise, traffic, worksymbols, namepicker, groupmaker, tally,
+  noise, traffic, worksymbols, namepicker, groupmaker, tally, progress,
   whiteboard, calculator, dice, spinner, coin, storydice, scoreboard, qrcode, nownext, webcam, countdown, weather, weatherToday, randompics, videoloop, interval, buzzer, poll,
 ];
 
@@ -53,7 +54,7 @@ export const byGroup = (g) => ALL.filter((w) => w.group === g);
 // The widget bar shows these categories; each opens a pop-up of its widgets.
 export const CATEGORIES = [
   { id: 'time', label: 'Time & weather', icon: '⏰', types: ['timer', 'stopwatch', 'interval', 'clock', 'alarm', 'schoolday', 'calendar', 'countdown', 'weather', 'weathertoday'] },
-  { id: 'class', label: 'Class', icon: '🧑‍🏫', types: ['noise', 'traffic', 'worksymbols', 'nownext', 'namepicker', 'groupmaker', 'tally', 'scoreboard', 'buzzer'] },
+  { id: 'class', label: 'Class', icon: '🧑‍🏫', types: ['noise', 'traffic', 'worksymbols', 'nownext', 'namepicker', 'groupmaker', 'tally', 'progress', 'scoreboard', 'buzzer'] },
   { id: 'media', label: 'Words & media', icon: '🖼️', types: ['text', 'list', 'whiteboard', 'image', 'randompics', 'embed', 'audio', 'webcam', 'videoloop', 'qrcode'] },
   { id: 'play', label: 'Maths & chance', icon: '🎲', types: ['calculator', 'poll', 'dice', 'spinner', 'coin', 'storydice'] },
 ];
