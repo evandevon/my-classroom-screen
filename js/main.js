@@ -13,7 +13,7 @@ import { ANIMS, renderMoving, classifyLink, MOVING_TYPES, loadLibrary, libURL, f
 import { checkOldRecords } from './oldrecords.js';
 import { screenshotDialog } from './screenshot.js';
 import { startupNotes, showWelcome, showWhatsNew, showWaysToHelp } from './welcome.js';
-import { initBackup, noteChange, maybeAskOnce, backupState, chooseFolder, resumeFolder, forgetFolder, writeBackup } from './backup.js';
+import { initBackup, maybeAskOnce, backupStatus, downloadBackup, markBackedUp } from './backup.js';
 import { initClasses, currentClassName, fromTimeline, onClassChange, showClassPicker, showClassManager } from './classes.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -33,7 +33,6 @@ const persist = debounce(async () => {
   screen.updated = Date.now();
   try {
     await db.putScreen(screen);
-    noteChange();   // keeps the backup folder's copy up to date (if one is chosen)
   } catch (e) {
     console.error(e);
     toast('Could not save — is storage full or blocked?');
@@ -480,12 +479,12 @@ async function renderDrawer() {
       menuBtn('🧹', 'Clear widgets', () => { if (screen.paused) { toast('Carry on with the paused screen first.'); return; } if (confirm('Remove all widgets from this screen?')) board.clearAll(); }),
     ),
     h('h3', {}, 'Save & share'),
-    h('p', { class: 'menu-saved' }, '✓ Your screens save themselves on this computer — there’s nothing to do.'),
+    h('p', { class: 'menu-saved' }, '✓ Your screens save themselves in this browser as you go.'),
+    backupLine(await backupStatus()),
     h('div', { class: 'menu-grid' },
       menuBtn('🔗', 'Share a link', () => { closeDrawer(); shareDialog(); }),
       menuBtn('💾', 'Save to a file', () => { closeDrawer(); exportDialog(); }),
       menuBtn('📂', 'Open a file', () => { closeDrawer(); importDialog(); }),
-      backupMenuBtn(),
     ),
     h('p', { class: 'hint menu-note' }, 'A link is quick for sharing one screen, but leaves out pictures, clips and sounds from this computer. A file keeps everything — use it for backups, a new computer or sharing a set of screens.'),
     h('h3', {}, 'Classes'),
@@ -509,33 +508,12 @@ async function renderDrawer() {
     h('p', { class: 'hint menu-made' }, 'Made by teachers, for teachers. Free for everyone. ', h('button', { class: 'linkish', onclick: () => { closeDrawer(); showWaysToHelp(); } }, '💛 Ways to help')),
   );
 }
-/** ☰ → keep a copy in a folder (Chrome/Edge): choose one, carry on after a new visit, or manage it. */
-function backupMenuBtn() {
-  const b = backupState();
-  if (!b.supported) return null;
-  if (!b.folder) return menuBtn('🗂', 'Keep a copy in a folder', () => { closeDrawer(); chooseFolder(); });
-  if (b.paused) return menuBtn('⏸', `Backup paused — tap to carry on (“${b.folder}”)`, () => resumeFolder());
-  return menuBtn('🗂', `Copying to “${b.folder}”`, () => { closeDrawer(); backupDialog(); });
-}
-async function backupDialog() {
-  const b = backupState();
-  const last = await db.getMeta('backupLast', 0);
-  const ago = last ? new Date(last).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'not yet';
-  const dlg = h('dialog', { class: 'modal' },
-    h('div', { class: 'modal-head' }, h('h2', {}, '🗂 Your backup folder'), h('button', { class: 'w-btn', 'aria-label': 'Close', onclick: () => dlg.close() }, '✕')),
-    h('div', { class: 'modal-body' },
-      h('p', {}, `A copy of all your screens and class lists is kept in “${b.folder}”, about a minute after each change. Last saved: ${ago}.`),
-      h('p', { class: 'hint' }, 'The last four weeks are kept as separate files too. To use a copy, open it with ☰ → Open a file. It’s a backup, not syncing: if two computers use the same folder, the one that saves last replaces the other’s copy.'),
-      h('div', { class: 'row' },
-        h('button', { class: 'btn primary', onclick: async () => { if (await writeBackup()) toast('💾 Saved.'); dlg.close(); } }, 'Save now'),
-        h('button', { class: 'btn', onclick: () => { dlg.close(); chooseFolder(); } }, 'Change folder'),
-        h('button', { class: 'btn danger', onclick: async () => { await forgetFolder(); dlg.close(); toast('Stopped. The copies already in the folder stay there.'); } }, 'Stop'),
-      ),
-    ),
+/** ☰ → Save & share: when everything was last saved to a file, with a gentle warning when it's been a while. */
+function backupLine(b) {
+  return h('div', { class: `menu-backup${b.stale ? ' stale' : ''}` },
+    h('span', {}, b.stale ? (b.last ? `⚠ Last backed up to a file ${b.when}.` : '⚠ Not backed up to a file yet.') : `✓ Last backed up to a file ${b.when}.`),
+    h('button', { class: `btn small${b.stale ? ' primary' : ''}`, onclick: () => { closeDrawer(); downloadBackup(); } }, '⬇ Back up everything'),
   );
-  dlg.addEventListener('close', () => setTimeout(() => dlg.remove(), 300));
-  document.body.append(dlg);
-  dlg.showModal();
 }
 const menuBtn = (icon, label, onclick) => h('button', { class: 'menu-btn', onclick }, h('span', { class: 'mi' }, icon), label);
 function toggle(label, checked, onChange) {
@@ -1034,6 +1012,7 @@ async function exportScreens(screens, name) {
   const blob = await buildProjectFile(fresh);
   const safe = name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'screen';
   downloadBlob(blob, `${safe}.classroom`);
+  if (screens.length >= (await db.listScreens()).length) markBackedUp();   // every screen saved = a backup
 }
 
 async function importDialog() {

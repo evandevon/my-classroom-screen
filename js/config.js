@@ -22,7 +22,7 @@ export const WHATS_NEW = [
       '✅ **Progress** widget: a row of tick boxes for each student, so children can mark how far through a task they are.',
       '✏️ **Whiteboards** take pictures — paste or drop one in, move and resize it, and draw over it.',
       '📸 **Save a picture of the screen** as a JPG or PDF (☰ menu).',
-      '🗂 **Keep a copy in a folder** that updates by itself (☰ → Save & share, Chrome and Edge).',
+      '💾 **Back up everything** to a file from the ☰ menu — it shows when you last did.',
       '⚙ Every widget’s settings now follow the same order: what it shows, how it behaves, sounds, then how it looks.',
     ],
   },

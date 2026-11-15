@@ -121,7 +121,7 @@ js/templates.js       starter screens and backgrounds
 js/sound.js           sound effects made with Web Audio (no audio files)
 js/oldrecords.js      one-time offer to download and delete records from the removed Data feature
 js/screenshot.js      ☰ → Save a picture (tab capture → JPG, or a one-page PDF written by hand)
-js/backup.js          keep a copy in a folder (File System Access), ask once
+js/backup.js          backup file of everything, last-backed-up status, persistent storage, ask once
 js/welcome.js         welcome, what's new, end of term, ways to help
 js/config.js          coffee / feedback links, coffee goal, thank-you list, What's new entries
 js/widgets/*.js       one file per widget; register new ones in js/widgets/index.js
@@ -141,8 +141,8 @@ To add a widget, copy an existing widget file. Export an object with `type`, `ti
 ## Saving a picture, backups and notes
 
 - **☰ → 📸 Save a picture (JPG or PDF)** takes one picture of the screen without the menu and widget bar. The browser asks to share the tab (choose *Share*); it grabs one frame and stops, and nothing is sent anywhere. Browsers that can't do this (e.g. iPad Safari) are pointed to the screenshot keys.
-- **☰ → 🗂 Keep a copy in a folder** (Chrome and Edge): choose a folder once — OneDrive, Google Drive or Documents — and *My Classroom Screen backup.classroom* there is updated about a minute after each change, with weekly copies of the last four weeks. Open it with ☰ → Open a file. It's a backup, not syncing: if two computers use the same folder, the one that saves last replaces the other's copy. After a new visit Chrome may ask to carry on; tap *Yes*.
-- On the second day someone uses the site (with a few widgets made and no backup yet), a small card asks **once** whether to keep a copy. Other browsers are offered a backup file instead.
+- **Backups:** screens live only in this browser. **☰ → Save & share** shows when everything was last backed up to a file, with a gentle ⚠ after four weeks (or if never), and a **⬇ Back up everything** button: one .classroom file of every screen and class list. Open it with ☰ → Open a file. Saving every screen with *Save to a file* counts too. The site also asks the browser not to clear its storage to free up space.
+- On the second day someone uses the site (with a few widgets made and no backup yet), a small card asks **once** whether to save a backup file. The end-of-term note also offers one, since laptops are often reset over the holidays.
 - **First visit:** a short 👋 welcome. **After an update:** a once-off ✨ What's new note for people already using the site. **Last week of term:** a once-a-term 🎉 thank-you. Each shows ways to help, and they can all be opened again from ☰ → Help.
 - **Owner settings** are in `js/config.js`: the coffee link, a feedback form link, an optional coffee goal (*3 of 10 coffees towards…*) and a thank-you list. Anything left empty doesn't show. Add a new entry to `WHATS_NEW` there for each update worth announcing.
 

@@ -8,6 +8,7 @@ import { h, toast } from './util.js';
 import { db } from './storage.js';
 import { SUPPORT, WHATS_NEW } from './config.js';
 import { REGIONS, detectRegion } from './termdates.js';
+import { downloadBackup } from './backup.js';
 
 const latest = () => Math.max(0, ...WHATS_NEW.map((w) => w.n));
 
@@ -104,6 +105,11 @@ function endOfTerm(today = new Date()) {
 function showEndOfTerm(term) {
   return modal(`🎉 You made it to the end of Term ${term.number}!`, [
     h('p', {}, 'Well done — have a proper rest. Thank you for using My Classroom Screen this term.'),
+    h('div', { class: 'term-backup' },
+      h('p', {}, 'Laptops are often reset over the holidays. Save a backup of your screens first — keep it somewhere safe, like OneDrive.'),
+      h('button', { class: 'btn primary', onclick: () => downloadBackup() }, '⬇ Download a backup before the holidays'),
+    ),
+    h('hr'),
     waysToHelp(),
   ], { primary: 'Thanks!' });
 }
