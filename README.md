@@ -21,6 +21,7 @@ No accounts and no ads. Everything is saved in the browser on your own device.
 | 📝 Text (bold, lists, sizes, colours) | 🎡 Name picker (spinning wheel or flash card, no repeats) | 🏆 Scoreboard (2–8 teams) |
 | ✅ List / checklist | 👥 Group maker (by number of groups or group size) |
 | | 🔢 Tally (count interruptions, great answers… for the class or each student) | 🔳 QR code (works offline) |
+| ➡️ Go to screen (a big button that opens another of your screens — put one on each screen to step through a lesson; finds the screen by name after a file or link) |
 | 🖼️ Image (upload or link) | ✅ Progress (an optional heading for what it's for, then a row of tick boxes for each student in the class, so children can mark how far through a task they are; + / − for more or fewer boxes; rows spread into columns to fit; ticks kept per class) | ➡️ Now / Next visual schedule |
 | 📷 Webcam / document camera (flip, rotate, zoom, freeze, full-resolution photos and ⏺ recorded clips — each opens in its own widget with a ⬇ download button) | | |
 | 🔁 Video loop (each webcam recording loops in its own widget — Step 1, Step 2… — with half/quarter speed and download; or loop any video file) | | |
@@ -45,7 +46,7 @@ Your screens **save themselves** in this browser on this computer — there's no
 - **👁 Preview** on any row opens that screen exactly as it is, without adding it. A banner across the top offers **Add this screen**, **Other screens** (back to the list) and **Close**. Nothing you do while previewing is saved, and closing takes you back to where you were.
 - A `.classroom` file is a zip: `classroom.json` (screens and class lists) and a `files/` folder with every photo, clip, picture and sound at its real size (rename it to `.zip` to look inside). Older `.json` files still open.
 - Files no screen uses any more (e.g. from a deleted widget) are tidied away automatically. Save a file now and then as a backup — clearing the browser's data would remove your screens.
-- **Screens:** tap ☰ to make, switch, rename, duplicate, delete or drag screens into order. Start blank or from a template.
+- **Screens:** tap ☰ to make, switch, rename, duplicate, delete or drag screens into order. Start blank or from a ready-made screen: Morning routine, Group work, Quiet reading, Maths lesson, Test conditions, Writing task, Science investigation, Stations / rotations, Brain break, Pack up or Relief teacher day.
 - **Pause screen** (☰ → This screen) stops everything — timers and stopwatches keep their time, alarms, cameras, microphones and videos switch off — so you can carry on tomorrow.
 
 ## Classes and student lists (stay on this device)

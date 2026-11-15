@@ -166,6 +166,16 @@ board.undo = undo;
 // For widgets that change themselves after a wait (e.g. a picture added to a whiteboard): one undo step.
 board.beginUndo = () => beginInteraction({ type: 'paste' });
 board.settleUndo = () => settleSoon(300);
+// For the "Go to screen" button widget.
+board.listScreens = () => sortedScreens();
+board.screenId = () => screen?.id;
+board.goToScreen = async (id, name) => {
+  const all = await sortedScreens();
+  const target = all.find((s) => s.id === id) || all.find((s) => s.name === name);   // by name after a file or link
+  if (!target) { toast(`There’s no screen called “${name}” here any more — choose another in the button’s ⚙.`); return; }
+  if (target.id === screen?.id) return;
+  await openScreen((await db.getScreen(target.id)) || target);
+};
 redoBtn.addEventListener('click', redo);
 document.addEventListener('pointerdown', (e) => { pointersDown++; beginInteraction(e); }, true);
 const pointerEnd = () => { pointersDown = Math.max(0, pointersDown - 1); settleSoon(); };
@@ -496,7 +506,7 @@ async function renderDrawer() {
       menuBtn('💛', 'Ways to help', () => { closeDrawer(); showWaysToHelp(); }),
     ),
     h('p', { class: 'hint' }, 'Everything is saved automatically in this browser. Use ☰ → “Save to a file” now and then as a backup.'),
-    h('p', { class: 'hint menu-made' }, 'Made by a NSW teacher, free for everyone. ', h('button', { class: 'linkish', onclick: () => { closeDrawer(); showWaysToHelp(); } }, '💛 Ways to help')),
+    h('p', { class: 'hint menu-made' }, 'Made by teachers, for teachers. Free for everyone. ', h('button', { class: 'linkish', onclick: () => { closeDrawer(); showWaysToHelp(); } }, '💛 Ways to help')),
   );
 }
 /** ☰ → keep a copy in a folder (Chrome/Edge): choose one, carry on after a new visit, or manage it. */

@@ -17,6 +17,7 @@ import namepicker from './namepicker.js';
 import groupmaker from './groupmaker.js';
 import tally from './tally.js';
 import progress from './progress.js';
+import gotoscreen from './gotoscreen.js';
 import whiteboard from './whiteboard.js';
 import calculator from './calculator.js';
 import dice from './dice.js';
@@ -38,7 +39,7 @@ import poll from './poll.js';
 const ALL = [
   timer, stopwatch, clock, alarm, schoolday, calendar, text, list, image, embed, audio,
   noise, traffic, worksymbols, namepicker, groupmaker, tally, progress,
-  whiteboard, calculator, dice, spinner, coin, storydice, scoreboard, qrcode, nownext, webcam, countdown, weather, weatherToday, randompics, videoloop, interval, buzzer, poll,
+  whiteboard, calculator, dice, spinner, coin, storydice, scoreboard, qrcode, nownext, gotoscreen, webcam, countdown, weather, weatherToday, randompics, videoloop, interval, buzzer, poll,
 ];
 
 export const WIDGETS = Object.fromEntries(ALL.map((w) => [w.type, w]));
@@ -55,6 +56,6 @@ export const byGroup = (g) => ALL.filter((w) => w.group === g);
 export const CATEGORIES = [
   { id: 'time', label: 'Time & weather', icon: '⏰', types: ['timer', 'stopwatch', 'interval', 'clock', 'alarm', 'schoolday', 'calendar', 'countdown', 'weather', 'weathertoday'] },
   { id: 'class', label: 'Class', icon: '🧑‍🏫', types: ['noise', 'traffic', 'worksymbols', 'nownext', 'namepicker', 'groupmaker', 'tally', 'progress', 'scoreboard', 'buzzer'] },
-  { id: 'media', label: 'Words & media', icon: '🖼️', types: ['text', 'list', 'whiteboard', 'image', 'randompics', 'embed', 'audio', 'webcam', 'videoloop', 'qrcode'] },
+  { id: 'media', label: 'Words & media', icon: '🖼️', types: ['text', 'list', 'whiteboard', 'image', 'randompics', 'embed', 'audio', 'webcam', 'videoloop', 'qrcode', 'gotoscreen'] },
   { id: 'play', label: 'Maths & chance', icon: '🎲', types: ['calculator', 'poll', 'dice', 'spinner', 'coin', 'storydice'] },
 ];

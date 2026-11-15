@@ -368,6 +368,9 @@ export class Board {
       addWidget: (type, state) => this.addWidget(type, { state }),
       beginUndo: () => this.beginUndo?.(),
       settleUndo: () => this.settleUndo?.(),
+      goToScreen: (id, name) => this.goToScreen?.(id, name),
+      listScreens: () => this.listScreens?.() ?? Promise.resolve([]),
+      screenId: () => this.screenId?.(),
     };
 
     // Settings open in a side panel, so the widget stays in view and shows changes as you make them.

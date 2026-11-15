@@ -41,7 +41,7 @@ export function waysToHelp() {
   const { coffeeUrl, feedbackUrl, goal, thanks } = SUPPORT;
   const link = (href, text, primary = false) => h('a', { class: `btn${primary ? ' primary' : ''}`, href, target: '_blank', rel: 'noopener' }, text);
   return h('div', { class: 'ways' },
-    h('p', {}, 'It’s made by one NSW teacher and free for everyone — no ads, no accounts, nothing sold. If it helps you, here’s how you can help it:'),
+    h('p', {}, 'Made by teachers, for teachers — free for everyone, with no ads, no accounts and nothing sold. If it helps you, here’s how you can help it:'),
     h('div', { class: 'ways-grid' },
       h('button', { class: 'btn', onclick: tell }, '📣 Tell a colleague'),
       feedbackUrl ? link(feedbackUrl, '💡 Suggest an idea or report a bug') : null,
