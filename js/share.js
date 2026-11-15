@@ -138,7 +138,7 @@ const EXT_BY_TYPE = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif
 const README = `My Classroom Screen — saved screens
 https://evandevon.github.io/my-classroom-screen/
 
-To open: in My Classroom Screen, menu ☰ → Save & share → Open a file (or drag this file onto the screen), then tick the screens you want.
+To open: in My Classroom Screen, menu ☰ → Save & share → Add screens from a file (or drag this file onto the screen), then tick the screens you want.
 
 This file is a normal zip. Rename it to .zip to look inside:
   classroom.json   the screens and their settings (and any class lists they use)

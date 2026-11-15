@@ -4,7 +4,7 @@
 //  • show "Last backed up to a file: …" in the menu, with a warning when it's been a while;
 //  • ask once, quietly, on a second day of use, whether to download a backup file;
 //  • offer a backup in the end-of-term note (see welcome.js), before the holidays.
-// A backup file is a .classroom file of every screen and class list; open it with ☰ → Open a file.
+// A backup file is a .classroom file of every screen and class list; open it with ☰ → Add screens from a file.
 
 import { h, downloadBlob, toast } from './util.js';
 import { db } from './storage.js';
@@ -32,7 +32,7 @@ export async function downloadBackup() {
   const blob = await buildProjectFile(await db.listScreens(), { allClasses: true });
   downloadBlob(blob, `My Classroom Screen backup ${stamp()}.classroom`);
   await markBackedUp();
-  toast('💾 Backup saved to your Downloads. Keep it somewhere safe (like OneDrive) — open it with ☰ → Open a file if you ever need it.', { ms: 8000 });
+  toast('💾 Backup saved to your Downloads. Keep it somewhere safe (like OneDrive) — open it with ☰ → Add screens from a file if you ever need it.', { ms: 8000 });
 }
 
 /** For the menu: when the last backup was, and whether it's time for another. */
