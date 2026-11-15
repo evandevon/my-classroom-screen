@@ -159,6 +159,9 @@ const undo = () => step(undoStack, redoStack, 'Undo');
 const redo = () => step(redoStack, undoStack, 'Redo');
 undoBtn.addEventListener('click', undo);
 board.undo = undo;
+// For widgets that change themselves after a wait (e.g. a picture added to a whiteboard): one undo step.
+board.beginUndo = () => beginInteraction({ type: 'paste' });
+board.settleUndo = () => settleSoon(300);
 redoBtn.addEventListener('click', redo);
 document.addEventListener('pointerdown', (e) => { pointersDown++; beginInteraction(e); }, true);
 const pointerEnd = () => { pointersDown = Math.max(0, pointersDown - 1); settleSoon(); };
@@ -691,7 +694,7 @@ document.addEventListener('drop', hideHint);
 document.addEventListener('dragend', hideHint);
 const IMAGE_LINK = /^(https?:\/\/\S+\.(png|jpe?g|gif|webp|svg|avif)(\?\S*)?|data:image\/[a-z+]+;base64,\S+)$/i;
 document.addEventListener('paste', (e) => {
-  if (!screen || e.target.closest?.('dialog[open], .side-settings')) return;   // pasting into a menu or settings box: leave it alone
+  if (e.defaultPrevented || !screen || e.target.closest?.('dialog[open], .side-settings')) return;   // pasting into a menu or settings box: leave it alone
   const typing = e.target.closest?.('input, textarea, select, [contenteditable="true"]');
   const files = [...(e.clipboardData?.items || [])].filter((it) => it.kind === 'file' && it.type.startsWith('image/')).map((it) => it.getAsFile()).filter(Boolean);
   const text = (e.clipboardData?.getData('text/plain') || '').trim();

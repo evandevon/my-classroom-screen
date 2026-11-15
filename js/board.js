@@ -366,6 +366,8 @@ export class Board {
       closeSettings: () => toggleSettings(false),
       openSettings: () => toggleSettings(true),
       addWidget: (type, state) => this.addWidget(type, { state }),
+      beginUndo: () => this.beginUndo?.(),
+      settleUndo: () => this.settleUndo?.(),
     };
 
     // Settings open in a side panel, so the widget stays in view and shows changes as you make them.
