@@ -123,6 +123,7 @@ js/oldrecords.js      one-time offer to download and delete records from the rem
 js/screenshot.js      ☰ → Save a picture (tab capture → JPG, or a one-page PDF written by hand)
 js/backup.js          backup file of everything, last-backed-up status, persistent storage, ask once
 js/welcome.js         welcome, what's new, end of term, ways to help
+js/groups.js          screen groups (name, colour, open/closed), kept with files and backups
 js/tabs.js            tabs tell each other which screen they use; opening one claims it (BroadcastChannel)
 js/config.js          coffee / feedback links, coffee goal, thank-you list, What's new entries
 js/widgets/*.js       one file per widget; register new ones in js/widgets/index.js
@@ -153,6 +154,14 @@ To add a widget, copy an existing widget file. Export an object with `type`, `ti
 - **A screen is used in one tab at a time.** Opening it in a second tab moves it there: the first tab stops running it (no timers, sounds, videos, camera or microphone, and no saving) and shows **“…is being used in another tab”** with **Use it here** (takes it back, with the other tab's latest changes) or **Show a different screen**. Running timers carry on in the tab that takes over. So two tabs never overwrite each other or ring twice.
 - Class lists changed in one tab update in the others straight away. Each tab keeps its own current class.
 - For two completely separate sets of screens, use two browser profiles (e.g. *School* and *Home*) — each has its own storage.
+
+## Groups of screens
+
+- **☰ → + New group** (e.g. *4K*, *Science*, *Routines*). Each group gets its own colour (🎨 to change it from eight); ✎ renames it; 🗑 deletes the group but keeps its screens.
+- Put a screen in a group by dragging its ⋮⋮ handle into the group (or onto a closed group's heading), or with its **📁** button — handy on a smartboard. One level only: a screen is in one group or none.
+- Tap a group's heading to close or open it; the site remembers. A closed group holding the screen you're on says *· here*.
+- A new screen goes into the same group as the screen you were on. Saved files and backups bring their groups with them (joining a group of the same name if there is one).
+- **Recently used:** once there are six or more screens, the last few you opened appear at the top of the menu.
 
 ## Undo, redo and screen order
 

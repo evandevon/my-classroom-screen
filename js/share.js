@@ -5,6 +5,7 @@ import { db } from './storage.js';
 import { dataURLToBlob, uid } from './util.js';
 import { WIDGETS } from './widgets/index.js';
 import { classLists, classesForScreens, addSharedClasses } from './classes.js';
+import { groupsForScreens, addGroupsFrom } from './groups.js';
 
 const FORMAT = 'my-classroom-screen';
 const VERSION = 1;
@@ -165,7 +166,8 @@ export async function buildProjectFile(screens, { allClasses = false } = {}) {
     }
   }
   const { classes, current } = classesForScreens(screens, allClasses);   // the class lists these screens use go with them
-  const json = JSON.stringify({ format: FORMAT, version: VERSION, exported: new Date().toISOString(), screens, assets, ...(classes.length ? { classes, currentClass: current } : {}) }, null, 1);
+  const groups = await groupsForScreens(screens);   // so a backup brings its screen groups back
+  const json = JSON.stringify({ format: FORMAT, version: VERSION, exported: new Date().toISOString(), screens, assets, ...(classes.length ? { classes, currentClass: current } : {}), ...(groups.length ? { groups } : {}) }, null, 1);
   return makeZip([{ name: 'classroom.json', data: json, compress: true }, { name: 'README.txt', data: README }, ...files], 'application/x-classroom+zip');
 }
 
@@ -183,7 +185,7 @@ export async function readProjectFile(file) {
     try { data = JSON.parse(typeof file === 'string' ? file : await file.text()); } catch { throw new Error('This is not a My Classroom Screen file.'); }
   }
   if (data.format !== FORMAT || !Array.isArray(data.screens)) throw new Error('This is not a My Classroom Screen file.');
-  return { kind: 'file', name: file.name || '', screens: data.screens, classes: data.classes || [], currentClass: data.currentClass || '', assets: data.assets || {}, zip };
+  return { kind: 'file', name: file.name || '', screens: data.screens, classes: data.classes || [], currentClass: data.currentClass || '', groups: data.groups || [], assets: data.assets || {}, zip };
 }
 
 /** Which of a file's class lists a screen uses ('current' means the sender's current class). */
@@ -223,7 +225,14 @@ export async function addImported(parsed, chosen) {
   const idMap = await storeAssets(parsed, chosen);
   const used = new Set(chosen.flatMap((sc) => [...classIdsUsed(sc, parsed.currentClass)]));
   const { idMap: classMap, added } = await addSharedClasses((parsed.classes || []).filter((c) => used.has(c.id)), used.has(parsed.currentClass) ? parsed.currentClass : '');
-  return { screens: chosen.map((sc) => prepareImportedScreen(sc, idMap, classMap)), addedClasses: added };
+  // Screen groups come too (reusing a group of the same name here).
+  const groupMap = await addGroupsFrom((parsed.groups || []).filter((g) => chosen.some((sc) => sc.group === g.id)));
+  const screens = chosen.map((sc) => {
+    const s = prepareImportedScreen(sc, idMap, classMap);
+    if (groupMap[sc.group]) s.group = groupMap[sc.group]; else delete s.group;
+    return s;
+  });
+  return { screens, addedClasses: added };
 }
 
 /**
@@ -232,7 +241,9 @@ export async function addImported(parsed, chosen) {
  */
 export async function previewImported(parsed, sc) {
   const idMap = await storeAssets(parsed, [sc]);
-  return prepareImportedScreen(sc, idMap, {});
+  const s = prepareImportedScreen(sc, idMap, {});
+  delete s.group;
+  return s;
 }
 
 /** Everything in a file, added in one go (kept for older callers). */
