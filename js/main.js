@@ -14,7 +14,7 @@ import { checkOldRecords } from './oldrecords.js';
 import { screenshotDialog } from './screenshot.js';
 import { startupNotes, showWelcome, showWhatsNew, showWaysToHelp } from './welcome.js';
 import { initBackup, maybeAskOnce, backupStatus, downloadBackup, markBackedUp } from './backup.js';
-import { initTabs, announce, notifySaved, askOthers, openElsewhere } from './tabs.js';
+import { initTabs, claim, release, askOthers, openElsewhere } from './tabs.js';
 import { initClasses, reloadClassLists, currentClassName, fromTimeline, onClassChange, showClassPicker, showClassManager } from './classes.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -28,16 +28,13 @@ const nameBtn = $('#screen-name');
 let screen = null;
 
 const deletedScreens = new Set(); // never save these again (a late save would bring a deleted screen back)
-let previewing = null;
-let lastSentKey = '';   // what this screen looked like when it was opened or last announced to other tabs   // looking at a screen from a file or link without adding it: { backId, parsed, raw, banner }
+let previewing = null;   // looking at a screen from a file or link without adding it: { backId, parsed, raw, banner }
+let usedElsewhere = false;   // another tab has taken this screen ("Use it here")
 const persist = debounce(async () => {
-  if (!screen || deletedScreens.has(screen.id) || previewing) return;   // a preview is never saved
+  if (!screen || deletedScreens.has(screen.id) || previewing || usedElsewhere) return;   // a preview, or a screen another tab is using, is never saved
   screen.updated = Date.now();
   try {
     await db.putScreen(screen);
-    // Another tab showing this screen is offered the changes — only real ones (leaving a tab saves too).
-    const key = comparable(screen);
-    if (key !== lastSentKey) { lastSentKey = key; notifySaved(screen.id); }
   } catch (e) {
     console.error(e);
     toast('Could not save — is storage full or blocked?');
@@ -138,6 +135,7 @@ async function restoreInto(before) {
   return true;
 }
 async function step(from, to, word) {
+  if (usedElsewhere) return;   // another tab is using this screen
   commitPending();
   const e = from.pop();
   if (!e) { toast(`Nothing to ${word.toLowerCase()}`); syncUndoButtons(); return; }
@@ -239,6 +237,7 @@ function newScreenFrom(tpl, name) {
 
 async function openScreen(s) {
   const leavingPreview = !!previewing;
+  if (usedElsewhere) persist.cancel();   // this tab's copy is out of date; never save it
   if (previewing) { previewing.banner.remove(); previewing = null; document.body.classList.remove('previewing'); }
   commitPending();
   if (leavingPreview) persist.cancel();   // a preview is never saved
@@ -251,37 +250,50 @@ async function openScreen(s) {
   document.title = `${screen.name} · My Classroom Screen`;
   db.setMeta('lastScreen', screen.id);
   updateClassPill();
-  lastSentKey = comparable(screen);
-  announce(screen.id);
-  updateTabBanner();
+  endUsedElsewhere();
+  claim(screen.id);   // a tab showing this screen elsewhere steps aside
 }
 
-// ---------- the same screen open in two tabs ----------
-// Tabs can show different screens. If two show the same one, whichever saves last wins, so say so.
-const tabBanner = h('div', { class: 'tab-banner', role: 'status', hidden: true });
-document.body.append(tabBanner);
-let changedElsewhere = false;
-function updateTabBanner({ changed = false } = {}) {
-  if (changed) changedElsewhere = true;
-  const shared = !!screen && !previewing && openElsewhere().has(screen.id);
-  if (!shared && !changedElsewhere) { tabBanner.hidden = true; return; }
-  tabBanner.hidden = false;
-  tabBanner.replaceChildren(...[
-    h('span', {}, changedElsewhere
-      ? '✏️ This screen was just changed in another tab.'
-      : '👀 This screen is also open in another tab — whichever saves last wins.'),
-    changedElsewhere
-      ? h('button', { class: 'btn small primary', onclick: async () => {
-        changedElsewhere = false;
-        persist.cancel();   // don't save this tab's older copy over the newer one
-        const fresh = await db.getScreen(screen.id);
-        if (fresh) await openScreen(fresh);
-        toast('Loaded the changes from the other tab.');
-      } }, 'Load the changes')
-      : null,
-    h('button', { class: 'btn small', onclick: () => { changedElsewhere = false; openDrawer(); } }, 'Show a different screen'),
-    h('button', { class: 'w-btn', 'aria-label': 'Hide this message', onclick: () => { changedElsewhere = false; tabBanner.hidden = true; } }, '✕'),
-  ].filter(Boolean));
+// ---------- one tab at a time per screen ("Use it here") ----------
+// Tabs can show different screens. If a screen is opened in another tab, this tab steps aside:
+// it stops running the screen (no timers, sounds, videos, camera or microphone), stops saving,
+// and covers the page with "Use it here". Tapping that takes the screen back, freshly loaded.
+const elsewhereCover = h('div', { class: 'elsewhere-cover', hidden: true },
+  h('div', { class: 'elsewhere-card', role: 'dialog', 'aria-label': 'This screen is open in another tab' },
+    h('div', { class: 'ec-icon', 'aria-hidden': 'true' }, '🪟'),
+    h('h2', {}, 'This screen is being used in another tab'),
+    h('p', {}, 'A screen can be used in one tab at a time, so two tabs never overwrite each other or ring twice.'),
+    h('div', { class: 'row' },
+      h('button', { class: 'btn primary', onclick: () => useItHere() }, 'Use it here'),
+      h('button', { class: 'btn', onclick: async () => tabChooser(openElsewhere(), await sortedScreens()) }, 'Show a different screen'),
+    ),
+  ));
+document.body.append(elsewhereCover);
+
+function stepAside() {
+  if (!screen || usedElsewhere || previewing) return;
+  commitPending();
+  persist.flush();             // keep what this tab had done until now
+  usedElsewhere = true;
+  release();
+  board.load({ ...screen, widgets: [] });   // stop every widget
+  moving?.setPaused(true);
+  document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+  closeDrawer();
+  elsewhereCover.querySelector('h2').textContent = `“${screen.name}” is being used in another tab`;
+  elsewhereCover.hidden = false;
+  document.body.classList.add('used-elsewhere');
+}
+function endUsedElsewhere() {
+  if (!usedElsewhere) return;
+  usedElsewhere = false;
+  elsewhereCover.hidden = true;
+  document.body.classList.remove('used-elsewhere');
+}
+async function useItHere() {
+  const fresh = await db.getScreen(screen.id);   // the other tab's latest version
+  endUsedElsewhere();
+  await openScreen(fresh || screen);
 }
 
 /** A new tab whose usual screen is already open in another tab: pick one for this tab (or make one). */
@@ -289,12 +301,12 @@ function tabChooser(busy, screens) {
   const dlg = h('dialog', { class: 'modal tab-chooser' },
     h('div', { class: 'modal-head' }, h('h2', {}, 'Which screen in this tab?'), h('button', { class: 'w-btn', 'aria-label': 'Close', onclick: () => dlg.close() }, '✕')),
     h('div', { class: 'modal-body' },
-      h('p', { class: 'hint' }, 'The site is already open in another tab. Pick a different screen here, so the two don’t overwrite each other.'),
+      h('p', { class: 'hint' }, 'The site is open in another tab too. A screen can be used in one tab at a time — choosing one that’s open elsewhere moves it to this tab.'),
       h('div', { class: 'tc-list' },
         ...screens.map((sc) => h('button', {
           class: `tc-item${sc.id === screen.id ? ' on' : ''}`,
-          onclick: async () => { dlg.close(); if (sc.id !== screen.id) await openScreen((await db.getScreen(sc.id)) || sc); },
-        }, h('b', {}, sc.name), h('small', {}, busy.has(sc.id) ? 'open in another tab' : sc.id === screen.id ? 'showing now' : `${sc.widgets.length} widget${sc.widgets.length === 1 ? '' : 's'}`))),
+          onclick: async () => { dlg.close(); if (sc.id === screen.id) { if (usedElsewhere) useItHere(); return; } await openScreen((await db.getScreen(sc.id)) || sc); },
+        }, h('b', {}, sc.name), h('small', {}, sc.id === screen.id && !usedElsewhere ? 'showing now' : busy.has(sc.id) ? 'in another tab — choose to use it here' : `${sc.widgets.length} widget${sc.widgets.length === 1 ? '' : 's'}`))),
       ),
       h('button', { class: 'btn primary', onclick: () => { dlg.close(); newScreenDialog(); } }, '+ New screen'),
     ),
@@ -1362,7 +1374,7 @@ async function init() {
 
   let screens = await sortedScreens();
   let target = null;
-  initTabs({ onScreens: () => updateTabBanner(), onSaved: () => updateTabBanner({ changed: true }), onClasses: reloadClassLists });
+  initTabs({ onClaimed: stepAside, onClasses: reloadClassLists });
   const busy = await askOthers();   // screens other tabs are showing
   let chooseInThisTab = false;
 
