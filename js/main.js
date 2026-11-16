@@ -15,6 +15,7 @@ import { screenshotDialog } from './screenshot.js';
 import { startupNotes, showWelcome, showWhatsNew, showWaysToHelp } from './welcome.js';
 import { initBackup, maybeAskOnce, backupStatus, downloadBackup, markBackedUp } from './backup.js';
 import { initTabs, claim, release, askOthers, openElsewhere } from './tabs.js';
+import { getGroups, forgetGroups, addGroup, updateGroup, removeGroup, GROUP_COLOURS } from './groups.js';
 import { initClasses, reloadClassLists, currentClassName, fromTimeline, onClassChange, showClassPicker, showClassManager } from './classes.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -252,6 +253,7 @@ async function openScreen(s) {
   updateClassPill();
   endUsedElsewhere();
   claim(screen.id);   // a tab showing this screen elsewhere steps aside
+  db.getMeta('recentScreens', []).then((r) => db.setMeta('recentScreens', [screen.id, ...r.filter((id) => id !== screen.id)].slice(0, 8)));
 }
 
 // ---------- one tab at a time per screen ("Use it here") ----------
@@ -390,57 +392,173 @@ async function sortedScreens() {
   const key = (s) => (Number.isFinite(s.order) ? s.order : 1e15 - (s.updated || 0));
   return (await db.listScreens()).sort((a, b) => key(a) - key(b));
 }
-/** Save a new order (array of screen ids). */
-async function saveScreenOrder(ids) {
+/** Save the order of the screen list, and which group each screen is in: [{ id, group }] top to bottom. */
+async function saveScreenOrder(entries) {
   persist.flush();
   const all = await db.listScreens();
   for (const s of all) {
-    const i = ids.indexOf(s.id);
+    const i = entries.findIndex((e) => e.id === s.id);
     if (i < 0) continue;
-    if (s.id === screen.id) { screen.order = i; persist.flush(); }
-    else if (s.order !== i) { s.order = i; await db.putScreen(s); }
+    const group = entries[i].group || undefined;
+    const target = s.id === screen.id ? screen : s;
+    if (target.order === i && (target.group || undefined) === group) continue;
+    target.order = i;
+    if (group) target.group = group; else delete target.group;
+    if (target === screen) persist.flush(); else await db.putScreen(target);
   }
 }
-/** Drag a screen up or down the list by its ⋮⋮ handle (mouse, pen or finger); arrow keys also work on the handle. */
-function makeReorderable(list) {
-  list.addEventListener('pointerdown', (e) => {
+const listEntries = (box) => [...box.querySelectorAll('.screen-list > li[data-id]')].map((li) => ({ id: li.dataset.id, group: li.parentElement.dataset.group || '' }));
+
+/**
+ * Drag a screen by its ⋮⋮ handle (mouse, pen or finger): up and down the list, into another group,
+ * or onto a closed group's heading. Arrow keys on the handle move it within its own list.
+ */
+function makeReorderable(box) {
+  box.addEventListener('pointerdown', (e) => {
     const grip = e.target.closest('.screen-grip');
     if (!grip || e.button > 0) return;
     e.preventDefault();
     const li = grip.closest('li');
-    // Capture on the list, not the handle: moving the row in the page would drop the handle's capture.
-    list.setPointerCapture(e.pointerId);
+    box.setPointerCapture(e.pointerId);   // on the whole box: moving the row would drop the handle's capture
     li.classList.add('dragging');
+    li.style.pointerEvents = 'none';      // so we can see what's underneath it
     const id = e.pointerId;
+    let dropHead = null;
     const move = (ev) => {
       if (ev.pointerId !== id) return;
-      const items = [...list.children].filter((x) => x !== li);
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const head = el?.closest('.group-head');
+      dropHead?.classList.remove('drop-here');
+      dropHead = null;
+      if (head && box.contains(head) && head.nextElementSibling?.hidden) { dropHead = head; head.classList.add('drop-here'); return; }
+      const list = el?.closest('.screen-list') || (head && box.contains(head) ? head.nextElementSibling : null);
+      if (!list || !box.contains(list)) return;
+      const items = [...list.querySelectorAll(':scope > li[data-id]')].filter((x) => x !== li);
       const after = items.find((x) => { const r = x.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; });
       if (after) { if (after !== li.nextSibling) list.insertBefore(li, after); }
-      else if (list.lastChild !== li) list.append(li);
+      else if (list.lastElementChild !== li) list.append(li);
     };
     const up = (ev) => {
       if (ev.pointerId !== id) return;
-      list.removeEventListener('pointermove', move);
-      list.removeEventListener('pointerup', up);
-      list.removeEventListener('pointercancel', up);
+      box.removeEventListener('pointermove', move);
+      box.removeEventListener('pointerup', up);
+      box.removeEventListener('pointercancel', up);
       li.classList.remove('dragging');
-      saveScreenOrder([...list.children].map((x) => x.dataset.id));
+      li.style.pointerEvents = '';
+      if (dropHead) { dropHead.classList.remove('drop-here'); dropHead.nextElementSibling.append(li); }
+      saveScreenOrder(listEntries(box)).then(() => renderDrawer());
     };
-    list.addEventListener('pointermove', move);
-    list.addEventListener('pointerup', up);
-    list.addEventListener('pointercancel', up);
+    box.addEventListener('pointermove', move);
+    box.addEventListener('pointerup', up);
+    box.addEventListener('pointercancel', up);
   });
-  list.addEventListener('keydown', (e) => {
+  box.addEventListener('keydown', (e) => {
     const grip = e.target.closest('.screen-grip');
     if (!grip || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
     e.preventDefault();
     const li = grip.closest('li');
-    if (e.key === 'ArrowUp' && li.previousSibling) list.insertBefore(li, li.previousSibling);
-    if (e.key === 'ArrowDown' && li.nextSibling) list.insertBefore(li.nextSibling, li);
+    const list = li.parentElement;
+    if (e.key === 'ArrowUp' && li.previousElementSibling) list.insertBefore(li, li.previousElementSibling);
+    if (e.key === 'ArrowDown' && li.nextElementSibling) list.insertBefore(li.nextElementSibling, li);
     grip.focus();
-    saveScreenOrder([...list.children].map((x) => x.dataset.id));
+    saveScreenOrder(listEntries(box));
   });
+}
+
+// ---------- screen groups ----------
+async function setScreenGroup(s, groupId) {
+  const target = s.id === screen.id ? screen : (await db.getScreen(s.id)) || s;
+  if (groupId) target.group = groupId; else delete target.group;
+  if (target === screen) persist.flush(); else await db.putScreen(target);
+}
+/** The 📁 button on a screen: choose its group (or make one). Works without dragging, e.g. on a smartboard. */
+async function moveToGroupDialog(s) {
+  const groups = await getGroups();
+  const pick = async (gid) => { dlg.close(); await setScreenGroup(s, gid); renderDrawer(); };
+  const dlg = modal(`Put “${s.name}” in a group`,
+    h('div', { class: 'group-pick' },
+      ...groups.map((g) => h('button', { class: `group-choice${s.group === g.id ? ' on' : ''}`, style: { '--gc': g.colour }, onclick: () => pick(g.id) }, h('span', { class: 'gdot' }), g.name)),
+      h('button', { class: `group-choice${!groups.some((g) => g.id === s.group) ? ' on' : ''}`, onclick: () => pick('') }, h('span', { class: 'gdot none' }), 'No group'),
+    ),
+    h('div', { class: 'row' }, h('button', { class: 'btn', onclick: async () => { dlg.close(); const g = await newGroup(); if (g) { await setScreenGroup(s, g.id); renderDrawer(); } } }, '+ New group…')),
+  );
+}
+async function newGroup() {
+  const name = await ask('New group — e.g. 4K, Science, Routines');
+  if (!name) return null;
+  const g = await addGroup(name);
+  renderDrawer();
+  return g;
+}
+function groupColourDialog(g) {
+  const dlg = modal(`Colour for “${g.name}”`,
+    h('div', { class: 'gcolours' },
+      ...GROUP_COLOURS.map(([c, label]) => h('button', {
+        class: `gcolour${g.colour === c ? ' on' : ''}`, style: { background: c }, title: label, 'aria-label': label,
+        onclick: async () => { dlg.close(); await updateGroup(g.id, { colour: c }); renderDrawer(); },
+      }))),
+  );
+}
+async function deleteGroup(g, count) {
+  if (count && !confirm(`Delete the group “${g.name}”? Its ${count} screen${count === 1 ? '' : 's'} stay, just without a group.`)) return;
+  for (const s of await db.listScreens()) if (s.group === g.id) await setScreenGroup(s, '');
+  await removeGroup(g.id);
+  renderDrawer();
+}
+
+/** The screen list in the menu: recently used, screens without a group, then each group (open or closed). */
+async function screenListSection(screens) {
+  forgetGroups();   // another tab may have changed them
+  const groups = await getGroups();
+  const known = new Set(groups.map((g) => g.id));
+  const groupOf = (s) => (known.has(s.group) ? s.group : '');
+  const colourOf = (s) => groups.find((g) => g.id === groupOf(s))?.colour;
+  const row = (s) => h('li', { class: s.id === screen.id ? 'current' : '', 'data-id': s.id, style: colourOf(s) ? { '--gc': colourOf(s) } : null },
+    screens.length > 1 ? h('button', { class: 'screen-grip', title: 'Drag to move this screen up or down, or into a group', 'aria-label': `Move ${s.name} (drag, or use the up and down arrow keys)` }, '⋮⋮') : null,
+    h('button', { class: 'screen-open', onclick: async () => { await openScreen((await db.getScreen(s.id)) || s); closeDrawer(); } },
+      h('span', { class: 'sname' }, s.name),
+      h('span', { class: 'smeta' }, `${s.widgets.length} widget${s.widgets.length === 1 ? '' : 's'}`),
+    ),
+    groups.length ? h('button', { class: 'w-btn', title: 'Put in a group', 'aria-label': `Put ${s.name} in a group`, onclick: () => moveToGroupDialog(s) }, '📁') : null,
+    h('button', { class: 'w-btn', title: 'Rename', 'aria-label': `Rename ${s.name}`, onclick: () => renameScreen(s) }, '✎'),
+    h('button', { class: 'w-btn', title: 'Duplicate', 'aria-label': `Duplicate ${s.name}`, onclick: () => duplicateScreen(s) }, '⧉'),
+    h('button', { class: 'w-btn close', title: 'Delete', 'aria-label': `Delete ${s.name}`, onclick: () => deleteScreen(s) }, '🗑'),
+  );
+  // Recently used: once there are enough screens for the list to get long.
+  let recent = null;
+  if (screens.length >= 6) {
+    const ids = (await db.getMeta('recentScreens', [])).filter((id) => id !== screen.id);
+    const picks = ids.map((id) => screens.find((s) => s.id === id)).filter(Boolean).slice(0, 4);
+    if (picks.length) {
+      recent = h('div', { class: 'recent-screens' },
+        h('span', { class: 'recent-label' }, 'Recently used'),
+        ...picks.map((s) => h('button', { class: 'recent-chip', style: colourOf(s) ? { '--gc': colourOf(s) } : null, onclick: async () => { await openScreen((await db.getScreen(s.id)) || s); closeDrawer(); } },
+          colourOf(s) ? h('span', { class: 'gdot' }) : null, s.name)));
+    }
+  }
+  const box = h('div', { class: 'screen-groups' },
+    h('ul', { class: 'screen-list', 'data-group': '' }, ...screens.filter((s) => !groupOf(s)).map(row)),
+    ...groups.map((g) => {
+      const items = screens.filter((s) => groupOf(s) === g.id);
+      const open = !g.collapsed;
+      const here = items.some((s) => s.id === screen.id);
+      return [
+        h('div', { class: `group-head${here ? ' has-current' : ''}`, style: { '--gc': g.colour } },
+          h('button', { class: 'group-toggle', 'aria-expanded': String(open), title: open ? 'Close this group' : 'Open this group', onclick: async () => { await updateGroup(g.id, { collapsed: open }); renderDrawer(); } },
+            h('span', { class: 'gchev', 'aria-hidden': 'true' }, open ? '▾' : '▸'),
+            h('span', { class: 'gdot' }),
+            h('span', { class: 'gname' }, g.name),
+            h('span', { class: 'gcount' }, `${items.length}${here && !open ? ' · here' : ''}`)),
+          h('button', { class: 'w-btn', title: 'Colour', 'aria-label': `Colour for ${g.name}`, onclick: () => groupColourDialog(g) }, '🎨'),
+          h('button', { class: 'w-btn', title: 'Rename group', 'aria-label': `Rename ${g.name}`, onclick: async () => { const n = await ask('Rename group', g.name); if (n) { await updateGroup(g.id, { name: n }); renderDrawer(); } } }, '✎'),
+          h('button', { class: 'w-btn close', title: 'Delete group (its screens stay)', 'aria-label': `Delete the group ${g.name}`, onclick: () => deleteGroup(g, items.length) }, '🗑'),
+        ),
+        h('ul', { class: 'screen-list group-list', 'data-group': g.id, hidden: !open, style: { '--gc': g.colour } }, ...items.map(row)),
+      ];
+    }).flat(),
+  );
+  makeReorderable(box);
+  return [recent, box];
 }
 
 // ---------- modal helper ----------
@@ -461,7 +579,8 @@ function ask(title, value = '') {
     const input = h('input', { type: 'text', value });
     let done = false;
     const ok = () => { done = true; resolve(input.value.trim() || null); dlg.close(); };
-    input.addEventListener('keydown', (e) => e.key === 'Enter' && ok());
+    // preventDefault: otherwise the same Enter press also 'clicks' the button that opened this box, opening it again
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ok(); } });
     const dlg = modal(title, input, h('div', { class: 'row end' }, h('button', { class: 'btn primary', onclick: ok }, 'OK')));
     dlg.addEventListener('close', () => !done && resolve(null));
     input.select();
@@ -487,13 +606,18 @@ nameBtn.addEventListener('click', () => showScreenPicker());
 
 async function showScreenPicker() {
   persist.flush();
-  const screens = await sortedScreens();
+  forgetGroups();
+  const groups = await getGroups();
+  const gpos = (s) => { const i = groups.findIndex((g) => g.id === s.group); return i < 0 ? -1 : i; };
+  const screens = (await sortedScreens()).map((s, i) => [s, i]).sort((a, b) => gpos(a[0]) - gpos(b[0]) || a[1] - b[1]).map(([s]) => s);
   const dlg = modal('Which screen?',
     h('div', { class: 'class-grid screen-grid' },
       ...screens.map((s) => {
+        const g = groups.find((x) => x.id === s.group);
         const icons = [...new Set(s.widgets.map((w) => WIDGETS[w.type]?.icon).filter(Boolean))].slice(0, 6).join(' ');
         return h('button', {
-          class: `class-tile screen-tile${s.id === screen.id ? ' on' : ''}`,
+          class: `class-tile screen-tile${s.id === screen.id ? ' on' : ''}${g ? ' grouped' : ''}`,
+          style: g ? { '--gc': g.colour } : null,
           'aria-current': s.id === screen.id ? 'true' : null,
           onclick: async () => {
             dlg.close();
@@ -501,7 +625,7 @@ async function showScreenPicker() {
           },
         },
           h('b', {}, s.name),
-          h('small', {}, `${s.widgets.length} widget${s.widgets.length === 1 ? '' : 's'}${s.paused ? ' · ⏸ paused' : ''}`),
+          h('small', {}, `${g ? `${g.name} · ` : ''}${s.widgets.length} widget${s.widgets.length === 1 ? '' : 's'}${s.paused ? ' · ⏸ paused' : ''}`),
           icons ? h('span', { class: 'screen-icons', 'aria-hidden': 'true' }, icons) : null,
         );
       }),
@@ -516,26 +640,16 @@ async function showScreenPicker() {
 
 async function renderDrawer() {
   const screens = await sortedScreens();
-  const list = h('ul', { class: 'screen-list' },
-    ...screens.map((s) =>
-      h('li', { class: s.id === screen.id ? 'current' : '', 'data-id': s.id },
-        screens.length > 1 ? h('button', { class: 'screen-grip', title: 'Drag to move this screen up or down', 'aria-label': `Move ${s.name} (drag, or use the up and down arrow keys)` }, '⋮⋮') : null,
-        h('button', { class: 'screen-open', onclick: async () => { await openScreen((await db.getScreen(s.id)) || s); closeDrawer(); } },
-          h('span', { class: 'sname' }, s.name),
-          h('span', { class: 'smeta' }, `${s.widgets.length} widget${s.widgets.length === 1 ? '' : 's'}`),
-        ),
-        h('button', { class: 'w-btn', title: 'Rename', 'aria-label': `Rename ${s.name}`, onclick: () => renameScreen(s) }, '✎'),
-        h('button', { class: 'w-btn', title: 'Duplicate', 'aria-label': `Duplicate ${s.name}`, onclick: () => duplicateScreen(s) }, '⧉'),
-        h('button', { class: 'w-btn close', title: 'Delete', 'aria-label': `Delete ${s.name}`, onclick: () => deleteScreen(s) }, '🗑'),
-      ),
-    ),
-  );
+  const [recent, groupsBox] = await screenListSection(screens);
 
-  makeReorderable(list);
   drawer.replaceChildren(
     h('div', { class: 'drawer-head' }, h('h2', {}, 'My screens'), h('button', { class: 'w-btn', 'aria-label': 'Close menu', onclick: closeDrawer }, '✕')),
-    h('button', { class: 'btn primary wide', onclick: newScreenDialog }, '+ New screen'),
-    list,
+    h('div', { class: 'row new-row' },
+      h('button', { class: 'btn primary', onclick: newScreenDialog }, '+ New screen'),
+      h('button', { class: 'btn', title: 'A group keeps screens together, e.g. one per class or subject. Close a group to hide its screens.', onclick: () => newGroup() }, '+ New group'),
+    ),
+    ...(recent ? [recent] : []),
+    groupsBox,
     h('h3', {}, 'This screen'),
     h('div', { class: 'menu-grid' },
       menuBtn('🖼️', 'Background', backgroundDialog),
@@ -643,6 +757,7 @@ function newScreenDialog() {
           onclick: async () => {
             dlg.close();
             const s = newScreenFrom(t, t.name === 'Blank screen' ? 'New screen' : t.name);
+            if (screen?.group) s.group = screen.group;   // next to the screen you were on
             await db.putScreen(s);
             await openScreen(s);
             closeDrawer();
