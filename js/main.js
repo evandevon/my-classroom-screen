@@ -1277,6 +1277,7 @@ async function openImport(parsed, { blankToRemove = null } = {}) {
     return { sc, already, box };
   });
   const classesOf = (list) => {
+    if (parsed.backup && list.length) return parsed.classes || [];   // restoring a backup brings every class list
     const used = new Set(list.flatMap((it) => [...classIdsUsed(it.sc, parsed.currentClass)]));
     return (parsed.classes || []).filter((c) => used.has(c.id));
   };

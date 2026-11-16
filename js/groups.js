@@ -41,7 +41,7 @@ export async function removeGroup(id) {
 /** For a saved file: the groups these screens use. */
 export async function groupsForScreens(screens) {
   const ids = new Set(screens.map((s) => s.group).filter(Boolean));
-  return (await getGroups()).filter((g) => ids.has(g.id)).map(({ id, name, colour }) => ({ id, name, colour }));
+  return (await getGroups()).filter((g) => ids.has(g.id)).map(({ id, name, colour, collapsed }) => ({ id, name, colour, collapsed: !!collapsed }));
 }
 
 /**
@@ -54,7 +54,7 @@ export async function addGroupsFrom(incoming = []) {
   for (const g of incoming) {
     const same = list.find((x) => x.id === g.id) || list.find((x) => x.name.toLowerCase() === String(g.name || '').toLowerCase());
     if (same) { map[g.id] = same.id; continue; }
-    const fresh = { id: uid('group'), name: g.name || 'Group', colour: g.colour || GROUP_COLOURS[0][0], collapsed: false };
+    const fresh = { id: uid('group'), name: g.name || 'Group', colour: g.colour || GROUP_COLOURS[0][0], collapsed: !!g.collapsed };
     list.push(fresh);
     map[g.id] = fresh.id;
   }
