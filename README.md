@@ -123,7 +123,7 @@ js/oldrecords.js      one-time offer to download and delete records from the rem
 js/screenshot.js      ☰ → Save a picture (tab capture → JPG, or a one-page PDF written by hand)
 js/backup.js          backup file of everything, last-backed-up status, persistent storage, ask once
 js/welcome.js         welcome, what's new, end of term, ways to help
-js/tabs.js            tabs tell each other which screen they show (BroadcastChannel)
+js/tabs.js            tabs tell each other which screen they use; opening one claims it (BroadcastChannel)
 js/config.js          coffee / feedback links, coffee goal, thank-you list, What's new entries
 js/widgets/*.js       one file per widget; register new ones in js/widgets/index.js
 js/vendor/qrcode.js   QR generator by Kazuhiko Arase (MIT)
@@ -149,9 +149,9 @@ To add a widget, copy an existing widget file. Export an object with `type`, `ti
 
 ## More than one tab
 
-- Each tab can show a different screen. Opening the site in a new tab still goes straight to your last screen, unless another tab is already showing it; then this tab starts on a free screen and asks **Which screen in this tab?** (or + New screen).
-- If two tabs show the same screen, both say so (whichever saves last wins). When the other tab changes it, this one offers **Load the changes**.
-- Class lists changed in one tab update in the others straight away, so an older tab never saves over newer lists. Each tab keeps its own current class.
+- Each tab can show a different screen. Opening the site in a new tab still goes straight to your last screen, unless another tab is already using it; then this tab starts on a free screen and asks **Which screen in this tab?** (or + New screen).
+- **A screen is used in one tab at a time.** Opening it in a second tab moves it there: the first tab stops running it (no timers, sounds, videos, camera or microphone, and no saving) and shows **“…is being used in another tab”** with **Use it here** (takes it back, with the other tab's latest changes) or **Show a different screen**. Running timers carry on in the tab that takes over. So two tabs never overwrite each other or ring twice.
+- Class lists changed in one tab update in the others straight away. Each tab keeps its own current class.
 - For two completely separate sets of screens, use two browser profiles (e.g. *School* and *Home*) — each has its own storage.
 
 ## Undo, redo and screen order
