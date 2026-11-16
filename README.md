@@ -143,6 +143,7 @@ To add a widget, copy an existing widget file. Export an object with `type`, `ti
 ## Saving a picture, backups and notes
 
 - **☰ → 📸 Save a picture (JPG or PDF)** takes one picture of the screen without the menu and widget bar. The browser asks to share the tab (choose *Share*); it grabs one frame and stops, and nothing is sent anywhere. Browsers that can't do this (e.g. iPad Safari) are pointed to the screenshot keys.
+- **Adding a backup** brings back every screen, class list and group (with its colour and whether it was closed). Screens you already have are marked *You already have this* and left unticked, so nothing is doubled.
 - **Backups:** screens live only in this browser. **☰ → Save & share** shows when everything was last backed up to a file, with a gentle ⚠ after four weeks (or if never), and a **⬇ Back up everything** button: one .classroom file of every screen and class list. Open it with ☰ → Add screens from a file. Saving every screen with *Save to a file* counts too. The site also asks the browser not to clear its storage to free up space.
 - On the second day someone uses the site (with a few widgets made and no backup yet), a small card asks **once** whether to save a backup file. The end-of-term note also offers one, since laptops are often reset over the holidays.
 - **First visit:** a short 👋 welcome. **After an update:** a once-off ✨ What's new note for people already using the site. **Last week of term:** a once-a-term 🎉 thank-you. Each shows ways to help, and they can all be opened again from ☰ → Help.
