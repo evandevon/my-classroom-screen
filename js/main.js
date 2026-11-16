@@ -15,7 +15,7 @@ import { screenshotDialog } from './screenshot.js';
 import { startupNotes, showWelcome, showWhatsNew, showWaysToHelp } from './welcome.js';
 import { initBackup, maybeAskOnce, backupStatus, downloadBackup, markBackedUp } from './backup.js';
 import { initTabs, claim, release, askOthers, openElsewhere } from './tabs.js';
-import { getGroups, forgetGroups, addGroup, updateGroup, removeGroup, GROUP_COLOURS } from './groups.js';
+import { getGroups, forgetGroups, saveGroups, addGroup, updateGroup, removeGroup, GROUP_COLOURS } from './groups.js';
 import { initClasses, reloadClassLists, currentClassName, fromTimeline, onClassChange, showClassPicker, showClassManager } from './classes.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -414,6 +414,52 @@ const listEntries = (box) => [...box.querySelectorAll('.screen-list > li[data-id
  * or onto a closed group's heading. Arrow keys on the handle move it within its own list.
  */
 function makeReorderable(box) {
+  // Whole groups: drag a group's ⋮⋮ handle up or down among the other groups.
+  const saveGroupOrder = async () => {
+    const order = [...box.querySelectorAll(':scope > .group-section')].map((x) => x.dataset.group);
+    const groups = await getGroups();
+    await saveGroups(order.map((id) => groups.find((g) => g.id === id)).filter(Boolean));
+  };
+  box.addEventListener('pointerdown', (e) => {
+    const grip = e.target.closest('.group-grip');
+    if (!grip || e.button > 0) return;
+    e.preventDefault();
+    const sec = grip.closest('.group-section');
+    box.setPointerCapture(e.pointerId);
+    sec.classList.add('dragging');
+    const id = e.pointerId;
+    const move = (ev) => {
+      if (ev.pointerId !== id) return;
+      const others = [...box.querySelectorAll(':scope > .group-section')].filter((x) => x !== sec);
+      const after = others.find((x) => { const r = x.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; });
+      if (after) { if (after !== sec.nextElementSibling) box.insertBefore(sec, after); }
+      else if (box.lastElementChild !== sec) box.append(sec);
+    };
+    const up = (ev) => {
+      if (ev.pointerId !== id) return;
+      box.removeEventListener('pointermove', move);
+      box.removeEventListener('pointerup', up);
+      box.removeEventListener('pointercancel', up);
+      sec.classList.remove('dragging');
+      saveGroupOrder();
+    };
+    box.addEventListener('pointermove', move);
+    box.addEventListener('pointerup', up);
+    box.addEventListener('pointercancel', up);
+  });
+  box.addEventListener('keydown', (e) => {
+    const grip = e.target.closest('.group-grip');
+    if (!grip || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault();
+    const sec = grip.closest('.group-section');
+    const prev = sec.previousElementSibling?.matches('.group-section') ? sec.previousElementSibling : null;
+    const next = sec.nextElementSibling;
+    if (e.key === 'ArrowUp' && prev) box.insertBefore(sec, prev);
+    if (e.key === 'ArrowDown' && next) box.insertBefore(next, sec);
+    grip.focus();
+    saveGroupOrder();
+  });
+  // Screens: drag a screen's ⋮⋮ handle within or between groups.
   box.addEventListener('pointerdown', (e) => {
     const grip = e.target.closest('.screen-grip');
     if (!grip || e.button > 0) return;
@@ -542,8 +588,9 @@ async function screenListSection(screens) {
       const items = screens.filter((s) => groupOf(s) === g.id);
       const open = !g.collapsed;
       const here = items.some((s) => s.id === screen.id);
-      return [
+      return h('div', { class: 'group-section', 'data-group': g.id },
         h('div', { class: `group-head${here ? ' has-current' : ''}`, style: { '--gc': g.colour } },
+          groups.length > 1 ? h('button', { class: 'group-grip', title: 'Drag to move this group up or down', 'aria-label': `Move the group ${g.name} (drag, or use the up and down arrow keys)` }, '⋮⋮') : null,
           h('button', { class: 'group-toggle', 'aria-expanded': String(open), title: open ? 'Close this group' : 'Open this group', onclick: async () => { await updateGroup(g.id, { collapsed: open }); renderDrawer(); } },
             h('span', { class: 'gchev', 'aria-hidden': 'true' }, open ? '▾' : '▸'),
             h('span', { class: 'gdot' }),
@@ -554,8 +601,8 @@ async function screenListSection(screens) {
           h('button', { class: 'w-btn close', title: 'Delete group (its screens stay)', 'aria-label': `Delete the group ${g.name}`, onclick: () => deleteGroup(g, items.length) }, '🗑'),
         ),
         h('ul', { class: 'screen-list group-list', 'data-group': g.id, hidden: !open, style: { '--gc': g.colour } }, ...items.map(row)),
-      ];
-    }).flat(),
+      );
+    }),
   );
   makeReorderable(box);
   return [recent, box];

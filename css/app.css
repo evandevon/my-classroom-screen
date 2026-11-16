@@ -1751,3 +1751,8 @@ body.capturing .widget { outline: none !important; }
 .gcolour { width: 56px; height: 56px; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 0 0 2px #d6dbe5; cursor: pointer; }
 .gcolour.on { box-shadow: 0 0 0 3px var(--ink); }
 .screen-tile.grouped { box-shadow: inset 0 5px 0 var(--gc); }
+.group-section { display: grid; gap: 4px; }
+.group-grip { flex: none; width: 30px; min-height: 40px; border: 0; background: none; color: var(--muted); font-weight: 900; letter-spacing: -3px; cursor: grab; touch-action: none; border-radius: 10px; }
+.group-grip:hover, .group-grip:focus-visible { background: #0000000d; color: var(--ink); }
+.group-section.dragging { position: relative; z-index: 2; border-radius: 12px; box-shadow: 0 8px 24px #0003; background: #fff; }
+.group-section.dragging .group-grip { cursor: grabbing; }
