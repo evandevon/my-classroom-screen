@@ -160,6 +160,8 @@ To add a widget, copy an existing widget file. Export an object with `type`, `ti
 
 - **☰ → + New group** (e.g. *4K*, *Science*, *Routines*). Each group gets its own colour (🎨 to change it from eight); ✎ renames it; 🗑 deletes the group but keeps its screens.
 - Put a screen in a group by dragging its ⋮⋮ handle into the group (or onto a closed group's heading), or with its **📁** button — handy on a smartboard. One level only: a screen is in one group or none.
+- To take a screen out of a group, drag it to the **No group** area at the top (it appears while you drag, even when every screen is in a group), or choose *No group* with 📁.
+- While dragging, a copy of the screen follows your finger or mouse, a dashed gap shows where it will land, the group it will join lights up, and the menu scrolls if you drag near its top or bottom.
 - Drag a group's ⋮⋮ handle to move the whole group up or down (or focus the handle and use the arrow keys).
 - Tap a group's heading to close or open it; the site remembers. A closed group holding the screen you're on says *· here*.
 - A new screen goes into the same group as the screen you were on. Saved files and backups bring their groups with them (joining a group of the same name if there is one).

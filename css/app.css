@@ -1759,3 +1759,15 @@ body.capturing .widget { outline: none !important; }
 .switch-head { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; font-size: 14px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .switch-head .gdot { width: 12px; height: 12px; }
 .switch-head + .screen-grid { margin-bottom: 14px; }
+
+/* dragging a screen in the menu: a copy follows the pointer, a dashed gap shows where it lands */
+.drag-ghost { position: fixed; z-index: 100005; margin: 0; list-style: none; pointer-events: none; border-radius: 12px; background: #fff; box-shadow: 0 14px 34px #0004, 0 0 0 2px var(--gc, var(--accent)); opacity: .96; transition: none; }
+.drag-ghost .w-btn { visibility: hidden; }
+.screen-list li.drag-gap { background: color-mix(in srgb, var(--accent) 8%, transparent); outline: 2px dashed color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: -2px; box-shadow: none; }
+.screen-list li.drag-gap > * { visibility: hidden; }
+body.grabbing, body.grabbing * { cursor: grabbing !important; }
+.screen-list.drop-list { border-radius: 12px; background: color-mix(in srgb, var(--gc, var(--accent)) 10%, transparent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gc, var(--accent)) 55%, transparent); }
+/* while dragging, the screens without a group are always a place to drop, even if there are none */
+.screen-groups.dragging-screen > .screen-list[data-group=""] { display: block; min-height: 48px; padding: 22px 4px 4px; position: relative; border-radius: 12px; border: 2px dashed #c9cfda; }
+.screen-groups.dragging-screen > .screen-list[data-group=""]::before { content: 'No group'; position: absolute; top: 4px; left: 10px; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.screen-groups.dragging-screen > .screen-list[data-group=""].drop-list { border-color: var(--accent); }

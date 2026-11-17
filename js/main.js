@@ -471,26 +471,44 @@ function makeReorderable(box) {
     grip.focus();
     saveGroupOrder();
   });
-  // Screens: drag a screen's ⋮⋮ handle within or between groups.
+  // Screens: drag a screen's ⋮⋮ handle within or between groups, or out of a group ("No group").
+  // A copy follows the pointer; a dashed gap shows where it will land; the target list lights up.
   box.addEventListener('pointerdown', (e) => {
     const grip = e.target.closest('.screen-grip');
     if (!grip || e.button > 0) return;
     e.preventDefault();
     const li = grip.closest('li');
     box.setPointerCapture(e.pointerId);   // on the whole box: moving the row would drop the handle's capture
-    li.classList.add('dragging');
+    const r0 = li.getBoundingClientRect();
+    const dx = e.clientX - r0.left, dy = e.clientY - r0.top;
+    const ghost = li.cloneNode(true);
+    ghost.classList.add('drag-ghost');
+    Object.assign(ghost.style, { width: `${r0.width}px`, left: '0px', top: '0px', transform: `translate(${r0.left}px, ${r0.top}px) rotate(-1.5deg)` });
+    document.body.append(ghost);
+    li.classList.add('drag-gap');
     li.style.pointerEvents = 'none';      // so we can see what's underneath it
+    box.classList.add('dragging-screen'); // shows the "No group" area even when it's empty
+    document.body.classList.add('grabbing');
+    const scroller = box.closest('.drawer') || box.parentElement;
     const id = e.pointerId;
     let dropHead = null;
+    let litList = null;
+    const light = (list) => { if (litList === list) return; litList?.classList.remove('drop-list'); litList = list; list?.classList.add('drop-list'); };
     const move = (ev) => {
       if (ev.pointerId !== id) return;
+      ghost.style.transform = `translate(${ev.clientX - dx}px, ${ev.clientY - dy}px) rotate(-1.5deg)`;
+      // near the top or bottom of the menu: scroll it
+      const sr = scroller.getBoundingClientRect();
+      if (ev.clientY < sr.top + 48) scroller.scrollTop -= 14;
+      else if (ev.clientY > sr.bottom - 48) scroller.scrollTop += 14;
       const el = document.elementFromPoint(ev.clientX, ev.clientY);
       const head = el?.closest('.group-head');
       dropHead?.classList.remove('drop-here');
       dropHead = null;
-      if (head && box.contains(head) && head.nextElementSibling?.hidden) { dropHead = head; head.classList.add('drop-here'); return; }
+      if (head && box.contains(head) && head.nextElementSibling?.hidden) { dropHead = head; head.classList.add('drop-here'); light(null); return; }
       const list = el?.closest('.screen-list') || (head && box.contains(head) ? head.nextElementSibling : null);
       if (!list || !box.contains(list)) return;
+      light(list);
       const items = [...list.querySelectorAll(':scope > li[data-id]')].filter((x) => x !== li);
       const after = items.find((x) => { const r = x.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; });
       if (after) { if (after !== li.nextSibling) list.insertBefore(li, after); }
@@ -501,8 +519,12 @@ function makeReorderable(box) {
       box.removeEventListener('pointermove', move);
       box.removeEventListener('pointerup', up);
       box.removeEventListener('pointercancel', up);
-      li.classList.remove('dragging');
+      ghost.remove();
+      li.classList.remove('drag-gap');
       li.style.pointerEvents = '';
+      light(null);
+      box.classList.remove('dragging-screen');
+      document.body.classList.remove('grabbing');
       if (dropHead) { dropHead.classList.remove('drop-here'); dropHead.nextElementSibling.append(li); }
       saveScreenOrder(listEntries(box)).then(() => renderDrawer());
     };
