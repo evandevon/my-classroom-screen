@@ -141,9 +141,12 @@ Your screens **save themselves** in this browser as you go. To move, share or ba
   - Nothing changes until you press **Add**. Added screens go alongside yours and never replace them.
   - A shared class with the same name as one of yours but different students is added as "Name (2)".
   - **Adding a backup** brings back every screen, class list and group (with its colour and whether it was closed).
-- **👁 Preview** on any row opens that screen exactly as it is, without adding it.
-  - A banner offers **Add this screen**, **Other screens** and **Close**.
-  - Nothing you do while previewing is saved, and closing takes you back to where you were.
+- **👁 Preview** on any row opens that screen in a **new tab**, so your own screen keeps running, and the window you previewed from stays open to choose screens to add.
+  - The bar says **"Looking at “…” — nothing here is saved automatically."** You can use the screen for real: timers, name picker, whiteboard.
+  - **➕ Copy to my screens** copies it into your screens as it is now, including your changes; your other tab is told and its list updates. After that the button reads **⟳ Update my copy**, which updates the same copy rather than making another.
+  - It stays a preview: later changes aren't saved unless you press *Update my copy*, and closing the tab with uncopied changes asks first.
+  - **✕** hides the bar; **👁 Preview** at the top brings it back. **Other screens in the file** and **Close this tab** are on the bar too.
+  - On phones and small tablets, or if the browser blocks new tabs, the preview opens in the same tab instead.
 - **Class lists in shared screens:** only share with colleagues; it's up to you who gets the names. On the other computer they're added to that teacher's classes. A class with the same name and students isn't doubled up.
 - **What's inside a file:** a `.classroom` file is a zip holding `classroom.json` (screens, class lists and groups) and a `files/` folder with every photo, clip, picture and sound at its real size. Rename it to `.zip` to look inside. Older `.json` files still open.
 - **Tidying up:** files no screen uses any more (e.g. from a deleted widget) are removed automatically.

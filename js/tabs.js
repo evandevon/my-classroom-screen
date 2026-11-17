@@ -10,7 +10,7 @@ const me = Math.random().toString(36).slice(2);
 const others = new Map();          // tab id → { screen, seen }
 const STALE_MS = 90000;            // a tab not heard from for this long is gone (hidden tabs may only tick once a minute)
 let current = '';
-let hooks = { onScreens() {}, onClaimed() {}, onClasses() {} };
+let hooks = { onScreens() {}, onClaimed() {}, onClasses() {}, onAdded() {} };
 
 const post = (msg) => { try { ch?.postMessage({ ...msg, tab: me }); } catch { /* closed */ } };
 
@@ -39,6 +39,7 @@ export function initTabs(h) {
       hooks.onScreens();
     }
     else if (m.t === 'classes') hooks.onClasses();
+    else if (m.t === 'added') hooks.onAdded(m.name);
   };
   setInterval(() => { post({ t: 'here', screen: current }); const n = others.size; prune(); if (others.size !== n) hooks.onScreens(); }, 4000);
   addEventListener('pagehide', () => post({ t: 'bye' }));
@@ -58,3 +59,5 @@ export function release() { current = ''; post({ t: 'here', screen: '' }); }
 /** This tab is now using a screen: any other tab showing it steps aside. */
 export function claim(screenId) { current = screenId || ''; post({ t: 'claim', screen: current }); }
 export function notifyClasses() { post({ t: 'classes' }); }
+/** A screen was copied into your screens from another tab (a preview). */
+export function notifyAdded(name) { post({ t: 'added', name }); }

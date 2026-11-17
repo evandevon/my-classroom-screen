@@ -1771,3 +1771,9 @@ body.grabbing, body.grabbing * { cursor: grabbing !important; }
 .screen-groups.dragging-screen > .screen-list[data-group=""] { display: block; min-height: 48px; padding: 22px 4px 4px; position: relative; border-radius: 12px; border: 2px dashed #c9cfda; }
 .screen-groups.dragging-screen > .screen-list[data-group=""]::before { content: 'No group'; position: absolute; top: 4px; left: 10px; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
 .screen-groups.dragging-screen > .screen-list[data-group=""].drop-list { border-color: var(--accent); }
+
+/* previews: the bar can be hidden; 👁 Preview at the top brings it back */
+.preview-banner[hidden] { display: none; }
+.preview-hide { margin-left: 2px; }
+.preview-pill { background: #fff4d6; color: #6b4e00; font-weight: 800; }
+.preview-pill[hidden] { display: none; }

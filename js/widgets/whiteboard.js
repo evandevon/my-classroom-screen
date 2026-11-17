@@ -298,7 +298,14 @@ export default {
   size: [780, 540],
   hasSettings: true,
   heavyKeys: ['strokes', 'rec'],
-  assetCompanions: { picAssetIds: ['pics'] },   // a share link can't carry the pictures, so it leaves them out
+  assetCompanions: { picAssetIds: ['pics'] },
+  /** Pictures from a file get new ids here: change them in the pictures, the recording and its steps. */
+  remapAssets(state, map) {
+    const fix = (list) => { for (const p of list || []) if (p.a) p.a = map(p.a) || p.a; };
+    fix(state.pics);
+    fix(state.rec?.basePics);
+    for (const op of state.rec?.ops || []) if (op.k === 'P') fix(op.pics);
+  },   // a share link can't carry the pictures, so it leaves them out
   undoShareKeys: ['rec'],   // recordings are replaced, never changed in place
   defaultState: () => ({ strokes: [], bg: 'white', paper: 'blank', gap: 0.06, straighten: false, pics: [], picAssetIds: [], rec: null, recAudioAssetId: null, recVoice: false, skipPauses: true, loop: false }),
 
@@ -309,6 +316,17 @@ export default {
     s.paper ||= 'blank';
     s.gap ||= 0.06;
     s.pics ||= [];
+    // Added from a file before mcs-v72, pictures kept the file's ids while picAssetIds got this
+    // computer's: match them up again (same order as save() lists them).
+    if (s.pics.length && Array.isArray(s.picAssetIds) && s.pics.some((p) => !s.picAssetIds.includes(p.a))) {
+      const old = [...new Set([...s.pics.map((p) => p.a), ...(s.rec?.basePics || []).map((p) => p.a), ...(s.rec?.ops || []).filter((o) => o.k === 'P').flatMap((o) => o.pics.map((p) => p.a))])];
+      if (old.length === s.picAssetIds.length) {
+        const map = Object.fromEntries(old.map((id, i) => [id, s.picAssetIds[i]]));
+        const fix = (list) => { for (const p of list || []) if (map[p.a]) p.a = map[p.a]; };
+        fix(s.pics); fix(s.rec?.basePics); for (const op of s.rec?.ops || []) if (op.k === 'P') fix(op.pics);
+        queueMicrotask(() => ctx.save());
+      }
+    }
     const paperCanvas = h('canvas', { class: 'wb-paper', 'aria-hidden': 'true' });
     const picsCanvas = h('canvas', { class: 'wb-pics', 'aria-hidden': 'true' });   // pictures, under the ink
     const picg = picsCanvas.getContext('2d');
