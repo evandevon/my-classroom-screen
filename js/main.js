@@ -390,7 +390,19 @@ async function applyBackground() {
 /** Screens in the teacher's own order (dragged in the menu); screens never placed yet go last, newest first. */
 async function sortedScreens() {
   const key = (s) => (Number.isFinite(s.order) ? s.order : 1e15 - (s.updated || 0));
-  return (await db.listScreens()).sort((a, b) => key(a) - key(b));
+  const list = (await db.listScreens()).sort((a, b) => key(a) - key(b));
+  // Every screen gets a fixed place, so using a screen never moves it in the lists (screens made before
+  // this keep where they were; new ones go at the end).
+  if (list.some((x) => !Number.isFinite(x.order))) {
+    let next = Math.max(-1, ...list.filter((x) => Number.isFinite(x.order)).map((x) => x.order)) + 1;
+    for (const x of list) {
+      if (Number.isFinite(x.order)) continue;
+      x.order = next++;
+      if (screen && x.id === screen.id) { screen.order = x.order; persist.flush(); } else await db.putScreen(x);
+    }
+    list.sort((a, b) => a.order - b.order);
+  }
+  return list;
 }
 /** Save the order of the screen list, and which group each screen is in: [{ id, group }] top to bottom. */
 async function saveScreenOrder(entries) {
@@ -651,36 +663,63 @@ nameBtn.setAttribute('aria-haspopup', 'dialog');
 nameBtn.title = 'Switch screen';
 nameBtn.addEventListener('click', () => showScreenPicker());
 
+/**
+ * The quick switcher (tap the screen's name). With a few screens it shows them all. With more, it shows
+ * the screens in this screen's group (or the ungrouped ones), in their usual order so they stay put,
+ * then up to four recently used ones from elsewhere; "All screens…" opens the menu.
+ */
+const SHOW_ALL_UP_TO = 8;
+const RECENT_IN_SWITCHER = 4;
 async function showScreenPicker() {
   persist.flush();
   forgetGroups();
   const groups = await getGroups();
-  const gpos = (s) => { const i = groups.findIndex((g) => g.id === s.group); return i < 0 ? -1 : i; };
-  const screens = (await sortedScreens()).map((s, i) => [s, i]).sort((a, b) => gpos(a[0]) - gpos(b[0]) || a[1] - b[1]).map(([s]) => s);
+  const known = new Set(groups.map((g) => g.id));
+  const groupOf = (s) => (known.has(s.group) ? s.group : '');
+  const gpos = (s) => groups.findIndex((g) => g.id === groupOf(s));
+  const all = await sortedScreens();
+  const tile = (s) => {
+    const g = groups.find((x) => x.id === groupOf(s));
+    const icons = [...new Set(s.widgets.map((w) => WIDGETS[w.type]?.icon).filter(Boolean))].slice(0, 6).join(' ');
+    return h('button', {
+      class: `class-tile screen-tile${s.id === screen.id ? ' on' : ''}${g ? ' grouped' : ''}`,
+      style: g ? { '--gc': g.colour } : null,
+      'aria-current': s.id === screen.id ? 'true' : null,
+      onclick: async () => {
+        dlg.close();
+        if (s.id !== screen.id) await openScreen((await db.getScreen(s.id)) || s);
+      },
+    },
+      h('b', {}, s.name),
+      h('small', {}, `${g ? `${g.name} · ` : ''}${s.widgets.length} widget${s.widgets.length === 1 ? '' : 's'}${s.paused ? ' · ⏸ paused' : ''}`),
+      icons ? h('span', { class: 'screen-icons', 'aria-hidden': 'true' }, icons) : null,
+    );
+  };
+  const grid = (list) => h('div', { class: 'class-grid screen-grid' }, ...list.map(tile));
+  let body;
+  if (all.length <= SHOW_ALL_UP_TO) {
+    // A few screens: show them all, grouped ones together.
+    body = [grid(all.map((s, i) => [s, i]).sort((a, b) => gpos(a[0]) - gpos(b[0]) || a[1] - b[1]).map(([s]) => s))];
+  } else {
+    const mine = groupOf(screen);
+    const g = groups.find((x) => x.id === mine);
+    const here = all.filter((s) => groupOf(s) === mine);   // this screen's group, or the ungrouped screens
+    const shown = new Set(here.map((s) => s.id));
+    const recent = (await db.getMeta('recentScreens', [])).map((id) => all.find((s) => s.id === id)).filter((s) => s && !shown.has(s.id)).slice(0, RECENT_IN_SWITCHER);
+    body = [
+      h('h3', { class: 'switch-head', style: g ? { '--gc': g.colour } : null }, g ? h('span', { class: 'gdot' }) : null, g ? g.name : 'Not in a group'),
+      grid(here),
+      recent.length ? h('h3', { class: 'switch-head' }, 'Recently used') : null,
+      recent.length ? grid(recent) : null,
+    ];
+  }
   const dlg = modal('Which screen?',
-    h('div', { class: 'class-grid screen-grid' },
-      ...screens.map((s) => {
-        const g = groups.find((x) => x.id === s.group);
-        const icons = [...new Set(s.widgets.map((w) => WIDGETS[w.type]?.icon).filter(Boolean))].slice(0, 6).join(' ');
-        return h('button', {
-          class: `class-tile screen-tile${s.id === screen.id ? ' on' : ''}${g ? ' grouped' : ''}`,
-          style: g ? { '--gc': g.colour } : null,
-          'aria-current': s.id === screen.id ? 'true' : null,
-          onclick: async () => {
-            dlg.close();
-            if (s.id !== screen.id) await openScreen((await db.getScreen(s.id)) || s);
-          },
-        },
-          h('b', {}, s.name),
-          h('small', {}, `${g ? `${g.name} · ` : ''}${s.widgets.length} widget${s.widgets.length === 1 ? '' : 's'}${s.paused ? ' · ⏸ paused' : ''}`),
-          icons ? h('span', { class: 'screen-icons', 'aria-hidden': 'true' }, icons) : null,
-        );
-      }),
-    ),
+    ...body,
     h('div', { class: 'row' },
+      all.length > SHOW_ALL_UP_TO ? h('button', { class: 'btn primary', onclick: () => { dlg.close(); openDrawer(); } }, `☰ All screens (${all.length})…`) : null,
       h('button', { class: 'btn', onclick: () => { dlg.close(); renameScreen(screen); } }, '✎ Rename this screen'),
       h('button', { class: 'btn', onclick: () => { dlg.close(); newScreenDialog(); } }, '+ New screen'),
-      h('button', { class: 'btn', onclick: () => { dlg.close(); openDrawer(); } }, '☰ More…'),
+      all.length <= SHOW_ALL_UP_TO ? h('button', { class: 'btn', onclick: () => { dlg.close(); openDrawer(); } }, '☰ More…') : null,
     ),
   );
 }

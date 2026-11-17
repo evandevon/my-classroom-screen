@@ -168,7 +168,8 @@ To add a widget, copy an existing widget file. Export an object with `type`, `ti
 ## Undo, redo and screen order
 
 - **↶ ↷ in the top bar, or Ctrl+Z / Ctrl+Shift+Z (Ctrl+Y):** undo anything you did on a screen — adding, moving, resizing or removing widgets, settings, scores, votes, typing, backgrounds — and deleting a screen. Things that change by themselves (a running timer, weather updates, a slideshow) aren't undo steps. In a text box, Ctrl+Z undoes your typing as usual.
-- **Screen order:** in ☰, drag a screen by its ⋮⋮ handle (or focus the handle and use the arrow keys). The "Which screen?" picker uses the same order.
+- **Screen order:** in ☰, drag a screen by its ⋮⋮ handle (or focus the handle and use the arrow keys). Using a screen never moves it; new screens go at the end.
+- **Quick switcher** (tap the screen's name at the top): with up to 8 screens it shows them all. With more, it shows the screens in this screen's group (or the ungrouped ones, if it isn't in a group) in their usual order, then up to four **Recently used** from elsewhere, and **☰ All screens…** opens the full list in the menu.
 
 ## Ideas for later
 
