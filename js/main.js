@@ -5,7 +5,7 @@ import { themePicker, textSizeSlider } from './themes.js';
 import { db, assetURL, sweepAssets, assetIdsOfScreen } from './storage.js';
 import { WIDGETS, CATEGORIES } from './widgets/index.js';
 import { TEMPLATES, GRADIENTS, SOLIDS } from './templates.js';
-import { makeShareLink, readShareHash, buildProjectFile, readProjectFile, addImported, previewImported, classIdsUsed, hasFiles, prepareImportedScreen } from './share.js';
+import { makeShareLink, readShareHash, buildProjectFile, readProjectFile, addImported, previewImported, classIdsUsed, hasFiles, prepareImportedScreen, copyPreviewToMine, parsedFromLinkData } from './share.js';
 import { h, uid, debounce, toast, pickFile, downloadBlob, enableMultiTouchTaps } from './util.js';
 enableMultiTouchTaps();
 import { showSoundHelp } from './help.js';
@@ -14,7 +14,7 @@ import { checkOldRecords } from './oldrecords.js';
 import { screenshotDialog } from './screenshot.js';
 import { startupNotes, showWelcome, showWhatsNew, showWaysToHelp } from './welcome.js';
 import { initBackup, maybeAskOnce, backupStatus, downloadBackup, markBackedUp } from './backup.js';
-import { initTabs, claim, release, askOthers, openElsewhere } from './tabs.js';
+import { initTabs, claim, release, askOthers, openElsewhere, notifyAdded } from './tabs.js';
 import { getGroups, forgetGroups, saveGroups, addGroup, updateGroup, removeGroup, GROUP_COLOURS } from './groups.js';
 import { initClasses, reloadClassLists, currentClassName, fromTimeline, onClassChange, showClassPicker, showClassManager } from './classes.js';
 
@@ -238,6 +238,7 @@ function newScreenFrom(tpl, name) {
 
 async function openScreen(s) {
   const leavingPreview = !!previewing;
+  if (leavingPreview) { previewPill.hidden = true; document.title = 'My Classroom Screen'; }
   if (usedElsewhere) persist.cancel();   // this tab's copy is out of date; never save it
   if (previewing) { previewing.banner.remove(); previewing = null; document.body.classList.remove('previewing'); }
   commitPending();
@@ -1330,7 +1331,7 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 async function openImport(parsed, { blankToRemove = null } = {}) {
   persist.flush();
   const mine = await db.listScreens();
-  const mySigs = new Map(mine.map((m) => [screenSignature(m), m]));
+  const mySigs = new Map(mine.flatMap((m) => [[screenSignature(m), m], ...(m.copiedFrom ? [[m.copiedFrom, m]] : [])]));
   const items = parsed.screens.map((sc) => {
     const already = mySigs.get(screenSignature(sc)) || null;
     const box = h('input', { type: 'checkbox', 'aria-label': `Add ${sc.name || 'screen'}` });
@@ -1389,7 +1390,25 @@ async function openImport(parsed, { blankToRemove = null } = {}) {
     else addBtn.disabled = false;
   });
   // 👁 Preview: have a look first, without adding anything
-  rows.forEach((row, i) => row.append(h('button', { class: 'btn small imp-preview', title: 'Have a look without adding it', onclick: (e) => { e.preventDefault(); dlg.close(); startPreview(parsed, items[i].sc, blankToRemove); } }, '👁 Preview')));
+  rows.forEach((row, i) => row.append(h('button', { class: 'btn small imp-preview', title: 'Have a look without adding it (opens in a new tab, so your screen keeps running)', onclick: async (e) => {
+    e.preventDefault();
+    if (await previewInNewTab(parsed, items[i].sc)) return;   // this window stays open, to choose screens to add
+    dlg.close(); startPreview(parsed, items[i].sc, blankToRemove);
+  } }, '👁 Preview')));
+  // Another tab copied a screen in (e.g. from a preview): mark it as one you already have.
+  const refresh = async () => {
+    if (!dlg.open) { removeEventListener('mcs-screens-added', refresh); return; }
+    const now = await db.listScreens();
+    const sigs = new Set(now.flatMap((m) => [screenSignature(m), m.copiedFrom].filter(Boolean)));
+    items.forEach((it, i) => {
+      if (it.already || !sigs.has(screenSignature(it.sc))) return;
+      it.already = true; it.box.checked = false;
+      rows[i].classList.add('already');
+      rows[i].querySelector('.imp-main').after(h('span', { class: 'imp-badge' }, 'You already have this'));
+    });
+    sync();
+  };
+  addEventListener('mcs-screens-added', refresh);
   sync();
 }
 
@@ -1412,7 +1431,11 @@ async function addChosen(parsed, chosen, blankToRemove = null) {
       deletedScreens.add(blankToRemove.id);
       await db.deleteScreen(blankToRemove.id);
     }
-    await openScreen(added[0]);
+    if (previewing?.inTab) {
+      // In a preview tab the preview stays; the screens just join your screens (your home tab is told).
+      added.forEach((sc) => notifyAdded(sc.name));
+      dispatchEvent(new Event('mcs-screens-added'));
+    } else await openScreen(added[0]);
     renderDrawer();
     toast(`Added ${added.length === 1 ? `“${added[0].name}”` : plural(added.length, 'screen')}. Your other screens are unchanged.${addedClasses.length ? ` Class list${addedClasses.length === 1 ? '' : 's'} added: ${addedClasses.join(', ')}.` : ''}`, { ms: 7000 });
     return true;
@@ -1427,30 +1450,123 @@ async function addChosen(parsed, chosen, blankToRemove = null) {
  * Look at a screen from a file or link without adding it. Nothing is saved, nothing of yours changes;
  * a banner offers "Add to my screens" or "Close preview" (back to your own screen).
  */
+// ---------- previews: looking at a screen from a file or link without adding it ----------
+// On a computer a preview opens in a new tab, so your own screen keeps running in this one.
+// The file is held briefly in this browser's storage for the new tab to read; leftovers go after a day.
+const PREVIEW_TTL = 24 * 60 * 60 * 1000;
+const previewTabOK = () => innerWidth >= 700;   // phones and small tablets preview in place
+async function previewInNewTab(parsed, raw) {
+  if (!previewTabOK() || previewTabId) return false;   // already in a preview tab: preview here
+  const index = parsed.screens.indexOf(raw);
+  const source = parsed.kind === 'link' ? { kind: 'link', data: parsed.data } : parsed.file ? { kind: 'file', file: parsed.file, name: parsed.name } : null;
+  if (!source || index < 0) return false;
+  const id = uid('preview');
+  const win = window.open(`${location.pathname}?preview=${id}`, '_blank');
+  if (!win) return false;   // pop-ups blocked: preview here instead
+  const all = await db.getMeta('previews', {});
+  all[id] = { ...source, index, created: Date.now(), touched: Date.now(), assetIds: [] };
+  await db.setMeta('previews', all);
+  toast('👁 Opened in a new tab. This window stays open, so you can choose screens to add.');
+  return true;
+}
+async function cleanOldPreviews() {
+  const all = await db.getMeta('previews', {});
+  let changed = false;
+  for (const [id, p] of Object.entries(all)) if (Date.now() - (p.touched || p.created || 0) > PREVIEW_TTL) { delete all[id]; changed = true; }
+  if (changed) await db.setMeta('previews', all);
+  return all;
+}
+/** Pictures and sounds that previews open in other tabs are using (so the tidy-up leaves them). */
+async function previewAssetIds() {
+  const all = await db.getMeta('previews', {});
+  return Object.values(all).filter((p) => Date.now() - (p.touched || 0) < 2 * 60 * 60 * 1000).flatMap((p) => p.assetIds || []);
+}
+let previewTabId = new URLSearchParams(location.search).get('preview');
+async function touchPreviewRecord() {
+  if (!previewTabId || !previewing || !screen) return;
+  const all = await db.getMeta('previews', {});
+  if (!all[previewTabId]) return;
+  all[previewTabId].touched = Date.now();
+  all[previewTabId].assetIds = [...assetIdsOfScreen(screen)];
+  await db.setMeta('previews', all);
+}
+
+const previewPill = h('button', { class: 'pill preview-pill', hidden: true, title: 'Show the preview bar (copy this screen, or close the preview)', onclick: () => { if (previewing) { previewing.banner.hidden = false; previewPill.hidden = true; } } }, '👁 Preview');
+
 async function startPreview(parsed, raw, blankToRemove = null) {
   persist.flush();
   commitPending();
+  const inTab = !!previewTabId;   // this tab was opened just for previewing
   const backId = previewing ? previewing.backId : screen?.id;
   const shown = await previewImported(parsed, raw);
   const from = parsed.kind === 'link' ? 'a share link' : parsed.name ? `“${parsed.name.replace(/\.(classroom|zip|json)$/i, '')}”` : 'a file';
-  const close = async () => { const back = backId && (await db.getScreen(backId)); await openScreen(back || (await sortedScreens())[0]); };
+  const close = async () => {
+    if (inTab) {
+      if (changedSinceCopy() && !confirm('Close this preview? Changes you haven’t copied to your screens will be lost.')) return;
+      previewing.cleanKey = comparable(screen);   // no second "leave site?" question
+      window.close();
+      await new Promise((res) => setTimeout(res, 300));
+      // Still here (the browser wouldn't close it): show your own screens in this tab instead.
+      previewTabId = null; history.replaceState(null, '', location.pathname);
+    }
+    const back = backId && (await db.getScreen(backId)); await openScreen(back || (await sortedScreens())[0]);
+  };
   const others = parsed.screens.length > 1;
+  const copyBtn = h('button', { class: 'btn primary small' }, '➕ Copy to my screens');
   const banner = h('div', { class: 'preview-banner', role: 'status' },
-    h('span', {}, h('b', {}, `👁 Previewing “${raw.name || 'screen'}”`), ` from ${from} — nothing is saved, and your screens aren’t changed.`),
-    h('button', { class: 'btn primary small', onclick: async () => { if (await addChosen(parsed, [raw], blankToRemove)) { /* opening the added screen ends the preview */ } } }, '➕ Add to my screens'),
-    others ? h('button', { class: 'btn small', onclick: async () => { await close(); openImport(parsed, { blankToRemove }); } }, '↩ Other screens in the file') : null,
-    h('button', { class: 'btn small', onclick: close }, '✕ Close preview'));
+    h('span', {}, h('b', {}, `👁 Looking at “${raw.name || 'screen'}”`), ` from ${from} — nothing here is saved automatically.`),
+    copyBtn,
+    others ? h('button', { class: 'btn small', onclick: async () => { if (inTab) { openImport(parsed, {}); return; } await close(); openImport(parsed, { blankToRemove }); } }, '↩ Other screens in the file') : null,
+    h('button', { class: 'btn small', onclick: close }, inTab ? '✕ Close this tab' : '✕ Close preview'),
+    h('button', { class: 'w-btn preview-hide', title: 'Hide this bar (👁 Preview at the top brings it back)', 'aria-label': 'Hide this bar', onclick: () => { banner.hidden = true; previewPill.hidden = false; } }, '✕'),
+  );
+  copyBtn.addEventListener('click', async () => {
+    copyBtn.disabled = true;
+    try { await copyPreview(); } finally { copyBtn.disabled = false; }
+    copyBtn.textContent = '⟳ Update my copy';
+    copyBtn.title = 'Copy your latest changes to the screen you copied (it doesn’t make another one)';
+  });
   if (previewing) previewing.banner.remove();
-  previewing = { backId, parsed, raw, banner };
+  previewing = { backId, parsed, raw, banner, inTab, copiedId: null, cleanKey: '' };
   document.body.classList.add('previewing');
   document.body.append(banner);
+  previewPill.hidden = true;
+  if (!previewPill.isConnected) nameBtn.after(previewPill);
   screen = shown;
   board.load(screen);
+  previewing.cleanKey = comparable(screen);
   updatePauseBadge();
   await applyBackground();
   nameBtn.textContent = `👁 ${shown.name}`;
-  document.title = `Preview: ${shown.name} · My Classroom Screen`;
+  document.title = `👁 ${shown.name} (preview) · My Classroom Screen`;
+  touchPreviewRecord();
 }
+const changedSinceCopy = () => !!(previewing && screen && comparable(screen) !== previewing.cleanKey);
+
+/** "Copy to my screens" (first time) / "Update my copy" (after): the screen as it is now. */
+async function copyPreview() {
+  if (!previewing || !screen) return;
+  commitPending();
+  const { parsed, raw } = previewing;
+  const s = await copyPreviewToMine(parsed, raw, screen);
+  s.copiedFrom = screenSignature(raw);   // so the import window knows you have it, even if you changed it
+  const old = previewing.copiedId && (await db.getScreen(previewing.copiedId));
+  if (old) { s.id = old.id; s.order = old.order; s.name = old.name; if (old.group) s.group = old.group; else delete s.group; }
+  else {
+    const names = new Set((await db.listScreens()).map((x) => x.name));
+    const base = s.name || 'Shared screen';
+    for (let n = 2; names.has(s.name); n++) s.name = `${base} (${n})`;
+  }
+  await db.putScreen(s);
+  previewing.copiedId = s.id;
+  previewing.cleanKey = comparable(screen);
+  notifyAdded(s.name);
+  dispatchEvent(new Event('mcs-screens-added'));
+  toast(old ? `⟳ Updated “${s.name}” in your screens.` : `➕ “${s.name}” is now in your screens. This is still a preview — changes from here on aren’t saved unless you press Update my copy.`, { ms: old ? 3000 : 7000 });
+}
+addEventListener('beforeunload', (e) => {
+  if (previewing?.inTab && changedSinceCopy()) { e.preventDefault(); e.returnValue = ''; }
+});
 
 /** Save screens to a .classroom file: tick which ones (this screen is ticked to start with). */
 async function exportDialog(preselect = null) {
@@ -1598,7 +1714,17 @@ async function init() {
 
   let screens = await sortedScreens();
   let target = null;
-  initTabs({ onClaimed: stepAside, onClasses: reloadClassLists });
+  initTabs({
+    onClaimed: stepAside,
+    onClasses: reloadClassLists,
+    onAdded: (name) => {
+      if (previewing?.inTab) return;
+      toast(`➕ “${name}” was copied to your screens from another tab.`);
+      forgetGroups();
+      if (drawer.classList.contains('open')) renderDrawer();
+      dispatchEvent(new Event('mcs-screens-added'));
+    },
+  });
   const busy = await askOthers();   // screens other tabs are showing
   let chooseInThisTab = false;
 
@@ -1623,19 +1749,45 @@ async function init() {
       target = screens.find((s) => !busy.has(s.id)) || target;
     }
   }
-  await openScreen(target);
+  // A preview opened in a new tab: show it, without opening (or taking from another tab) any of your screens.
+  const previews = await cleanOldPreviews();
+  const pv = previewTabId && previews[previewTabId];
+  if (previewTabId && !pv) { toast('That preview has been closed or has expired.'); previewTabId = null; history.replaceState(null, '', location.pathname); }
+  if (pv) {
+    try {
+      const parsed = pv.kind === 'link' ? parsedFromLinkData(pv.data) : await readProjectFile(new File([pv.file], pv.name || 'screens.classroom'));
+      if (pv.kind === 'file') parsed.file = pv.file;
+      await startPreview(parsed, parsed.screens[pv.index] || parsed.screens[0]);
+      setInterval(touchPreviewRecord, 5 * 60 * 1000);
+    } catch (e) {
+      console.error(e); toast('That preview couldn’t be opened.'); previewTabId = null;
+      await openScreen(target);
+    }
+  } else await openScreen(target);
+  if (pv && previewTabId) { /* a preview tab: no start-up notes or questions */ return finishStartup(); }
   if (sharedLink) openImport(sharedLink, { blankToRemove: starter });
   if (chooseInThisTab) tabChooser(busy, await sortedScreens());
   setTimeout(() => startupNotes({ firstRun: !!starter }).catch(console.error), 800);   // welcome / what's new / end of term
+  return finishStartup({ notes: true });
+}
+
+/** The rest of start-up, for every tab (a preview tab skips the notes and questions). */
+async function finishStartup({ notes = false } = {}) {
+  if (!notes) { await initBackup(() => { if (drawer.classList.contains('open')) renderDrawer(); }); return startSweeping(); }
   // Records from the removed Data feature: offer to download and delete them (once nothing else is open).
   setTimeout(() => !document.querySelector('dialog[open]') && checkOldRecords(), 2500);
   await initBackup(() => { if (drawer.classList.contains('open')) renderDrawer(); });
   setTimeout(() => maybeAskOnce(), 20000);   // asks once, quietly, on a second day of use
-  // Tidy up files nothing uses any more (deleted widgets / screens), now and every half hour.
-  const sweep = () => {
+  startSweeping();
+}
+
+/** Tidy up files nothing uses any more (deleted widgets / screens), soon and every half hour. */
+function startSweeping() {
+  const sweep = async () => {
     persist.flush();
     const keep = board.lastRemoved ? [...assetIdsOfScreen({ widgets: [board.lastRemoved] })] : [];
     if (previewing && screen) keep.push(...assetIdsOfScreen(screen));
+    keep.push(...(await previewAssetIds()));   // previews open in other tabs
     setTimeout(() => sweepAssets(keep).catch((e) => console.warn('tidy-up', e)), 1500); // after the save lands
   };
   setTimeout(sweep, 15000);

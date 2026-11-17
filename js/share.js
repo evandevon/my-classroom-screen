@@ -1,7 +1,7 @@
 import { makeZip, readZip, isZip } from './zip.js';
 // Share links (compressed screen in the URL hash) and project files (JSON with embedded assets).
 
-import { db } from './storage.js';
+import { db, assetIdsOfScreen } from './storage.js';
 import { dataURLToBlob, uid } from './util.js';
 import { WIDGETS } from './widgets/index.js';
 import { classLists, classesForScreens, addSharedClasses } from './classes.js';
@@ -112,13 +112,18 @@ export async function makeShareLink(screen, opts = {}) {
   return { url, dropped, long: encoded.length > MAX_LINK };
 }
 
+/** A share link's contents again (for a preview opened in a new tab). */
+export function parsedFromLinkData(data) {
+  return { kind: 'link', screens: [data.screen], classes: data.classes || [], currentClass: data.currentClass || '', assets: {}, zip: null, data };
+}
+
 export async function readShareHash() {
   const m = location.hash.match(/^#s=([A-Za-z0-9_-]+)/);
   if (!m) return null;
   const data = JSON.parse(await inflate(fromB64url(m[1])));
   if (data.f !== FORMAT || !data.screen) throw new Error('Not a My Classroom Screen link');
   // Read only: nothing is added until the teacher chooses (see addImported).
-  return { kind: 'link', screens: [data.screen], classes: data.classes || [], currentClass: data.currentClass || '', assets: {}, zip: null };
+  return { kind: 'link', screens: [data.screen], classes: data.classes || [], currentClass: data.currentClass || '', assets: {}, zip: null, data };
 }
 
 // ---------- project files ----------
@@ -185,7 +190,7 @@ export async function readProjectFile(file) {
     try { data = JSON.parse(typeof file === 'string' ? file : await file.text()); } catch { throw new Error('This is not a My Classroom Screen file.'); }
   }
   if (data.format !== FORMAT || !Array.isArray(data.screens)) throw new Error('This is not a My Classroom Screen file.');
-  return { kind: 'file', name: file.name || '', screens: data.screens, classes: data.classes || [], currentClass: data.currentClass || '', groups: data.groups || [], backup: !!data.backup || /^My Classroom Screen backup/i.test(file.name || ''), assets: data.assets || {}, zip };
+  return { kind: 'file', name: file.name || '', screens: data.screens, classes: data.classes || [], currentClass: data.currentClass || '', groups: data.groups || [], backup: !!data.backup || /^My Classroom Screen backup/i.test(file.name || ''), assets: data.assets || {}, zip, file: typeof file === 'string' ? null : file };
 }
 
 /** Which of a file's class lists a screen uses ('current' means the sender's current class). */
@@ -237,6 +242,21 @@ export async function addImported(parsed, chosen) {
 }
 
 /**
+ * "Copy to my screens" from a preview: the screen as it is now (with any changes made while
+ * previewing) becomes one of your screens. Its class lists and group come too, and the pictures and
+ * sounds it uses (already stored for the preview) are kept.
+ */
+export async function copyPreviewToMine(parsed, raw, current) {
+  const used = new Set(classIdsUsed(raw, parsed.currentClass));
+  const { idMap: classMap } = await addSharedClasses((parsed.classes || []).filter((c) => used.has(c.id)), used.has(parsed.currentClass) ? parsed.currentClass : '');
+  const groupMap = await addGroupsFrom((parsed.groups || []).filter((g) => g.id === raw.group));
+  const keep = Object.fromEntries([...assetIdsOfScreen(current)].map((id) => [id, id]));
+  const s = prepareImportedScreen(current, keep, classMap);
+  if (groupMap[raw.group]) s.group = groupMap[raw.group]; else delete s.group;
+  return s;
+}
+
+/**
  * A look at one screen from a file or link without adding it: its pictures and sounds are made
  * available (and tidied away later if it isn't added); class lists aren't added.
  */
@@ -264,6 +284,9 @@ export function prepareImportedScreen(screen, idMap = {}, classMap = {}) {
   for (const w of s.widgets || []) {
     w.id = uid('w');
     if (w.state?.source && classMap[w.state.source]) w.state.source = classMap[w.state.source];   // the class as saved on this computer
+    // A widget that refers to files deeper in its state (e.g. whiteboard pictures) remaps those itself,
+    // before the ...AssetId(s) lists are changed.
+    WIDGETS[w.type]?.remapAssets?.(w.state || {}, (id) => idMap[id] || null);
     for (const k of Object.keys(w.state || {})) {
       if (k.endsWith('AssetId') && w.state[k]) w.state[k] = idMap[w.state[k]] || null;
       if (k.endsWith('AssetIds') && Array.isArray(w.state[k])) w.state[k] = w.state[k].map((id) => idMap[id] || null);
