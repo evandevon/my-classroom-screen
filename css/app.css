@@ -1777,3 +1777,7 @@ body.grabbing, body.grabbing * { cursor: grabbing !important; }
 .preview-hide { margin-left: 2px; }
 .preview-pill { background: #fff4d6; color: #6b4e00; font-weight: 800; }
 .preview-pill[hidden] { display: none; }
+.menu-sub { margin: 10px 0 6px; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.share-explain { padding: 10px 14px; border-radius: 12px; background: #eef4ff; color: #1d2b4f; line-height: 1.4; }
+.share-explain p { margin: 0 0 4px; }
+.share-explain ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }

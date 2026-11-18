@@ -121,9 +121,9 @@ The widget bar at the bottom has four groups. Tap one to see its widgets.
 
 ## Saving, sharing and backups
 
-Your screens **save themselves** in this browser as you go. To move, share or back them up, use ☰ → *Save & share*:
+Your screens **save themselves** in this browser as you go. To move, share or back them up, use ☰ → *Save & share*, which has three parts: **Keep a safe copy**, **Send a copy** and **Bring screens in**. Links and files are always **copies, not live links**: once sent, the screens on each computer change separately.
 
-| | ⬇ Back up everything | 💾 Save to a file | 🔗 Share a link |
+| | ⬇ Back up everything | 💾 Save to a file | 🔗 Send a copy as a link |
 |---|---|---|---|
 | Good for | Keeping a safe copy | Sending screens to a colleague, or moving some to another computer | Sending one screen quickly |
 | Screens | All of them | The ones you tick | The one showing |
