@@ -58,6 +58,18 @@ export function release() { current = ''; post({ t: 'here', screen: '' }); }
 
 /** This tab is now using a screen: any other tab showing it steps aside. */
 export function claim(screenId) { current = screenId || ''; post({ t: 'claim', screen: current }); }
+/**
+ * Before a screen is replaced with a new version (e.g. "Replace mine" when adding screens): any other
+ * tab showing it steps aside first, saving what it had, so its older copy can't be saved over the new one.
+ */
+export async function takeOver(ids = []) {
+  const busy = openElsewhere();
+  const list = ids.filter((id) => id && busy.has(id));
+  if (!ch || !list.length) return;
+  for (const id of list) post({ t: 'claim', screen: id });
+  await new Promise((r) => setTimeout(r, 400));
+  post({ t: 'here', screen: current });
+}
 export function notifyClasses() { post({ t: 'classes' }); }
 /** A screen was copied into your screens from another tab (a preview). */
 export function notifyAdded(name) { post({ t: 'added', name }); }

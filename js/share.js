@@ -226,13 +226,14 @@ async function storeAssets(parsed, screens) {
   return idMap;
 }
 
-export async function addImported(parsed, chosen) {
+export async function addImported(parsed, chosen, { noFileGroup = new Set() } = {}) {
   const idMap = await storeAssets(parsed, chosen);
   // A backup brings back every class list in it; a shared file only the ones its chosen screens use.
   const used = parsed.backup ? new Set((parsed.classes || []).map((c) => c.id)) : new Set(chosen.flatMap((sc) => [...classIdsUsed(sc, parsed.currentClass)]));
   const { idMap: classMap, added } = await addSharedClasses((parsed.classes || []).filter((c) => used.has(c.id)), used.has(parsed.currentClass) ? parsed.currentClass : '');
   // Screen groups come too (reusing a group of the same name here).
-  const groupMap = await addGroupsFrom((parsed.groups || []).filter((g) => chosen.some((sc) => sc.group === g.id)));
+  // (Not for screens given a different group, or replacing one of yours: no empty groups left behind.)
+  const groupMap = await addGroupsFrom((parsed.groups || []).filter((g) => chosen.some((sc) => sc.group === g.id && !noFileGroup.has(sc))));
   const screens = chosen.map((sc) => {
     const s = prepareImportedScreen(sc, idMap, classMap);
     if (groupMap[sc.group]) s.group = groupMap[sc.group]; else delete s.group;
@@ -246,10 +247,10 @@ export async function addImported(parsed, chosen) {
  * previewing) becomes one of your screens. Its class lists and group come too, and the pictures and
  * sounds it uses (already stored for the preview) are kept.
  */
-export async function copyPreviewToMine(parsed, raw, current) {
+export async function copyPreviewToMine(parsed, raw, current, { fileGroup = true } = {}) {
   const used = new Set(classIdsUsed(raw, parsed.currentClass));
   const { idMap: classMap } = await addSharedClasses((parsed.classes || []).filter((c) => used.has(c.id)), used.has(parsed.currentClass) ? parsed.currentClass : '');
-  const groupMap = await addGroupsFrom((parsed.groups || []).filter((g) => g.id === raw.group));
+  const groupMap = fileGroup ? await addGroupsFrom((parsed.groups || []).filter((g) => g.id === raw.group)) : {};
   const keep = Object.fromEntries([...assetIdsOfScreen(current)].map((id) => [id, id]));
   const s = prepareImportedScreen(current, keep, classMap);
   if (groupMap[raw.group]) s.group = groupMap[raw.group]; else delete s.group;

@@ -138,7 +138,11 @@ Your screens **save themselves** in this browser as you go. To move, share or ba
 - **Reminders:** on the second day someone uses the site (with a few widgets made and no backup yet), a small card asks **once** whether to save a backup file. The end-of-term note offers one too, since laptops are often reset over the holidays.
 - **Bringing screens in** always works the same way. Use ☰ → **Add screens from a file**, drag a `.classroom` file onto the screen, or open a share link.
   - A window lists the screens with tick boxes, marks any **you already have** (unticked), and shows which class lists come too.
-  - Nothing changes until you press **Add**. Added screens go alongside yours and never replace them.
+  - Nothing changes until you press **Add**. Added screens go alongside yours.
+  - **Same name as one of yours** (but different contents, e.g. an updated copy coming back from home): the row asks what to do.
+    - **Keep both** (the default): type a name for the new copy (it suggests "Name (2)") and choose its group.
+    - **Replace mine**: your screen gets the new contents but keeps its name, group and place in the list. **Undo** on the message puts it back. If that screen is open in another tab, that tab steps aside first so it can't save its old copy over the new one.
+    - **Copy to my screens** from a preview asks the same thing.
   - A shared class with the same name as one of yours but different students is added as "Name (2)".
   - **Adding a backup** brings back every screen, class list and group (with its colour and whether it was closed).
 - **👁 Preview** on any row opens that screen in a **new tab**, so your own screen keeps running, and the window you previewed from stays open to choose screens to add.

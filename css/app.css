@@ -1781,3 +1781,22 @@ body.grabbing, body.grabbing * { cursor: grabbing !important; }
 .share-explain { padding: 10px 14px; border-radius: 12px; background: #eef4ff; color: #1d2b4f; line-height: 1.4; }
 .share-explain p { margin: 0 0 4px; }
 .share-explain ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+
+/* Adding a screen whose name matches one of yours: Keep both (rename, group) or Replace mine */
+.imp-item { display: grid; gap: 0; border-radius: 14px; background: #f4f6fa; }
+.imp-item > .imp-row { background: transparent; }
+.imp-clash { margin: 0 12px 10px 46px; padding: 10px 12px; border-radius: 12px; background: #fff; border: 1px solid #e3e7ef; display: grid; gap: 8px; }
+.imp-clash[hidden] { display: none; }
+.clash-head { margin: 0; font-weight: 700; font-size: 14px; }
+.clash-modes { display: flex; gap: 6px; flex-wrap: wrap; }
+.clash-mode { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 99px; border: 1.5px solid #d5dbe6; cursor: pointer; font-weight: 700; font-size: 14px; }
+.clash-mode:has(input:checked) { border-color: var(--accent, #3b5bdb); background: #eef2ff; color: var(--accent, #3b5bdb); }
+.clash-mode input { width: 16px; height: 16px; margin: 0; }
+.clash-keep { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.clash-keep[hidden] { display: none; }
+.clash-keep label { display: grid; gap: 3px; font-size: 12px; font-weight: 700; color: var(--muted, #666); }
+.clash-keep input, .clash-keep select { font: inherit; font-size: 15px; font-weight: 400; color: #111; padding: 7px 9px; border-radius: 10px; border: 1px solid #cfd6e2; background: #fff; min-width: 0; }
+.clash-note { grid-column: 1 / -1; color: #7a5a00; }
+.clash-note:empty { display: none; }
+.clash-replace { margin: 0; }
+@media (max-width: 520px) { .clash-keep { grid-template-columns: 1fr; } .imp-clash { margin-left: 12px; } }

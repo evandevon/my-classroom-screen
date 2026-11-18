@@ -14,7 +14,7 @@ import { checkOldRecords } from './oldrecords.js';
 import { screenshotDialog } from './screenshot.js';
 import { startupNotes, showWelcome, showWhatsNew, showWaysToHelp } from './welcome.js';
 import { initBackup, maybeAskOnce, backupStatus, downloadBackup, markBackedUp } from './backup.js';
-import { initTabs, claim, release, askOthers, openElsewhere, notifyAdded } from './tabs.js';
+import { initTabs, claim, release, askOthers, openElsewhere, notifyAdded, takeOver } from './tabs.js';
 import { getGroups, forgetGroups, saveGroups, addGroup, updateGroup, removeGroup, GROUP_COLOURS } from './groups.js';
 import { initClasses, reloadClassLists, currentClassName, fromTimeline, onClassChange, showClassPicker, showClassManager } from './classes.js';
 
@@ -1336,6 +1336,89 @@ function screenSignature(sc) {
 const widgetIcons = (sc) => [...new Set((sc.widgets || []).map((w) => WIDGETS[w.type]?.icon).filter(Boolean))].slice(0, 7).join(' ');
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
+const sameName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+function freeName(want, taken) {   // taken: lower-case names
+  let name = want;
+  for (let n = 2; taken.has(name.trim().toLowerCase()); n++) name = `${want} (${n})`;
+  return name;
+}
+
+/**
+ * A screen coming in has the same name as one of yours: Keep both (the copy can be renamed and put in
+ * any group) or Replace mine. Keep both is the safe default. Returns { el, choice() }.
+ */
+function clashPanel(sc, twin, groups, fileGroups, taken) {
+  const base = sc.name || 'Untitled screen';
+  const pick = 'clash-' + uid('c');
+  const keep = h('input', { type: 'radio', name: pick, value: 'keep', checked: true });
+  const replace = h('input', { type: 'radio', name: pick, value: 'replace' });
+  const nameIn = h('input', { type: 'text', value: freeName(base, taken), maxlength: 80, 'aria-label': `Name for the new copy of ${base}` });
+  const fromFile = sc.group && (fileGroups || []).find((g) => g.id === sc.group);
+  const fileTwin = fromFile && groups.find((g) => sameName(g.name, fromFile.name));
+  const groupSel = h('select', { 'aria-label': 'Group for the new copy' },
+    h('option', { value: '' }, 'Not in a group'),
+    ...groups.map((g) => h('option', { value: g.id }, g.name)),
+    fromFile && !fileTwin ? h('option', { value: 'file' }, `${fromFile.name} (new group, from the file)`) : null);
+  groupSel.value = fileTwin ? fileTwin.id : fromFile ? 'file' : '';
+  const nameNote = h('small', { class: 'clash-note' });
+  const keepBits = h('div', { class: 'clash-keep' },
+    h('label', {}, h('span', {}, 'Name'), nameIn),
+    h('label', {}, h('span', {}, 'Group'), groupSel),
+    nameNote);
+  const twinGroup = twin.group && groups.find((g) => g.id === twin.group);
+  const replaceBits = h('p', { class: 'clash-replace hint', hidden: true },
+    `Your “${twin.name}” will be swapped for this one. It keeps its place in your list${twinGroup ? ` and in “${twinGroup.name}”` : ''}. You can undo straight after.`);
+  const sync = () => {
+    keepBits.hidden = !keep.checked;
+    replaceBits.hidden = !replace.checked;
+    const n = nameIn.value.trim();
+    nameNote.textContent = n && taken.has(n.toLowerCase()) ? `You already have “${n}” — it’ll be called “${freeName(n, taken)}”.` : '';
+  };
+  [keep, replace].forEach((r) => r.addEventListener('change', sync));
+  nameIn.addEventListener('input', sync);
+  nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+  sync();
+  const el = h('div', { class: 'imp-clash' },
+    h('p', { class: 'clash-head' }, `You already have a screen called “${twin.name}”.`),
+    h('div', { class: 'clash-modes', role: 'radiogroup', 'aria-label': `What to do with ${base}` },
+      h('label', { class: 'clash-mode' }, keep, h('span', {}, 'Keep both')),
+      h('label', { class: 'clash-mode' }, replace, h('span', {}, 'Replace mine'))),
+    keepBits, replaceBits);
+  return {
+    el,
+    choice: () => (replace.checked ? { mode: 'replace', target: twin } : { mode: 'keep', name: nameIn.value.trim() || freeName(base, taken), group: groupSel.value }),
+  };
+}
+
+/**
+ * Write new versions over some of your screens ("Replace mine"). Tabs showing them step aside first,
+ * and this tab's own copy isn't saved over them. Returns the old versions (for Undo).
+ */
+async function overwriteScreens(fresh) {
+  const olds = [];
+  for (const s of fresh) olds.push(await db.getScreen(s.id));
+  await takeOver(fresh.map((s) => s.id));
+  if (screen && fresh.some((s) => s.id === screen.id)) { persist.cancel(); deletedScreens.add(screen.id); }
+  for (const s of fresh) await db.putScreen(s);
+  return olds.filter(Boolean);
+}
+/** After overwriteScreens: show the right version here, and let saving resume. */
+async function afterOverwrite(fresh, show) {
+  const ids = new Set(fresh.map((s) => s.id));
+  const here = screen && ids.has(screen.id) ? screen.id : null;
+  if (show) await openScreen(show);
+  else if (here) await openScreen(fresh.find((s) => s.id === here));
+  if (here) deletedScreens.delete(here);
+  renderDrawer();
+}
+function replacedToast(msg, olds) {
+  toast(msg, { ms: 10000, action: 'Undo', onAction: async () => {
+    await overwriteScreens(olds);
+    await afterOverwrite(olds, null);
+    toast(olds.length === 1 ? `“${olds[0].name}” is back as it was.` : 'Your screens are back as they were.');
+  } });
+}
+
 /**
  * One window for bringing screens in — from a file, a link or a file dropped on the screen.
  * Tick the screens you want; ones you already have are unticked; nothing changes until "Add".
@@ -1344,11 +1427,16 @@ async function openImport(parsed, { blankToRemove = null } = {}) {
   persist.flush();
   const mine = await db.listScreens();
   const mySigs = new Map(mine.flatMap((m) => [[screenSignature(m), m], ...(m.copiedFrom ? [[m.copiedFrom, m]] : [])]));
+  const groups = await getGroups();
+  const taken = new Set([...mine, ...parsed.screens].map((m) => String(m.name || '').trim().toLowerCase()));
   const items = parsed.screens.map((sc) => {
     const already = mySigs.get(screenSignature(sc)) || null;
     const box = h('input', { type: 'checkbox', 'aria-label': `Add ${sc.name || 'screen'}` });
     box.checked = !already;
-    return { sc, already, box };
+    // Same name as one of yours (but not the same screen): ask — Keep both (renamed) or Replace mine.
+    const twin = !already && mine.find((m) => sameName(m.name, sc.name || 'Untitled screen'));
+    const clash = twin ? clashPanel(sc, twin, groups, parsed.groups, taken) : null;
+    return { sc, already, box, clash };
   });
   const classesOf = (list) => {
     if (parsed.backup && list.length) return parsed.classes || [];   // restoring a backup brings every class list
@@ -1367,6 +1455,7 @@ async function openImport(parsed, { blankToRemove = null } = {}) {
     classLine.hidden = !cls.length;
     allBox.checked = chosen.length === items.length;
     allBox.indeterminate = chosen.length > 0 && chosen.length < items.length;
+    items.forEach((it) => { if (it.clash) it.clash.el.hidden = !it.box.checked; });
   };
   allBox.addEventListener('change', () => { items.forEach((it) => (it.box.checked = allBox.checked)); sync(); });
   const rows = items.map((it) => {
@@ -1379,15 +1468,16 @@ async function openImport(parsed, { blankToRemove = null } = {}) {
         h('b', {}, it.sc.name || 'Untitled screen'),
         h('small', {}, bits.join(' · ')),
         widgetIcons(it.sc) ? h('span', { class: 'screen-icons', 'aria-hidden': 'true' }, widgetIcons(it.sc)) : null),
-      it.already ? h('span', { class: 'imp-badge' }, 'You already have this') : null);
+      it.already ? h('span', { class: 'imp-badge' }, 'You already have this') : it.clash ? h('span', { class: 'imp-badge' }, 'Same name as yours') : null);
   });
+  const unchanged = items.some((it) => it.clash) ? 'Your own screens won’t change unless you choose Replace mine.' : 'Your own screens won’t change.';
   const intro = parsed.kind === 'link'
-    ? 'Someone shared a screen with you. Add it to your screens? Your own screens won’t change.'
-    : `${parsed.name ? `“${parsed.name.replace(/\.(classroom|zip|json)$/i, '')}” has` : 'This file has'} ${plural(items.length, 'screen')}. Tick the ones you want — they’re added alongside your screens, which won’t change.`;
+    ? `Someone shared a screen with you. Add it to your screens? ${unchanged}`
+    : `${parsed.name ? `“${parsed.name.replace(/\.(classroom|zip|json)$/i, '')}” has` : 'This file has'} ${plural(items.length, 'screen')}. Tick the ones you want — they’re added alongside your screens. ${unchanged}`;
   const dlg = modal(parsed.kind === 'link' ? 'A shared screen' : 'Add screens from a file',
     h('p', {}, intro),
     items.length > 1 ? h('label', { class: 'check imp-all' }, allBox, h('span', {}, 'All screens')) : null,
-    h('div', { class: 'imp-list' }, ...rows),
+    h('div', { class: 'imp-list' }, ...rows.map((row, i) => (items[i].clash ? h('div', { class: 'imp-item' }, row, items[i].clash.el) : row))),
     classLine,
     h('div', { class: 'row end' },
       items.length === 1 && items[0].already ? h('button', { class: 'btn', onclick: async () => { dlg.close(); await openScreen(items[0].already); } }, 'Open the one I have') : null,
@@ -1395,10 +1485,12 @@ async function openImport(parsed, { blankToRemove = null } = {}) {
       addBtn),
   );
   addBtn.addEventListener('click', async () => {
-    const chosen = items.filter((it) => it.box.checked).map((it) => it.sc);
+    const picked = items.filter((it) => it.box.checked);
+    const chosen = picked.map((it) => it.sc);
     if (!chosen.length) return;
+    const choices = new Map(picked.filter((it) => it.clash).map((it) => [it.sc, it.clash.choice()]));
     addBtn.disabled = true;
-    if (await addChosen(parsed, chosen, blankToRemove)) dlg.close();
+    if (await addChosen(parsed, chosen, blankToRemove, choices)) dlg.close();
     else addBtn.disabled = false;
   });
   // 👁 Preview: have a look first, without adding anything
@@ -1416,6 +1508,8 @@ async function openImport(parsed, { blankToRemove = null } = {}) {
       if (it.already || !sigs.has(screenSignature(it.sc))) return;
       it.already = true; it.box.checked = false;
       rows[i].classList.add('already');
+      rows[i].querySelector('.imp-badge')?.remove();
+      if (it.clash) { it.clash.el.remove(); it.clash = null; }
       rows[i].querySelector('.imp-main').after(h('span', { class: 'imp-badge' }, 'You already have this'));
     });
     sync();
@@ -1425,31 +1519,57 @@ async function openImport(parsed, { blankToRemove = null } = {}) {
 }
 
 /** Add screens from a file or link alongside the teacher's own, and show the first one. */
-async function addChosen(parsed, chosen, blankToRemove = null) {
+async function addChosen(parsed, chosen, blankToRemove = null, choices = new Map()) {
   try {
-    const { screens: added, addedClasses } = await addImported(parsed, chosen);
-    const names = new Set((await db.listScreens()).map((x) => x.name));
-    const top = Math.max(-1, ...(await db.listScreens()).map((x) => (Number.isFinite(x.order) ? x.order : -1)));
-    added.forEach((sc, i) => {
-      let name = sc.name || 'Shared screen';
-      for (let n = 2; names.has(name); n++) name = `${sc.name || 'Shared screen'} (${n})`;
-      sc.name = name; names.add(name);
-      sc.order = top + 1 + i;   // new screens go at the end of your list
+    // A screen given its own group, or replacing one of yours, doesn't bring its group from the file.
+    const noFileGroup = new Set(chosen.filter((sc) => { const c = choices.get(sc); return c && (c.mode === 'replace' || c.group !== 'file'); }));
+    const { screens: prepared, addedClasses } = await addImported(parsed, chosen, { noFileGroup });
+    const all = await db.listScreens();
+    const names = new Set(all.map((x) => String(x.name || '').trim().toLowerCase()));
+    let top = Math.max(-1, ...all.map((x) => (Number.isFinite(x.order) ? x.order : -1)));
+    const added = [];
+    const replaced = [];
+    prepared.forEach((sc, i) => {
+      const c = choices.get(chosen[i]);
+      const target = c?.mode === 'replace' && all.find((x) => x.id === c.target.id);
+      if (target) {
+        // Replace mine: the new contents, in your screen's place (same name, group and spot in the list).
+        sc.id = target.id; sc.name = target.name;
+        if (Number.isFinite(target.order)) sc.order = target.order; else delete sc.order;
+        if (target.group) sc.group = target.group; else delete sc.group;
+        replaced.push(sc);
+        return;
+      }
+      sc.name = freeName(c?.name || sc.name || 'Shared screen', names);
+      names.add(sc.name.toLowerCase());
+      if (c && c.group !== 'file') { if (c.group) sc.group = c.group; else delete sc.group; }
+      sc.order = ++top;   // new screens go at the end of your list
+      added.push(sc);
     });
     for (const sc of added) await db.putScreen(sc);
+    const olds = replaced.length ? await overwriteScreens(replaced) : [];
     // A first-time visitor's empty starter screen isn't needed once they have the shared one.
     if (blankToRemove && !undoStack.length && !redoStack.length) {   // they haven't done anything on it yet
       if (screen?.id === blankToRemove.id) persist.cancel();
       deletedScreens.add(blankToRemove.id);
       await db.deleteScreen(blankToRemove.id);
     }
+    const first = added[0] || replaced[0];
     if (previewing?.inTab) {
       // In a preview tab the preview stays; the screens just join your screens (your home tab is told).
-      added.forEach((sc) => notifyAdded(sc.name));
+      [...added, ...replaced].forEach((sc) => notifyAdded(sc.name));
       dispatchEvent(new Event('mcs-screens-added'));
-    } else await openScreen(added[0]);
+      if (replaced.length) await afterOverwrite(replaced, null);
+    } else if (replaced.length) await afterOverwrite(replaced, first);
+    else await openScreen(first);
     renderDrawer();
-    toast(`Added ${added.length === 1 ? `“${added[0].name}”` : plural(added.length, 'screen')}. Your other screens are unchanged.${addedClasses.length ? ` Class list${addedClasses.length === 1 ? '' : 's'} added: ${addedClasses.join(', ')}.` : ''}`, { ms: 7000 });
+    const parts = [];
+    if (added.length) parts.push(`Added ${added.length === 1 ? `“${added[0].name}”` : plural(added.length, 'screen')}.`);
+    if (replaced.length) parts.push(`Replaced ${replaced.length === 1 ? `your “${replaced[0].name}”` : plural(replaced.length, 'of your screens')}.`);
+    if (!replaced.length) parts.push('Your other screens are unchanged.');
+    if (addedClasses.length) parts.push(`Class list${addedClasses.length === 1 ? '' : 's'} added: ${addedClasses.join(', ')}.`);
+    if (olds.length) replacedToast(parts.join(' '), olds);
+    else toast(parts.join(' '), { ms: 7000 });
     return true;
   } catch (e) {
     console.error(e);
@@ -1560,21 +1680,46 @@ async function copyPreview() {
   if (!previewing || !screen) return;
   commitPending();
   const { parsed, raw } = previewing;
-  const s = await copyPreviewToMine(parsed, raw, screen);
-  s.copiedFrom = screenSignature(raw);   // so the import window knows you have it, even if you changed it
   const old = previewing.copiedId && (await db.getScreen(previewing.copiedId));
+  // The first copy, with the same name as one of yours: Keep both (renamed, choose a group) or Replace mine.
+  const mine = old ? [] : await db.listScreens();
+  const twin = mine.find((m) => sameName(m.name, raw.name || 'Untitled screen'));
+  const choice = twin ? await askClash(raw, twin, parsed, mine) : null;
+  if (twin && !choice) return;
+  const s = await copyPreviewToMine(parsed, raw, screen, { fileGroup: !choice || (choice.mode === 'keep' && choice.group === 'file') });
+  s.copiedFrom = screenSignature(raw);   // so the import window knows you have it, even if you changed it
+  let olds = [];
   if (old) { s.id = old.id; s.order = old.order; s.name = old.name; if (old.group) s.group = old.group; else delete s.group; }
-  else {
-    const names = new Set((await db.listScreens()).map((x) => x.name));
-    const base = s.name || 'Shared screen';
-    for (let n = 2; names.has(s.name); n++) s.name = `${base} (${n})`;
+  else if (choice?.mode === 'replace') {
+    s.id = twin.id; s.name = twin.name;
+    if (Number.isFinite(twin.order)) s.order = twin.order; else delete s.order;
+    if (twin.group) s.group = twin.group; else delete s.group;
+  } else {
+    const taken = new Set(mine.map((x) => String(x.name || '').trim().toLowerCase()));
+    s.name = freeName(choice?.name || s.name || 'Shared screen', taken);
+    if (choice && choice.group !== 'file') { if (choice.group) s.group = choice.group; else delete s.group; }
   }
-  await db.putScreen(s);
+  if (choice?.mode === 'replace') { olds = await overwriteScreens([s]); await afterOverwrite([s], null); }
+  else await db.putScreen(s);
   previewing.copiedId = s.id;
   previewing.cleanKey = comparable(screen);
   notifyAdded(s.name);
   dispatchEvent(new Event('mcs-screens-added'));
-  toast(old ? `⟳ Updated “${s.name}” in your screens.` : `➕ “${s.name}” is now in your screens. This is still a preview — changes from here on aren’t saved unless you press Update my copy.`, { ms: old ? 3000 : 7000 });
+  if (olds.length) replacedToast(`⟳ Replaced your “${s.name}” with this one. This is still a preview — changes from here on aren’t saved unless you press Update my copy.`, olds);
+  else toast(old ? `⟳ Updated “${s.name}” in your screens.` : `➕ “${s.name}” is now in your screens. This is still a preview — changes from here on aren’t saved unless you press Update my copy.`, { ms: old ? 3000 : 7000 });
+}
+/** A small window with the same choice as in the import window, for copying a previewed screen in. */
+async function askClash(raw, twin, parsed, mine) {
+  const taken = new Set(mine.map((m) => String(m.name || '').trim().toLowerCase()));
+  const panel = clashPanel(raw, twin, await getGroups(), parsed.groups, taken);
+  return new Promise((resolve) => {
+    let result = null;
+    const dlg = modal('Copy to my screens', panel.el,
+      h('div', { class: 'row end' },
+        h('button', { class: 'btn', onclick: () => dlg.close() }, 'Cancel'),
+        h('button', { class: 'btn primary', onclick: () => { result = panel.choice(); dlg.close(); } }, 'Copy')));
+    dlg.addEventListener('close', () => resolve(result));
+  });
 }
 addEventListener('beforeunload', (e) => {
   if (previewing?.inTab && changedSinceCopy()) { e.preventDefault(); e.returnValue = ''; }
