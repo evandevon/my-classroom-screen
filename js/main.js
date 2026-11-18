@@ -751,58 +751,95 @@ async function renderDrawer() {
   const screens = await sortedScreens();
   const [recent, groupsBox] = await screenListSection(screens);
 
+  // The menu is a set of colour-coded cards, with a bar of shortcuts at the top that stays put while
+  // the menu scrolls (tap one to jump to that card).
+  const cards = [
+    menuCard('screens', '🗂️', 'My screens', [
+      h('div', { class: 'row new-row' },
+        h('button', { class: 'btn primary', onclick: newScreenDialog }, '+ New screen'),
+        h('button', { class: 'btn', title: 'A group keeps screens together, e.g. one per class or subject. Close a group to hide its screens.', onclick: () => newGroup() }, '+ New group'),
+      ),
+      ...(recent ? [recent] : []),
+      groupsBox,
+    ]),
+    menuCard('this', '🖼️', 'This screen', [
+      h('div', { class: 'menu-grid' },
+        menuBtn('🖼️', 'Background', backgroundDialog),
+        menuBtn('🎨', 'Widget theme & text size', () => { closeDrawer(); themeDialog(); }),
+        screen.paused
+          ? menuBtn('▶', 'Carry on', () => { resumeScreen(); closeDrawer(); })
+          : menuBtn('⏸', 'Pause screen', () => { pauseScreen(); closeDrawer(); }),
+        menuBtn('📸', 'Save a picture (JPG or PDF)', () => { closeDrawer(); screenshotDialog(screen.name); }),
+        menuBtn('🧹', 'Clear widgets', () => { if (screen.paused) { toast('Carry on with the paused screen first.'); return; } if (confirm('Remove all widgets from this screen?')) board.clearAll(); }, null, 'danger'),
+      ),
+    ]),
+    menuCard('save', '💾', 'Save & share', [
+      h('p', { class: 'menu-saved' }, '✓ Your screens save themselves in this browser as you go.'),
+      h('h4', { class: 'menu-sub' }, 'Keep a safe copy'),
+      backupLine(await backupStatus()),
+      h('h4', { class: 'menu-sub' }, 'Send a copy'),
+      h('div', { class: 'menu-grid' },
+        menuBtn('🔗', 'Send a copy as a link', () => { closeDrawer(); shareDialog(); }, 'Makes a link holding a copy of this screen as it is now. It isn’t a live link: changes made later — by you, or by whoever opens it — stay separate. Pictures, clips and sounds from this computer aren’t included (Save to a file carries them).'),
+        menuBtn('💾', 'Save to a file', () => { closeDrawer(); exportDialog(); }, 'Choose some screens to save as a .classroom file — to send to a colleague or take to another computer. It’s a copy: pictures, sounds, groups and (if you tick it) class lists go too, and later changes stay separate.'),
+      ),
+      h('h4', { class: 'menu-sub' }, 'Bring screens in'),
+      h('div', { class: 'menu-grid' },
+        menuBtn('📂', 'Add screens from a file', () => { closeDrawer(); importDialog(); }, 'Open a .classroom file and choose which of its screens to add. Your own screens stay as they are.'),
+      ),
+      h('p', { class: 'hint menu-note' }, 'Links and files are copies, not live links: once sent, the screens on each computer change separately. To bring an updated version back, add it from a new link or file.'),
+    ]),
+    menuCard('classes', '👥', 'Classes', [
+      h('div', { class: 'menu-grid' },
+        menuBtn('👥', 'Classes & student lists', () => { closeDrawer(); showClassManager(); }),
+      ),
+    ]),
+    menuCard('options', '⚙️', 'Options', [
+      h('div', { class: 'stack' },
+        toggle('Snap widgets to a grid', board.snap, (v) => { board.snap = v; db.setMeta('snap', v); }),
+        toggle('Hide widget title bars (tap a widget to show)', document.body.classList.contains('clean'), (v) => { document.body.classList.toggle('clean', v); db.setMeta('clean', v); }),
+        toggle('Large buttons', document.body.classList.contains('large'), (v) => { document.body.classList.toggle('large', v); db.setMeta('large', v); }),
+      ),
+    ]),
+    menuCard('help', '❓', 'Help', [
+      h('div', { class: 'menu-grid' },
+        menuBtn('👋', 'Welcome & quick overview', () => { closeDrawer(); showWelcome(); }),
+        menuBtn('✨', 'What’s new', () => { closeDrawer(); showWhatsNew(); }),
+        menuBtn('🔔', 'Keep alarms ringing (stop tabs sleeping)', showSoundHelp),
+        menuBtn('💛', 'Ways to help', () => { closeDrawer(); showWaysToHelp(); }),
+      ),
+    ]),
+  ];
+  const jump = h('nav', { class: 'menu-jump', 'aria-label': 'Menu sections' },
+    ...cards.map((c) => h('button', { class: `jump-chip mc-${c.dataset.key}`, title: c.dataset.title, onclick: () => drawer.scrollTo({ top: c.offsetTop - drawer.querySelector('.drawer-top').offsetHeight - 10, behavior: 'smooth' }) },
+      h('span', { 'aria-hidden': 'true' }, c.dataset.icon), h('span', { class: 'jump-label' }, c.dataset.short))));
+
+  // Light up the shortcut for the card at the top of the menu as it scrolls.
+  drawer.onscroll = () => {
+    const line = drawer.querySelector('.drawer-top').getBoundingClientRect().bottom + 24;
+    const atEnd = drawer.scrollTop + drawer.clientHeight >= drawer.scrollHeight - 4;
+    let on = cards[0];
+    for (const c of cards) if (c.getBoundingClientRect().top <= line) on = c;
+    if (atEnd) on = cards.find((c) => c.getBoundingClientRect().top <= line + 200 && c === cards[cards.length - 1]) || on;
+    jump.querySelectorAll('.jump-chip').forEach((chip, i) => chip.classList.toggle('on', cards[i] === on));
+  };
   drawer.replaceChildren(
-    h('div', { class: 'drawer-head' }, h('h2', {}, 'My screens'), h('button', { class: 'w-btn', 'aria-label': 'Close menu', onclick: closeDrawer }, '✕')),
-    h('div', { class: 'row new-row' },
-      h('button', { class: 'btn primary', onclick: newScreenDialog }, '+ New screen'),
-      h('button', { class: 'btn', title: 'A group keeps screens together, e.g. one per class or subject. Close a group to hide its screens.', onclick: () => newGroup() }, '+ New group'),
-    ),
-    ...(recent ? [recent] : []),
-    groupsBox,
-    h('h3', {}, 'This screen'),
-    h('div', { class: 'menu-grid' },
-      menuBtn('🖼️', 'Background', backgroundDialog),
-      menuBtn('🎨', 'Widget theme & text size', () => { closeDrawer(); themeDialog(); }),
-      screen.paused
-        ? menuBtn('▶', 'Carry on', () => { resumeScreen(); closeDrawer(); })
-        : menuBtn('⏸', 'Pause screen', () => { pauseScreen(); closeDrawer(); }),
-      menuBtn('📸', 'Save a picture (JPG or PDF)', () => { closeDrawer(); screenshotDialog(screen.name); }),
-      menuBtn('🧹', 'Clear widgets', () => { if (screen.paused) { toast('Carry on with the paused screen first.'); return; } if (confirm('Remove all widgets from this screen?')) board.clearAll(); }),
-    ),
-    h('h3', {}, 'Save & share'),
-    h('p', { class: 'menu-saved' }, '✓ Your screens save themselves in this browser as you go.'),
-    h('h4', { class: 'menu-sub' }, 'Keep a safe copy'),
-    backupLine(await backupStatus()),
-    h('h4', { class: 'menu-sub' }, 'Send a copy'),
-    h('div', { class: 'menu-grid' },
-      menuBtn('🔗', 'Send a copy as a link', () => { closeDrawer(); shareDialog(); }, 'Makes a link holding a copy of this screen as it is now. It isn’t a live link: changes made later — by you, or by whoever opens it — stay separate. Pictures, clips and sounds from this computer aren’t included (Save to a file carries them).'),
-      menuBtn('💾', 'Save to a file', () => { closeDrawer(); exportDialog(); }, 'Choose some screens to save as a .classroom file — to send to a colleague or take to another computer. It’s a copy: pictures, sounds, groups and (if you tick it) class lists go too, and later changes stay separate.'),
-    ),
-    h('h4', { class: 'menu-sub' }, 'Bring screens in'),
-    h('div', { class: 'menu-grid' },
-      menuBtn('📂', 'Add screens from a file', () => { closeDrawer(); importDialog(); }, 'Open a .classroom file and choose which of its screens to add. Your own screens stay as they are.'),
-    ),
-    h('p', { class: 'hint menu-note' }, 'Links and files are copies, not live links: once sent, the screens on each computer change separately. To bring an updated version back, add it from a new link or file.'),
-    h('h3', {}, 'Classes'),
-    h('div', { class: 'menu-grid' },
-      menuBtn('👥', 'Classes & student lists', () => { closeDrawer(); showClassManager(); }),
-    ),
-    h('h3', {}, 'Options'),
-    h('div', { class: 'stack' },
-      toggle('Snap widgets to a grid', board.snap, (v) => { board.snap = v; db.setMeta('snap', v); }),
-      toggle('Hide widget title bars (tap a widget to show)', document.body.classList.contains('clean'), (v) => { document.body.classList.toggle('clean', v); db.setMeta('clean', v); }),
-      toggle('Large buttons', document.body.classList.contains('large'), (v) => { document.body.classList.toggle('large', v); db.setMeta('large', v); }),
-    ),
-    h('h3', {}, 'Help'),
-    h('div', { class: 'menu-grid' },
-      menuBtn('👋', 'Welcome & quick overview', () => { closeDrawer(); showWelcome(); }),
-      menuBtn('✨', 'What’s new', () => { closeDrawer(); showWhatsNew(); }),
-      menuBtn('🔔', 'Keep alarms ringing (stop tabs sleeping)', showSoundHelp),
-      menuBtn('💛', 'Ways to help', () => { closeDrawer(); showWaysToHelp(); }),
-    ),
-    h('p', { class: 'hint' }, 'Everything is saved automatically in this browser. Use ☰ → “Save to a file” now and then as a backup.'),
+    h('div', { class: 'drawer-top' },
+      h('div', { class: 'drawer-head' }, h('h2', {}, 'Menu'), h('button', { class: 'w-btn', 'aria-label': 'Close menu', onclick: closeDrawer }, '✕')),
+      jump),
+    ...cards,
     h('p', { class: 'hint menu-made' }, 'Made by teachers, for teachers. Free for everyone. ', h('button', { class: 'linkish', onclick: () => { closeDrawer(); showWaysToHelp(); } }, '💛 Ways to help')),
   );
+  drawer.onscroll();
+}
+const SHORT = { screens: 'Screens', this: 'This screen', save: 'Save', classes: 'Classes', options: 'Options', help: 'Help' };
+/** One section of the ☰ menu: a tinted card with a coloured heading. */
+function menuCard(key, icon, title, content) {
+  const id = `menu-${key}`;
+  const card = h('section', { class: `menu-card mc-${key}`, 'aria-labelledby': `${id}-h` },
+    h('h3', { class: 'menu-card-head', id: `${id}-h` }, h('span', { class: 'mch-icon', 'aria-hidden': 'true' }, icon), title),
+    ...content);
+  Object.assign(card.dataset, { key, icon, title, short: SHORT[key] || title });
+  return card;
 }
 /** ☰ → Save & share: when everything was last saved to a file, with a gentle warning when it's been a while. */
 function backupLine(b) {
@@ -811,7 +848,7 @@ function backupLine(b) {
     h('button', { class: `btn small${b.stale ? ' primary' : ''}`, title: 'Saves every screen and every class list into one .classroom file in your Downloads, in one click. Keep it somewhere safe (like OneDrive) — if this browser is ever cleared, add the screens back from it.', onclick: () => { closeDrawer(); downloadBackup(); } }, '⬇ Back up everything'),
   );
 }
-const menuBtn = (icon, label, onclick, tip) => h('button', { class: 'menu-btn', onclick, title: tip || null }, h('span', { class: 'mi' }, icon), label);
+const menuBtn = (icon, label, onclick, tip, kind = '') => h('button', { class: `menu-btn${kind ? ` ${kind}` : ''}`, onclick, title: tip || null }, h('span', { class: 'mi', 'aria-hidden': 'true' }, icon), h('span', {}, label));
 function toggle(label, checked, onChange) {
   const c = h('input', { type: 'checkbox', onchange: (e) => onChange(e.target.checked) });
   c.checked = checked;

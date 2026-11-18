@@ -1800,3 +1800,38 @@ body.grabbing, body.grabbing * { cursor: grabbing !important; }
 .clash-note:empty { display: none; }
 .clash-replace { margin: 0; }
 @media (max-width: 520px) { .clash-keep { grid-template-columns: 1fr; } .imp-clash { margin-left: 12px; } }
+
+/* ---------- ☰ menu: colour-coded cards + a sticky row of shortcuts ---------- */
+.drawer { padding-top: 0; background: #fafbfc; }
+.drawer-top { position: sticky; top: 0; z-index: 3; margin: 0 -16px 12px; padding: 14px 16px 10px; background: #fafbfcf2; backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); }
+.menu-jump { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.jump-chip { flex: none; display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; min-height: 32px; border-radius: 99px; border: 1.5px solid var(--mc-line); background: var(--mc-tint); color: var(--mc-ink); font-weight: 800; font-size: calc(13px * var(--fs, 1)); cursor: pointer; }
+.jump-chip:hover, .jump-chip:focus-visible, .jump-chip.on { background: var(--mc); color: #fff; border-color: var(--mc); }
+body.large .jump-chip { min-height: 44px; padding: 6px 14px; }
+
+.menu-card { --mc: #3a5ccc; --mc-ink: #2c47a3; --mc-tint: #f2f5fd; --mc-line: #d8e0f6;
+  margin: 0 0 12px; padding: 12px 12px 14px; border-radius: 16px; background: var(--mc-tint); border: 1px solid var(--mc-line); border-left: 5px solid var(--mc);
+}
+.mc-screens { --mc: #3a5ccc; --mc-ink: #2c47a3; --mc-tint: #f2f5fd; --mc-line: #d8e0f6; }
+.mc-this    { --mc: #8e5bd9; --mc-ink: #6a3fb3; --mc-tint: #f7f2fd; --mc-line: #e6daf7; }
+.mc-save    { --mc: #23946f; --mc-ink: #1a6e53; --mc-tint: #eff9f4; --mc-line: #d2ecdf; }
+.mc-classes { --mc: #e07b00; --mc-ink: #9a5400; --mc-tint: #fff6ea; --mc-line: #f6dfbf; }
+.mc-options { --mc: #6b7280; --mc-ink: #4b5160; --mc-tint: #f4f5f7; --mc-line: #e1e4e9; }
+.mc-help    { --mc: #d6457f; --mc-ink: #a82f60; --mc-tint: #fdf1f6; --mc-line: #f4d6e3; }
+.drawer .menu-card-head { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: var(--mc-ink); font-size: calc(15px * var(--fs, 1)); letter-spacing: .05em; }
+.mch-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--mc); font-size: 16px; letter-spacing: 0; filter: saturate(1.1); }
+.menu-card .menu-btn { background: #fff; border-color: var(--mc-line); }
+.menu-card .menu-btn:hover { background: #fff; border-color: var(--mc); box-shadow: 0 0 0 1px var(--mc) inset; }
+.menu-card .menu-btn:focus-visible { outline: 3px solid var(--mc); outline-offset: 1px; }
+.menu-btn.danger { color: #b3261e; }
+.menu-btn.danger:hover { border-color: #b3261e; box-shadow: 0 0 0 1px #b3261e inset; }
+.menu-card .menu-sub { color: var(--mc-ink); opacity: .85; }
+.menu-card .menu-sub:first-of-type { margin-top: 6px; }
+.mc-save .menu-saved { margin-top: 0; }
+.mc-save .menu-backup:not(.stale) { background: #fff; border: 1px solid var(--mc-line); }
+.menu-card .screen-list li:not(.current) { background: #fff; }
+.menu-card .stack { background: #fff; border: 1px solid var(--mc-line); border-radius: 12px; padding: 4px 10px; }
+.menu-card .new-row { margin-top: 0; }
+.menu-card .menu-note { margin-bottom: 0; }
+.drawer .menu-made { text-align: center; margin: 4px 0 12px; }
+.drawer::after { content: ""; display: block; height: 30vh; }   /* so the last cards can scroll up to the shortcuts */
