@@ -68,6 +68,7 @@ The widget bar at the bottom has four groups. Tap one to see its widgets.
 ## Screens
 
 - **☰ menu:** make, open, rename, duplicate, delete and drag screens into order. Using a screen never moves it; new screens go at the end.
+- **The menu is in colour-coded cards:** 🗂️ My screens (blue), 🖼️ This screen (purple), 💾 Save & share (green), 👥 Classes (orange), ⚙️ Options (grey) and ❓ Help (pink). A row of shortcuts at the top stays in place as you scroll: tap one to jump to that card, and the one you're in lights up.
 - **Starting points:** start blank or from a ready-made screen. The choices are Morning routine, Group work, Quiet reading, Maths lesson, Test conditions, Writing task, Science investigation, Stations / rotations, Brain break, Pack up and Relief teacher day.
 - **Quick switcher:** tap the screen's name at the top.
   - With up to 8 screens it shows them all.
