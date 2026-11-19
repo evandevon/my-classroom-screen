@@ -7,6 +7,8 @@ export default {
   icon: '⏱️',
   group: 'core',
   size: [340, 260],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { Object.assign(s, { running: false, startedAt: null, elapsed: 0, laps: [], held: false }); },
   hold(s) {
     if (!s.running) return null;
     s.elapsed += Date.now() - s.startedAt;

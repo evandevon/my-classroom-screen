@@ -1835,3 +1835,28 @@ body.large .jump-chip { min-height: 44px; padding: 6px 14px; }
 .menu-card .menu-note { margin-bottom: 0; }
 .drawer .menu-made { text-align: center; margin: 4px 0 12px; }
 .drawer::after { content: ""; display: block; height: 30vh; }   /* so the last cards can scroll up to the shortcuts */
+
+/* ---------- ⭐ My widgets: button at the start of the widget bar, and its tray ---------- */
+.dock-mine .di { filter: drop-shadow(0 1px 0 #c98a00); }
+.dock-mine.open { background: #fff3cf; }
+.dock-pop.mine { width: min(720px, calc(100vw - 16px)); max-height: min(70vh, 620px); overflow: auto; }
+.mw-count { font-weight: 700; color: var(--muted); font-size: .8em; }
+.mw-hint { margin: 0 4px 10px; color: var(--muted); font-size: calc(13px * var(--fs, 1)); }
+.mw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.mw-grid.empty { display: block; }
+.mw-card { position: relative; border-radius: 14px; background: #f6f7fa; border: 1px solid var(--line); overflow: hidden; display: flex; flex-direction: column; }
+.mw-card:hover, .mw-card:focus-within { border-color: #e0a800; box-shadow: 0 0 0 2px #ffd666; }
+.mw-add { all: unset; cursor: pointer; display: flex; flex-direction: column; flex: 1; }
+.mw-add:focus-visible { outline: 3px solid #e0a800; outline-offset: -3px; border-radius: 14px; }
+.mw-pic { display: grid; place-items: center; aspect-ratio: 4 / 3; background: repeating-conic-gradient(#eef0f4 0 25%, #f7f8fa 0 50%) 0 0 / 16px 16px; padding: 6px; }
+.mw-pic img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; box-shadow: 0 1px 4px #0002; background: #fff; }
+.mw-icon { font-size: 44px; }
+.mw-name { display: flex; gap: 5px; align-items: baseline; padding: 7px 9px 9px; font-weight: 800; font-size: calc(13px * var(--fs, 1)); line-height: 1.25; color: var(--ink, #1d1d1f); overflow-wrap: anywhere; }
+.mw-type { flex: none; }
+.mw-tools { position: absolute; top: 4px; right: 4px; display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
+.mw-card:hover .mw-tools, .mw-card:focus-within .mw-tools { opacity: 1; }
+@media (hover: none) { .mw-tools { opacity: 1; } }
+.mw-tools .w-btn { background: #ffffffe6; box-shadow: 0 1px 3px #0003; width: 32px; height: 32px; }
+.mw-empty { padding: 6px 8px 10px; color: var(--muted); }
+.mw-empty p { margin: 0 0 6px; }
+.mw-empty b { color: var(--ink, #1d1d1f); }

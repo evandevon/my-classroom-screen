@@ -69,6 +69,8 @@ export default {
   icon: '⏰',
   group: 'core',
   size: [400, 320],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.fired = {}; },
   hasSettings: true,
   defaultState: () => ({
     alarms: [

@@ -11,6 +11,8 @@ export default {
   icon: '🎡',
   group: 'manage',
   size: [440, 460],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.picked = []; s.last = ''; },
   hasSettings: true,
   privateKeys: ['names', 'picked', 'last'],
   defaultState: () => ({ source: 'current', names: '', mode: 'wheel', removePicked: true, picked: [], last: '', sound: 'fanfare' }),

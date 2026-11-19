@@ -58,6 +58,8 @@ export default {
   icon: '🎴',
   group: 'core',
   size: [520, 420],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.current = -1; s.bag = []; },
   hasSettings: true,
   assetCompanions: { picAssetIds: ['names', 'folder', 'bag', 'current'] },
   volatileKeys: ['current', 'bag'],   // the slideshow moving on isn't something to undo

@@ -8,6 +8,8 @@ export default {
   icon: '✅',
   group: 'core',
   size: [360, 340],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { (s.items || []).forEach((it) => (it.done = false)); s.current = 0; s.round = 1; },
   hasSettings: true,
   defaultState: () => ({
     heading: 'Today we will…',

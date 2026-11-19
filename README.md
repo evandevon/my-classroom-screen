@@ -183,6 +183,18 @@ Your screens **save themselves** in this browser as you go. To move, share or ba
 
 **Adding to the libraries:** drop pictures (jpg, png, webp, gif) or short looping videos (mp4, webm) into the `backgrounds/` folder on GitHub, or sound files (mp3, m4a, ogg, wav) into `sounds/`. The *Background library* GitHub Action then makes the previews and the lists (`backgrounds/index.json`, `sounds/index.json`) automatically. Short seamless loops work best.
 
+## ⭐ My widgets (a library of your own widgets)
+
+- **Save one:** set a widget up how you like it (size, spot, settings, content, colour theme, text size), then tap **☆** on its title bar. A message confirms it, with **Rename** and **Undo**.
+- **Use one:** tap **⭐ My widgets** at the start of the widget bar, then tap a saved widget. It's added to this screen at the size and spot it was saved with (kept inside the edges on a smaller screen, and nudged if an identical one is already there).
+- **Saved widgets start fresh:**
+  - **Kept:** settings and content.
+  - **Reset:** timers back to their set time, stopwatches at zero, picked names, scores, dice and poll votes cleared, lists unticked, Now/Next back to the first item.
+- **Each one has a small picture** of how it looked when saved, plus its name (e.g. "Timer · 10:00 · Morning task"). **✎** renames it, and **✕** removes it (with Undo).
+- **It's a copy:** changing a placed widget doesn't change the saved one, and the other way round.
+- **One library for all your screens,** kept in this browser. **Back up everything** includes it, and adding that backup file brings missing ones back. It isn't included in links or Save to a file.
+- **Pictures, sounds and clips** a saved widget uses are kept, even if no screen uses them any more.
+
 ## Widget settings, themes and text size
 
 - **⚙ settings:** tapping ⚙ opens a widget's settings in a panel at the side of the screen (on the left if the widget is on the right), so you can watch the widget change as you adjust it.

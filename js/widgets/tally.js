@@ -21,6 +21,8 @@ export default {
   icon: '🔢',
   group: 'manage',
   size: [520, 380],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.counts = {}; s.current = 0; },
   hasSettings: true,
   privateKeys: ['students', 'counts'],
   defaultState: () => ({

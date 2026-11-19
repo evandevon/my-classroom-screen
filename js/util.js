@@ -75,9 +75,10 @@ export function field(label, input) {
   return h('label', { class: 'field' }, h('span', {}, label), input);
 }
 
-export function toast(message, { action, onAction, ms = 5000 } = {}) {
+export function toast(message, { action, onAction, actions = [], ms = 5000 } = {}) {
   const host = document.getElementById('toasts');
   const t = h('div', { class: 'toast', role: 'status' }, h('span', {}, message));
+  for (const [label, fn] of actions) t.append(h('button', { class: 'btn small', onclick: () => { fn?.(); t.remove(); } }, label));
   if (action) {
     t.append(
       h('button', {

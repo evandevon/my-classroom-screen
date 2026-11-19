@@ -11,6 +11,8 @@ export default {
   icon: '🔁',
   group: 'core',
   size: [420, 340],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.paused = false; },
   hasSettings: true,
   defaultState: () => ({ clipAssetId: null, fileName: '', label: '', speed: 1, muted: true, fit: 'contain', paused: false }),
 

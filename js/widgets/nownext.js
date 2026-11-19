@@ -20,6 +20,8 @@ export default {
   icon: '➡️',
   group: 'extras',
   size: [560, 280],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.index = 0; },
   hasSettings: true,
   defaultState: () => ({
     items: '📖 Reading\n✏️ Writing\n🍎 Recess\n🔬 Science\n🎨 Art\n🏠 Home time',

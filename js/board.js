@@ -85,7 +85,7 @@ export class Board {
     return Math.max(0, ...this.screen.widgets.map((w) => w.z || 0));
   }
 
-  addWidget(type, { state, x, y, w, h: hh } = {}) {
+  addWidget(type, { state, x, y, w, h: hh, look } = {}) {
     const def = WIDGETS[type];
     if (!def) return;
     if (this.screen.paused) { toast('This screen is paused — press “Carry on” first.'); return; }
@@ -107,6 +107,12 @@ export class Board {
     // New widgets follow the theme last chosen for the whole screen.
     if (this.screen.widgetTheme) rec.theme = this.screen.widgetTheme;
     if (this.screen.widgetShadow) rec.shadow = true;
+    // From ⭐ My widgets: the look it was saved with.
+    if (look) {
+      if (look.theme) rec.theme = look.theme; else delete rec.theme;
+      if (look.shadow) rec.shadow = true; else delete rec.shadow;
+      if (look.fs) rec.fs = look.fs;
+    }
     this.screen.widgets.push(rec);
     this.mount(rec);
     this.setActive(rec.id);
@@ -337,6 +343,12 @@ export class Board {
       title,
       h('div', { class: 'w-actions' },
         settingsBtn,
+        btn('Save to My widgets (to add again on any screen)', '☆', (e) => {
+          const b = e.currentTarget;
+          if (b.disabled) return;
+          b.disabled = true; b.textContent = '⭐';
+          Promise.resolve(this.onSaveWidget?.(rec, el)).finally(() => setTimeout(() => { b.disabled = false; b.textContent = '☆'; }, 1200));
+        }, 'star'),
         btn('Duplicate', '⧉', () => this.duplicate(rec.id), 'dup hide-locked'),
         lockBtn,
         btn('Remove', '✕', () => this.remove(rec.id), 'close hide-locked'),

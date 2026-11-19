@@ -30,6 +30,8 @@ export default {
   icon: '📚',
   group: 'extras',
   size: [620, 340],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.faces = []; s.locked = []; },
   hasSettings: true,
   defaultState: () => ({ count: 6, theme: 'mixed', custom: '', faces: [], locked: [], prompt: 0 }),
 
