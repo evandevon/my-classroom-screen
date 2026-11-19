@@ -9,6 +9,8 @@ export default {
   icon: '👥',
   group: 'manage',
   size: [560, 400],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.groups = []; },
   hasSettings: true,
   privateKeys: ['names', 'groups'],
   defaultState: () => ({ source: 'current', names: '', by: 'count', n: 4, groups: [] }),

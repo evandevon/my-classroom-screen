@@ -111,6 +111,8 @@ export default {
   icon: '🗓️',
   group: 'core',
   size: [860, 260],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.fired = {}; },
   hasSettings: true,
   defaultState: () => ({
     plans: { all: TEMPLATES.nsw.make() },

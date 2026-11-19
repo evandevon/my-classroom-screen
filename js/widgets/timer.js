@@ -68,6 +68,8 @@ export default {
   icon: '⏳',
   group: 'core',
   size: [380, 320],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.running = false; s.endAt = null; s.held = false; s.remaining = s.duration; },
   hasSettings: true,
   /** Screen paused: keep the time left. Returns a line for the paused screen. */
   hold(s) {

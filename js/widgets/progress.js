@@ -43,6 +43,8 @@ export default {
   icon: '✅',
   group: 'manage',
   size: [860, 580],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.ticks = {}; },
   hasSettings: true,
   privateKeys: ['ticks'],
   defaultState: () => ({ source: 'current', count: 3, heading: '', ticks: {} }),   // ticks: classId → name → [true, false…]

@@ -16,6 +16,15 @@ export const SUPPORT = {
 // teachers about (n must go up by one each time); people who've seen the newest one aren't shown it again.
 export const WHATS_NEW = [
   {
+    n: 2,
+    title: 'New: My widgets',
+    items: [
+      '⭐ **My widgets**: set a widget up just how you like it, tap **☆** on its title bar, and it’s saved. Add it to any screen from **⭐ My widgets** at the start of the widget bar — same size, spot and settings, starting fresh.',
+      '🗂️ **Groups of screens** in the ☰ menu, with colours — drag screens in and out.',
+      '🎨 The ☰ menu is now in colour-coded sections, with shortcuts at the top.',
+    ],
+  },
+  {
     n: 1,
     title: 'New this week',
     items: [

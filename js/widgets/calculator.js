@@ -57,6 +57,8 @@ export default {
   icon: '🧮',
   group: 'extras',
   size: [320, 440],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.expr = ''; s.history = []; },
   defaultState: () => ({ expr: '', history: [] }),
 
   mount(ctx) {

@@ -35,6 +35,8 @@ export default {
   icon: '🌀',
   group: 'extras',
   size: [460, 480],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.tally = {}; s.last = ''; },
   hasSettings: true,
   defaultState: () => ({ text: PRESETS.colours.text, tally: {}, last: '', showTally: true, sound: 'ding' }),
 

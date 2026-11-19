@@ -21,6 +21,8 @@ export default {
   icon: '🗳️',
   group: 'extras',
   size: [560, 400],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.counts = (s.options || []).map(() => 0); },
   hasSettings: true,
   defaultState: () => ({ question: 'How are you feeling?', options: ['😀', '🙂', '😐', '🙁', '😢'], counts: [0, 0, 0, 0, 0], reveal: true, sound: true }),
 

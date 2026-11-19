@@ -9,6 +9,8 @@ export default {
   icon: '🏆',
   group: 'extras',
   size: [520, 300],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { (s.teams || []).forEach((t) => (t.score = 0)); },
   hasSettings: true,
   /** For share links: rows named after students in a class list become "Player 1", "Player 2"… */
   scrubNames(state, known) {

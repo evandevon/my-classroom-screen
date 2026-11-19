@@ -2,6 +2,7 @@ import { makeZip, readZip, isZip } from './zip.js';
 // Share links (compressed screen in the URL hash) and project files (JSON with embedded assets).
 
 import { db, assetIdsOfScreen } from './storage.js';
+import { listMyWidgets, myWidgetsAsScreen, restoreMyWidgets } from './mywidgets.js';
 import { dataURLToBlob, uid } from './util.js';
 import { WIDGETS } from './widgets/index.js';
 import { classLists, classesForScreens, addSharedClasses } from './classes.js';
@@ -158,7 +159,9 @@ This file is a normal zip. Rename it to .zip to look inside:
 export async function buildProjectFile(screens, { allClasses = false } = {}) {
   const assets = {};
   const files = [];
-  for (const s of screens) {
+  // A backup carries ⭐ My widgets too (and the pictures and sounds they use).
+  const myWidgets = allClasses ? await listMyWidgets() : [];
+  for (const s of [...screens, ...(myWidgets.length ? [await myWidgetsAsScreen()] : [])]) {
     for (const id of assetIdsIn(s)) {
       if (assets[id]) continue;
       const a = await db.getAsset(id);
@@ -172,7 +175,7 @@ export async function buildProjectFile(screens, { allClasses = false } = {}) {
   }
   const { classes, current } = classesForScreens(screens, allClasses);   // the class lists these screens use go with them
   const groups = await groupsForScreens(screens);   // so a backup brings its screen groups back
-  const json = JSON.stringify({ format: FORMAT, version: VERSION, exported: new Date().toISOString(), screens, assets, ...(classes.length ? { classes, currentClass: current } : {}), ...(groups.length ? { groups } : {}), ...(allClasses ? { backup: true } : {}) }, null, 1);
+  const json = JSON.stringify({ format: FORMAT, version: VERSION, exported: new Date().toISOString(), screens, assets, ...(classes.length ? { classes, currentClass: current } : {}), ...(groups.length ? { groups } : {}), ...(myWidgets.length ? { myWidgets } : {}), ...(allClasses ? { backup: true } : {}) }, null, 1);
   return makeZip([{ name: 'classroom.json', data: json, compress: true }, { name: 'README.txt', data: README }, ...files], 'application/x-classroom+zip');
 }
 
@@ -190,7 +193,7 @@ export async function readProjectFile(file) {
     try { data = JSON.parse(typeof file === 'string' ? file : await file.text()); } catch { throw new Error('This is not a My Classroom Screen file.'); }
   }
   if (data.format !== FORMAT || !Array.isArray(data.screens)) throw new Error('This is not a My Classroom Screen file.');
-  return { kind: 'file', name: file.name || '', screens: data.screens, classes: data.classes || [], currentClass: data.currentClass || '', groups: data.groups || [], backup: !!data.backup || /^My Classroom Screen backup/i.test(file.name || ''), assets: data.assets || {}, zip, file: typeof file === 'string' ? null : file };
+  return { kind: 'file', name: file.name || '', screens: data.screens, classes: data.classes || [], currentClass: data.currentClass || '', groups: data.groups || [], myWidgets: Array.isArray(data.myWidgets) ? data.myWidgets : [], backup: !!data.backup || /^My Classroom Screen backup/i.test(file.name || ''), assets: data.assets || {}, zip, file: typeof file === 'string' ? null : file };
 }
 
 /** Which of a file's class lists a screen uses ('current' means the sender's current class). */
@@ -227,19 +230,28 @@ async function storeAssets(parsed, screens) {
 }
 
 export async function addImported(parsed, chosen, { noFileGroup = new Set() } = {}) {
-  const idMap = await storeAssets(parsed, chosen);
+  // A backup brings back ⭐ My widgets too (ones not here already), with their pictures and sounds.
+  const saved = parsed.backup ? parsed.myWidgets || [] : [];
+  const savedScreen = { id: 'my-widgets', widgets: saved.map((m) => ({ id: m.id, type: m.type, state: m.state })) };
+  const idMap = await storeAssets(parsed, saved.length ? [...chosen, savedScreen] : chosen);
+
   // A backup brings back every class list in it; a shared file only the ones its chosen screens use.
   const used = parsed.backup ? new Set((parsed.classes || []).map((c) => c.id)) : new Set(chosen.flatMap((sc) => [...classIdsUsed(sc, parsed.currentClass)]));
   const { idMap: classMap, added } = await addSharedClasses((parsed.classes || []).filter((c) => used.has(c.id)), used.has(parsed.currentClass) ? parsed.currentClass : '');
   // Screen groups come too (reusing a group of the same name here).
   // (Not for screens given a different group, or replacing one of yours: no empty groups left behind.)
   const groupMap = await addGroupsFrom((parsed.groups || []).filter((g) => chosen.some((sc) => sc.group === g.id && !noFileGroup.has(sc))));
+  let restoredWidgets = 0;
+  if (saved.length) {
+    const remapped = prepareImportedScreen(savedScreen, idMap, classMap).widgets;
+    restoredWidgets = await restoreMyWidgets(saved.map((m, i) => ({ ...m, state: remapped[i].state })));
+  }
   const screens = chosen.map((sc) => {
     const s = prepareImportedScreen(sc, idMap, classMap);
     if (groupMap[sc.group]) s.group = groupMap[sc.group]; else delete s.group;
     return s;
   });
-  return { screens, addedClasses: added };
+  return { screens, addedClasses: added, restoredWidgets };
 }
 
 /**

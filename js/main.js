@@ -14,6 +14,7 @@ import { checkOldRecords } from './oldrecords.js';
 import { screenshotDialog } from './screenshot.js';
 import { startupNotes, showWelcome, showWhatsNew, showWaysToHelp } from './welcome.js';
 import { initBackup, maybeAskOnce, backupStatus, downloadBackup, markBackedUp } from './backup.js';
+import { listMyWidgets, saveToMyWidgets, renameMyWidget, removeMyWidget, myWidgetCards, placeOnBoard, freshState, onMyWidgetsChange, forgetMyWidgets, myWidgetsAsScreen } from './mywidgets.js';
 import { initTabs, claim, release, askOthers, openElsewhere, notifyAdded, takeOver } from './tabs.js';
 import { getGroups, forgetGroups, saveGroups, addGroup, updateGroup, removeGroup, GROUP_COLOURS } from './groups.js';
 import { initClasses, reloadClassLists, currentClassName, fromTimeline, onClassChange, showClassPicker, showClassManager } from './classes.js';
@@ -171,6 +172,12 @@ board.beginUndo = () => beginInteraction({ type: 'paste' });
 board.settleUndo = () => settleSoon(300);
 // For the "Go to screen" button widget.
 board.listScreens = () => sortedScreens();
+// ☆ on a widget: save it to ⭐ My widgets.
+board.onSaveWidget = (rec, el) => saveToMyWidgets(rec, el, { onRename: renameSaved });
+async function renameSaved(item) {
+  const name = await ask('Name this saved widget', item.name);
+  if (name) await renameMyWidget(item.id, name);
+}
 board.screenId = () => screen?.id;
 board.goToScreen = async (id, name) => {
   const all = await sortedScreens();
@@ -1560,7 +1567,7 @@ async function addChosen(parsed, chosen, blankToRemove = null, choices = new Map
   try {
     // A screen given its own group, or replacing one of yours, doesn't bring its group from the file.
     const noFileGroup = new Set(chosen.filter((sc) => { const c = choices.get(sc); return c && (c.mode === 'replace' || c.group !== 'file'); }));
-    const { screens: prepared, addedClasses } = await addImported(parsed, chosen, { noFileGroup });
+    const { screens: prepared, addedClasses, restoredWidgets } = await addImported(parsed, chosen, { noFileGroup });
     const all = await db.listScreens();
     const names = new Set(all.map((x) => String(x.name || '').trim().toLowerCase()));
     let top = Math.max(-1, ...all.map((x) => (Number.isFinite(x.order) ? x.order : -1)));
@@ -1605,6 +1612,7 @@ async function addChosen(parsed, chosen, blankToRemove = null, choices = new Map
     if (replaced.length) parts.push(`Replaced ${replaced.length === 1 ? `your “${replaced[0].name}”` : plural(replaced.length, 'of your screens')}.`);
     if (!replaced.length) parts.push('Your other screens are unchanged.');
     if (addedClasses.length) parts.push(`Class list${addedClasses.length === 1 ? '' : 's'} added: ${addedClasses.join(', ')}.`);
+    if (restoredWidgets) parts.push(`⭐ ${plural(restoredWidgets, 'saved widget')} back in My widgets.`);
     if (olds.length) replacedToast(parts.join(' '), olds);
     else toast(parts.join(' '), { ms: 7000 });
     return true;
@@ -1813,11 +1821,52 @@ const pop = h('div', { class: 'dock-pop', hidden: true, role: 'dialog' });
 document.body.append(pop);
 function closePop() {
   pop.hidden = true;
+  pop.classList.remove('mine');
   document.querySelectorAll('.dock-cat.open').forEach((b) => b.classList.remove('open'));
 }
 document.addEventListener('pointerdown', (e) => {
-  if (!pop.hidden && !e.target.closest('.dock-pop, .dock-cat')) closePop();
+  if (!pop.hidden && !e.target.closest('.dock-pop, .dock-cat, dialog, .toast')) closePop();
 }, true);
+
+// ⭐ My widgets: the tray of saved widgets, opened from the start of the widget bar.
+async function openMyWidgets(btn) {
+  const wasOpen = !pop.hidden && pop.dataset.cat === 'mine';
+  closePop();
+  if (wasOpen) return;
+  forgetMyWidgets();   // another tab may have saved one
+  pop.dataset.cat = 'mine';
+  pop.setAttribute('aria-label', 'My widgets');
+  pop.classList.add('mine');
+  await drawMyWidgets();
+  pop.hidden = false;
+  btn.classList.add('open');
+  const r = btn.getBoundingClientRect();
+  const pw = pop.offsetWidth;
+  pop.style.left = `${Math.max(8, Math.min(window.innerWidth - pw - 8, r.left))}px`;
+  pop.style.bottom = `${window.innerHeight - r.top + 10}px`;
+}
+async function drawMyWidgets() {
+  const list = await listMyWidgets();
+  pop.replaceChildren(
+    h('div', { class: 'dock-pop-head' },
+      h('span', {}, '⭐ My widgets', list.length ? h('small', { class: 'mw-count' }, ` ${list.length}`) : null),
+      h('button', { class: 'w-btn', 'aria-label': 'Close', onclick: closePop }, '✕')),
+    list.length ? h('p', { class: 'mw-hint' }, 'Tap one to add it — same size, spot and settings, starting fresh. Save more with ☆ on any widget’s title bar.') : null,
+    h('div', { class: list.length ? 'mw-grid' : 'mw-grid empty' }, ...myWidgetCards(list, {
+      onAdd: addSavedWidget,
+      onRename: async (m) => { await renameSaved(m); },
+      onRemove: (m) => removeMyWidget(m.id),
+    })),
+  );
+}
+onMyWidgetsChange(() => { if (!pop.hidden && pop.dataset.cat === 'mine') drawMyWidgets(); });
+function addSavedWidget(m) {
+  if (!WIDGETS[m.type]) { toast('This kind of widget isn’t available any more.'); return; }
+  closePop();
+  const spot = placeOnBoard(m, screen.widgets);
+  const rec = board.addWidget(m.type, { state: freshState(m.type, m.state), ...spot, look: { theme: m.theme, shadow: m.shadow, fs: m.fs } });
+  if (rec) toast(`Added “${m.name}”.`, { ms: 3000 });
+}
 document.addEventListener('keydown', (e) => e.key === 'Escape' && closePop());
 
 function addFromDock(type) {
@@ -1859,7 +1908,12 @@ function drawRecent() {
 
 function buildDock() {
   const dock = $('#dock-items');
+  const starBtn = h('button', { class: 'dock-btn dock-cat dock-mine', 'aria-haspopup': 'dialog', title: 'My widgets: widgets you’ve saved, to add on any screen' },
+    h('span', { class: 'di', 'aria-hidden': 'true' }, '⭐'),
+    h('span', { class: 'dl' }, 'My widgets', h('i', { class: 'caret' }, '▴')));
+  starBtn.addEventListener('click', () => openMyWidgets(starBtn));
   dock.append(
+    h('div', { class: 'dock-group dock-minebox', role: 'group', 'aria-label': 'My widgets' }, starBtn),
     h('div', { class: 'dock-group dock-cats', role: 'group', 'aria-label': 'Add a widget' },
       ...CATEGORIES.map((cat) => {
         const b = h('button', { class: 'dock-btn dock-cat', 'aria-haspopup': 'dialog', title: `${cat.label} widgets` },
@@ -1982,6 +2036,8 @@ function startSweeping() {
     const keep = board.lastRemoved ? [...assetIdsOfScreen({ widgets: [board.lastRemoved] })] : [];
     if (previewing && screen) keep.push(...assetIdsOfScreen(screen));
     keep.push(...(await previewAssetIds()));   // previews open in other tabs
+    forgetMyWidgets();
+    keep.push(...assetIdsOfScreen(await myWidgetsAsScreen()));   // pictures and sounds in ⭐ My widgets
     setTimeout(() => sweepAssets(keep).catch((e) => console.warn('tidy-up', e)), 1500); // after the save lands
   };
   setTimeout(sweep, 15000);

@@ -40,6 +40,8 @@ export default {
   icon: '🎲',
   group: 'extras',
   size: [380, 260],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.values = []; },
   hasSettings: true,
   defaultState: () => ({ count: 2, sides: 6, values: [], total: true, dots: true }),
 

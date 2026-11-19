@@ -43,6 +43,8 @@ const weather = {
   icon: '🌦️',
   group: 'core',
   size: [520, 380],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { s.data = null; s.fetchedAt = 0; },
   hasSettings: true,
   cacheKeys: ['data', 'fetchedAt'],
   volatileKeys: ['data', 'fetchedAt'],   // refreshed weather isn't something to undo

@@ -10,6 +10,8 @@ export default {
   icon: '🪙',
   group: 'extras',
   size: [420, 360],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { Object.assign(s, { faces: [], heads: 0, tails: 0, recent: [] }); },
   hasSettings: true,
   defaultState: () => ({ count: 1, faces: [], heads: 0, tails: 0, recent: [], headLabel: 'Heads', tailLabel: 'Tails' }),
 

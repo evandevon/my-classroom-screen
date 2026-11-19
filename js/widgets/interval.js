@@ -39,6 +39,8 @@ export default {
   icon: '🔂',
   group: 'core',
   size: [440, 380],
+  /** Saved to My widgets: keep the settings and content, start the activity fresh. */
+  fresh(s) { Object.assign(s, { running: false, startAt: 0, elapsed: 0, held: false }); },
   hasSettings: true,
   defaultState: () => ({
     work: 30, rest: 15, rounds: 8, prep: 10, restAfterLast: false,
