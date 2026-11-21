@@ -229,9 +229,10 @@ Tablets use the same free layout as the smartboard. On phones (and short landsca
 - **First visit:** a short 👋 welcome.
 - **After an update:** a once-off ✨ What's new note for people already using the site.
 - **Last week of term:** a once-a-term 🎉 thank-you with a backup reminder.
-- **Ways to help:** each note shows ways to help: tell a colleague, suggest an idea or report a bug, send a kind word, or shout a coffee. They can all be opened again from ☰ → Help, along with 💛 *Ways to help*.
+- **Ways to help:** each note shows ways to help: tell a colleague, tell me how you use it, suggest an idea or report a bug, send a kind word, or shout a coffee. They can all be opened again from ☰ → Help, along with 💛 *Ways to help*.
 - **Owner settings** are in `js/config.js`:
   - the coffee link and a feedback form link;
+  - `storyEmail`: where teachers send how they use the site. It adds **📸 Tell me how you use it** to Ways to help. That button opens a ready-made email with prompts (year level, favourite widgets, a moment it helped), a reminder to leave out students' names and faces, and a choice of permission: *ask me first*, *without my name*, or *with my first name and school*. There are also buttons to copy the address and questions (for school computers with no mail app) and to save a picture of the screen to attach.
   - an optional coffee goal (*3 of 10 coffees towards…*);
   - a thank-you list.
 

@@ -39,12 +39,13 @@ export function waysToHelp() {
       toast('🔗 Link copied — paste it in an email or the staff chat.');
     } catch { /* cancelled */ }
   };
-  const { coffeeUrl, feedbackUrl, goal, thanks } = SUPPORT;
+  const { coffeeUrl, feedbackUrl, storyEmail, goal, thanks } = SUPPORT;
   const link = (href, text, primary = false) => h('a', { class: `btn${primary ? ' primary' : ''}`, href, target: '_blank', rel: 'noopener' }, text);
   return h('div', { class: 'ways' },
     h('p', {}, 'Made by teachers, for teachers — free for everyone, with no ads, no accounts and nothing sold. If it helps you, here’s how you can help it:'),
     h('div', { class: 'ways-grid' },
       h('button', { class: 'btn', onclick: tell }, '📣 Tell a colleague'),
+      storyEmail ? h('button', { class: 'btn', onclick: showStory }, '📸 Tell me how you use it') : null,
       feedbackUrl ? link(feedbackUrl, '💡 Suggest an idea or report a bug') : null,
       feedbackUrl ? link(feedbackUrl, '💬 Send a kind word') : null,
       coffeeUrl ? link(coffeeUrl, '☕ Shout me a coffee', true) : null,
@@ -56,6 +57,57 @@ export function waysToHelp() {
     ) : null,
     thanks?.length ? h('p', { class: 'hint ways-thanks' }, `Thank you to ${thanks.slice(0, 12).join(', ')}${thanks.length > 12 ? ' and others' : ''} for keeping it going. 💛`) : null,
   );
+}
+
+// "Tell me how you use it": a ready-made email (with a permission choice) for stories that might be
+// used on the site or in posts. School computers often have no mail app, so the address can be copied too.
+const PERMISSIONS = [
+  ['ask', 'Please ask me first before using any of it'],
+  ['anon', 'Yes, you can use it — without my name'],
+  ['named', 'Yes, you can use it with my first name and school'],
+];
+export function showStory() {
+  const email = SUPPORT.storyEmail;
+  let perm = 'ask';
+  const radios = PERMISSIONS.map(([v, label]) => h('label', { class: 'story-perm' },
+    h('input', { type: 'radio', name: 'story-perm', value: v, checked: v === perm, onchange: () => (perm = v) }), h('span', {}, label)));
+  const body = () => [
+    'Hi,',
+    '',
+    'Here’s how I use My Classroom Screen:',
+    '',
+    'My role and year level(s): ',
+    'What I use it for, and when in the day: ',
+    'Favourite widgets or screens: ',
+    'A moment it really helped: ',
+    'Anything I’d change or add: ',
+    '',
+    `Permission: ${PERMISSIONS.find(([v]) => v === perm)[1]}.`,
+    ...(perm === 'named' ? ['First name to use: ', 'School: '] : []),
+    '',
+    '(A picture of one of my screens is attached, if I had one handy.)',
+  ].join('\n');
+  const subject = 'How I use My Classroom Screen';
+  const mailto = () => `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body())}`;
+  const copy = async (text, msg) => { try { await navigator.clipboard.writeText(text); toast(msg); } catch { toast('Couldn’t copy — select it and copy instead.'); } };
+  return modal('📸 Tell me how you use it', [
+    h('p', {}, 'I’d love to hear how My Classroom Screen fits into your day. Real stories help other teachers find it — with your OK, I might share some on the site or in posts.'),
+    h('div', { class: 'story-ideas' },
+      h('b', {}, 'A few lines is plenty, e.g.'),
+      h('ul', {},
+        h('li', {}, 'what year level or subject you use it with'),
+        h('li', {}, 'the widgets or screens you use most, and when (morning routine, rotations, pack-up…)'),
+        h('li', {}, 'a moment it made a lesson run more smoothly'),
+        h('li', {}, 'a picture of one of your screens — ☰ → 📸 Save a picture makes a JPG to attach'))),
+    h('p', { class: 'story-privacy' }, '🔒 Please leave out students’ names and faces — a picture of the screen itself is perfect.'),
+    h('fieldset', { class: 'story-perms' }, h('legend', {}, 'Can your story be shared?'), ...radios),
+    h('div', { class: 'row story-actions' },
+      h('a', { class: 'btn primary', href: '#', onclick: (e) => { e.currentTarget.href = mailto(); } }, '✉️ Write the email'),
+      h('button', { class: 'btn', onclick: () => dispatchEvent(new Event('mcs-save-picture')) }, '📸 Save a picture of this screen')),
+    h('p', { class: 'hint story-fallback' }, 'Email doesn’t open? Send it to ', h('b', {}, email), ' ',
+      h('button', { class: 'linkish', onclick: () => copy(email, '📋 Email address copied.') }, 'copy address'), ' · ',
+      h('button', { class: 'linkish', onclick: () => copy(body(), '📋 Questions copied — paste them into your email.') }, 'copy the questions')),
+  ], { primary: 'Close' });
 }
 
 export function showWelcome() {

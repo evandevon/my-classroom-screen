@@ -172,6 +172,8 @@ board.beginUndo = () => beginInteraction({ type: 'paste' });
 board.settleUndo = () => settleSoon(300);
 // For the "Go to screen" button widget.
 board.listScreens = () => sortedScreens();
+// From Ways to help → Tell me how you use it.
+addEventListener('mcs-save-picture', () => { if (screen) { closeDrawer(); screenshotDialog(screen.name); } });
 // ☆ on a widget: save it to ⭐ My widgets.
 board.onSaveWidget = (rec, el) => saveToMyWidgets(rec, el, { onRename: renameSaved });
 async function renameSaved(item) {
