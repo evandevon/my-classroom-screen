@@ -5,9 +5,11 @@ export const SUPPORT = {
   coffeeUrl: '',
   // A form for feature ideas, bug reports and kind words (e.g. a Google Form). Hidden until set.
   feedbackUrl: '',
-  // Where teachers send how they use the site (for promo stories), e.g. 'you@example.com'.
-  // Adds "📸 Tell me how you use it" to Ways to help. Hidden until set.
-  storyEmail: '',
+  // Where teachers send how they use the site (for promo stories). Either one adds
+  // "📸 Tell me how you use it" to Ways to help; hidden until one is set. The form is preferred
+  // (your address stays off the site, and the permission answer is recorded in its sheet).
+  storyFormUrl: '',   // e.g. 'https://forms.gle/…'
+  storyEmail: '',     // e.g. 'you@example.com' — used only if there's no form
   // What the next coffees go towards, shown as a small progress bar, e.g.
   // { label: 'micro:bit buttons', have: 3, need: 10 }. A near goal makes one coffee feel like it counts.
   goal: null,

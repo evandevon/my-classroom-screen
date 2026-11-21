@@ -232,7 +232,21 @@ Tablets use the same free layout as the smartboard. On phones (and short landsca
 - **Ways to help:** each note shows ways to help: tell a colleague, tell me how you use it, suggest an idea or report a bug, send a kind word, or shout a coffee. They can all be opened again from ☰ → Help, along with 💛 *Ways to help*.
 - **Owner settings** are in `js/config.js`:
   - the coffee link and a feedback form link;
-  - `storyEmail`: where teachers send how they use the site. It adds **📸 Tell me how you use it** to Ways to help. That button opens a ready-made email with prompts (year level, favourite widgets, a moment it helped), a reminder to leave out students' names and faces, and a choice of permission: *ask me first*, *without my name*, or *with my first name and school*. There are also buttons to copy the address and questions (for school computers with no mail app) and to save a picture of the screen to attach.
+  - `storyFormUrl` (preferred) or `storyEmail`: where teachers send how they use the site. Either one adds **📸 Tell me how you use it** to Ways to help, with prompts (year level, favourite widgets, a moment it helped), a reminder to leave out students' names and faces, and a button to save a picture of the screen.
+    - **With a form,** the button opens it. The form should ask about permission (see below), and your address stays off the site.
+    - **With only an email,** it opens a ready-made email with a permission choice (*ask me first*, *without my name*, or *with my first name and school*). There are also buttons to copy the address and the questions, for school computers with no mail app.
+    - **Suggested form questions:**
+      1. Your role and year level(s) — short answer.
+      2. What do you use it for, and when in the day? — paragraph.
+      3. Favourite widgets or screens — short answer.
+      4. A moment it really helped (optional) — paragraph.
+      5. Anything you'd change or add? (optional) — paragraph.
+      6. **Can your story be shared?** (required) — multiple choice: *Please ask me first* / *Yes, without my name* / *Yes, with my first name and school*.
+      7. First name and school, only if you chose that (optional) — short answer.
+      8. Email, only if you'd like a reply or want to be asked first (optional) — short answer.
+      9. A picture of one of your screens (optional) — file upload. This needs a Google sign-in, so add a note offering another way, e.g. email.
+
+    Turn off *Collect email addresses* in the form's settings, so sending a story can be anonymous.
   - an optional coffee goal (*3 of 10 coffees towards…*);
   - a thank-you list.
 
