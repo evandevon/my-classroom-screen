@@ -5,6 +5,9 @@ export const SUPPORT = {
   coffeeUrl: '',
   // A form for feature ideas, bug reports and kind words (e.g. a Google Form). Hidden until set.
   feedbackUrl: '',
+  // Where teachers send how they use the site (for promo stories), e.g. 'you@example.com'.
+  // Adds "📸 Tell me how you use it" to Ways to help. Hidden until set.
+  storyEmail: '',
   // What the next coffees go towards, shown as a small progress bar, e.g.
   // { label: 'micro:bit buttons', have: 3, need: 10 }. A near goal makes one coffee feel like it counts.
   goal: null,
