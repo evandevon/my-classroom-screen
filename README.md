@@ -33,6 +33,7 @@ The widget bar at the bottom has four groups. Tap one to see its widgets.
 - **👥 Group maker** — by number of groups or group size, keeping apart students who shouldn't work together.
 - **🔢 Tally** — count interruptions, great answers… for the class or each student.
 - **✅ Progress** — an optional heading, then a row of tick boxes for each student in the class, so children can mark how far through a task they are. + and − set the number of boxes; rows spread into columns to fit; ticks are kept for each class.
+- **📈 Progress bar** — a bar towards a class goal (e.g. 20 marbles for a party), with **−** at one end and **+** at the other, plus *how many added* and *how many to go*. Choose the goal, how much each tap adds (1, 2, 5 or 10), the colour, and what the bar says when it's full (*🎉 Reward time!*). There's a pop on each tap and a fanfare when it fills; ↺ in ⚙ starts again from 0.
 - **🏆 Scoreboard** — 2–8 teams, or a row for each student.
 - **🔔 Quiz buzzer** — 2–8 teams; the first touch wins and only its sound plays; shows 2nd and 3rd and how far behind; keyboard keys, so Makey Makey or Arduino buttons work.
 
