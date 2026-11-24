@@ -1872,3 +1872,26 @@ body.large .jump-chip { min-height: 44px; padding: 6px 14px; }
 .story-actions { gap: 8px; flex-wrap: wrap; }
 .story-actions a.btn { text-decoration: none; }
 .story-fallback .linkish { font-size: inherit; }
+
+/* Progress bar (goalbar): − [bar] +, with added / to go */
+.goalbar { --gb: #2a9d8f; height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 4cqmin; padding: 3cqmin 4cqmin; container-type: size; }
+.gb-title { text-align: center; font-weight: 800; font-size: calc(min(10cqh, 6.5cqw) * var(--fs, 1)); line-height: 1.15; }
+.gb-row { display: flex; align-items: center; gap: 3cqw; }
+.gb-btn { flex: none; min-width: max(48px, 14cqh); height: max(48px, 24cqh); padding: 0 2cqw; border-radius: 999px; border: none; cursor: pointer;
+  font: inherit; font-weight: 900; font-size: calc(max(22px, 13cqh) * var(--fs, 1)); line-height: 1; color: #fff; background: var(--gb); box-shadow: 0 3px 0 #0002; touch-action: manipulation; }
+.gb-minus { background: #eceef3; color: #3b4150; }
+.gb-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #0002; }
+.gb-btn:disabled { opacity: .35; cursor: default; }
+.gb-btn:focus-visible { outline: 3px solid var(--gb); outline-offset: 3px; }
+.gb-bar { position: relative; flex: 1; height: max(36px, 26cqh); border-radius: 999px; background: #eceef3; overflow: hidden; box-shadow: inset 0 2px 4px #0001; }
+.gb-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--gb); border-radius: 999px; transition: width .35s cubic-bezier(.3, 1.3, .5, 1);
+  background-image: linear-gradient(180deg, #fff3, #fff0 60%); }
+.gb-inbar { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 900; font-size: calc(max(16px, 11cqh) * var(--fs, 1)); color: #1d1d1f;
+  text-shadow: 0 0 6px #fff, 0 0 2px #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4%; }
+.gb-nums { display: flex; justify-content: space-between; font-weight: 800; font-size: calc(max(14px, 8cqh) * var(--fs, 1)); padding: 0 calc(max(48px, 14cqh) + 3cqw); color: var(--muted, #555); }
+.gb-nums[hidden] { display: none; }
+.gb-added { color: var(--gb); filter: brightness(.8); }
+.goalbar.gb-full .gb-fill { animation: gb-shine 1.6s linear infinite; background-image: linear-gradient(110deg, #fff0 30%, #fff8 45%, #fff0 60%); background-size: 250% 100%; }
+@keyframes gb-shine { from { background-position: 150% 0; } to { background-position: -100% 0; } }
+.goalbar.gb-cheer .gb-bar { animation: pop .5s cubic-bezier(.2, 1.6, .4, 1); }
+@media (prefers-reduced-motion: reduce) { .goalbar.gb-full .gb-fill, .goalbar.gb-cheer .gb-bar { animation: none; } .gb-fill { transition: none; } }
