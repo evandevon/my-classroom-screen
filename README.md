@@ -55,7 +55,7 @@ The widget bar at the bottom has four groups. Tap one to see its widgets.
 - **📷 Webcam / document camera** — flip, rotate, zoom, freeze, full-resolution photos and ⏺ recorded clips; each opens in its own widget with a ⬇ download button.
 - **🔁 Video loop** — each webcam recording loops in its own widget (Step 1, Step 2…) at normal, half or quarter speed with a download; or loop any video file.
 - **🔳 QR code** (works offline).
-- **➡️ Go to screen** — a big button that opens another of your screens. Put one on each screen to step through a lesson. It finds the screen by name after a file or link.
+- **🔘 Buttons** — one or more big, coloured buttons. Each one opens another of your screens or opens a website in a new tab. Put them on each screen to step through a lesson. Screen buttons find the screen by name after a file or link.
 
 ### 🎲 Maths & chance
 

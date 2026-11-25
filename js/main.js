@@ -170,7 +170,7 @@ board.undo = undo;
 // For widgets that change themselves after a wait (e.g. a picture added to a whiteboard): one undo step.
 board.beginUndo = () => beginInteraction({ type: 'paste' });
 board.settleUndo = () => settleSoon(300);
-// For the "Go to screen" button widget.
+// For the Buttons widget (buttons that open another screen).
 board.listScreens = () => sortedScreens();
 // From Ways to help → Tell me how you use it.
 addEventListener('mcs-save-picture', () => { if (screen) { closeDrawer(); screenshotDialog(screen.name); } });

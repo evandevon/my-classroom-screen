@@ -21,6 +21,13 @@ export const SUPPORT = {
 // teachers about (n must go up by one each time); people who've seen the newest one aren't shown it again.
 export const WHATS_NEW = [
   {
+    n: 3,
+    title: 'New: Buttons',
+    items: [
+      '🔘 **Go to screen** is now **Buttons**: put several buttons in one widget, give each its own colour, and have each one open another screen or a website in a new tab.',
+    ],
+  },
+  {
     n: 2,
     title: 'New: My widgets',
     items: [
