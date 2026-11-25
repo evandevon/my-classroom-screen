@@ -57,7 +57,11 @@ export function summary(type, s = {}) {
     case 'nownext': bits.push(short(String(s.items || '').split('\n')[0] || '')); break;
     case 'countdown': bits.push(`${s.icon || ''} ${s.title || ''}`.trim()); break;
     case 'scoreboard': bits.push(short((s.teams || []).map((t) => t.name).join(' v '))); break;
-    case 'gotoscreen': bits.push(s.label || (s.targetName ? `→ ${s.targetName}` : '')); break;
+    case 'gotoscreen': {
+      const list = Array.isArray(s.buttons) ? s.buttons : [s];
+      bits.push(short(list.map((b) => b.label || (b.action === 'link' ? b.url : b.targetName ? `→ ${b.targetName}` : '')).filter(Boolean).join(', ')));
+      break;
+    }
     case 'dice': bits.push(`${s.count} × d${s.sides}`); break;
     case 'traffic': break;
     default: bits.push(s.label, s.heading, s.title, s.question, typeof s.caption === 'string' ? s.caption : '', s.fileName);
